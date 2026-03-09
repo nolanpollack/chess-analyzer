@@ -16,6 +16,11 @@ Current enums (add new ones here when introduced):
 - FK naming: {table_singular}_id
 - Denormalize player_id onto any table queried by player to avoid
   deep join chains (e.g. move_insights has player_id directly)
+- Result classification (win/loss/draw) is computed at the application
+  layer via `classifyResult()` in `src/lib/chess-utils.ts`, NOT stored
+  as a DB column. The DB stores the raw `result_detail` (e.g. "checkmated",
+  "resigned", "stalemate") from the provider.
+- `last_synced_at` on the players table tracks the most recent successful sync
 
 ## LLM output columns
 Every row produced by LLM must store:

@@ -17,6 +17,19 @@
 - Worker creates its own Postgres connection — never imports src/db/index.ts
   (shares the schema types from src/db/schema.ts, but not the connection)
 
+## Queue (pg-boss)
+- pg-boss v12: `PgBoss` is a named export (`import { PgBoss }`)
+- v12 `work()` handler receives `Job<T>[]` (array), not a single job
+- Polling option is `pollingIntervalSeconds` (not `newJobCheckInterval`)
+- v12 requires explicit queue creation via `boss.createQueue(name)` before
+  `send()` or `work()` — it is idempotent (no-ops if already exists)
+- Server-side enqueueing: a shared lazy `PgBoss` singleton in `src/lib/queue.ts`
+  can call `send()` without `start()` — the constructor opens the DB connection,
+  `send()` just inserts rows. The worker has its own instance that calls `start()` + `work()`.
+- Use `ensureQueue()` from `src/lib/queue.ts` before any `send()` or `findJobs()`
+  call on the server side
+- Queue client file: `src/lib/queue.ts`
+
 ## Import boundaries
 - src/worker/ ↔ src/server/ — no cross-imports
 - src/worker/ ↔ src/routes/ — no cross-imports
@@ -33,6 +46,10 @@
 - Loaders call server functions directly (no HTTP round-trip)
 - Client components use TanStack Query for mutations/caching
 - Server functions live in src/server/ organized by domain
+- Server functions use `.validator(zodSchema)` for input validation;
+  the handler receives `{ data }` with the validated input
+- Server functions return discriminated results (e.g. `{ username }` | `{ error }`)
+  rather than throwing — callers check `"error" in result`
 
 ## External API rules
 - Chess.com: public API, no auth required

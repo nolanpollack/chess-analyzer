@@ -1,5 +1,9 @@
 import { PgBoss } from "pg-boss";
 import { env } from "#/env";
+import {
+	registerSyncGamesJob,
+	SYNC_GAMES_QUEUE,
+} from "#/worker/jobs/sync-games";
 
 const boss = new PgBoss(env.DATABASE_URL);
 
@@ -9,8 +13,9 @@ async function start() {
 	await boss.start();
 	console.log("[worker] started");
 
-	// Job handlers registered here in later phases:
-	// import and register from src/worker/jobs/
+	await boss.createQueue(SYNC_GAMES_QUEUE);
+	registerSyncGamesJob(boss);
+	console.log("[worker] registered sync-games handler");
 }
 
 start().catch((err: unknown) => {
