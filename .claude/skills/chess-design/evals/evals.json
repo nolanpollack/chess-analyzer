@@ -1,0 +1,118 @@
+{
+  "skill_name": "chess-design",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Build a new route for a game detail page at src/routes/$username.$gameId.tsx. It should show: the game result, date played, both players' ratings, the opening name, and a placeholder for the move list (just a card with 'Move analysis coming soon'). Use real data shapes from the existing codebase where possible.",
+      "expected_output": "A TSX file that follows the design language: text-2xl font-semibold tracking-tight for the page title, text-sm for body content, text-muted-foreground for metadata, shadcn Table or Card components, no raw Tailwind colors, skeleton loading state, and an empty state. No font-bold, no shadow-md, no decorative elements.",
+      "files": [
+        "/home/nolanpollack/github/chess-analyzer/src/routes/$username.tsx",
+        "/home/nolanpollack/github/chess-analyzer/.claude/skills/chess-design/SKILL.md"
+      ],
+      "assertions": [
+        {
+          "text": "No raw Tailwind color utilities used (no bg-blue-*, text-gray-*, text-green-*, bg-red-*, etc.)",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Page title uses font-semibold (not font-bold)",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Page title includes text-2xl and tracking-tight",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Loading state uses Skeleton component (not a spinner or null)",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Metadata (dates, ratings, labels) uses text-muted-foreground",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "No shadow-md or heavier shadow class used",
+          "passed": false,
+          "evidence": ""
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Add a stats summary row above the games table in src/routes/$username.tsx that shows total games, wins, losses, and draws as four numbers side by side. It should pull from the existing gamesData query result.",
+      "expected_output": "A stat summary component using the correct typography scale (text-2xl or text-lg for numbers, text-sm text-muted-foreground for labels), consistent gap-6 or gap-8 between stats, semantic colors (green for wins, destructive for losses, muted for draws), no cards wrapping individual stats unless it's a proper grid of all four, no shadows.",
+      "files": [
+        "/home/nolanpollack/github/chess-analyzer/src/routes/$username.tsx",
+        "/home/nolanpollack/github/chess-analyzer/.claude/skills/chess-design/SKILL.md"
+      ],
+      "assertions": [
+        {
+          "text": "No raw Tailwind color utilities used for win/loss/draw (no text-green-*, text-red-*, bg-green-*, etc.)",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Stat labels use text-muted-foreground",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Win count uses a semantic success/green token (e.g. chart-2 CSS var or text-[hsl(var(--chart-2))]) not a hardcoded Tailwind green",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Loss count uses destructive color token (text-destructive or similar)",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Consistent spacing between stat items (gap-6 or gap-8)",
+          "passed": false,
+          "evidence": ""
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review the dashboard page at src/routes/$username.tsx for any violations of the project's design language and list what should be fixed. Then fix them.",
+      "expected_output": "Identifies and fixes real violations: font-bold on the h1 (should be font-semibold), table headers lack the uppercase tracking-wide muted style. Should NOT invent violations that don't exist or over-engineer correct patterns.",
+      "files": [
+        "/home/nolanpollack/github/chess-analyzer/src/routes/$username.tsx",
+        "/home/nolanpollack/github/chess-analyzer/.claude/skills/chess-design/SKILL.md"
+      ],
+      "assertions": [
+        {
+          "text": "Identifies the font-bold class on the h1 player name as a violation",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Identifies table headers missing text-xs text-muted-foreground uppercase tracking-wide as a violation",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Fixed file replaces font-bold with font-semibold on the page title/h1",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Fixed file updates TableHead elements to use subtle muted styling",
+          "passed": false,
+          "evidence": ""
+        },
+        {
+          "text": "Does not invent violations that don't exist",
+          "passed": false,
+          "evidence": ""
+        }
+      ]
+    }
+  ]
+}

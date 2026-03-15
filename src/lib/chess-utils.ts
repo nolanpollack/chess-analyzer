@@ -1,6 +1,7 @@
 /**
  * Chess utility functions shared by server, worker, and client code.
  */
+import openings from "./openings.json";
 
 // ── Result Classification ──────────────────────────────────────────────
 
@@ -33,6 +34,35 @@ export function classifyResult(resultDetail: string): ResultCategory {
 	return category;
 }
 
+/**
+ * Returns all result_detail codes that belong to a given category.
+ * Use this for filtering queries instead of maintaining a separate map.
+ */
+export function getResultDetails(category: ResultCategory): string[] {
+	return Object.entries(RESULT_MAP)
+		.filter(([, cat]) => cat === category)
+		.map(([detail]) => detail);
+}
+
+// ── ECO Opening Lookup ─────────────────────────────────────────────────
+
+// Build ECO → name map from the lichess dataset (first entry per ECO = base name,
+// since the dataset is ordered from fewest moves to most within each ECO code).
+const ECO_TO_NAME = new Map<string, string>();
+for (const entry of openings) {
+	if (!ECO_TO_NAME.has(entry.eco)) {
+		ECO_TO_NAME.set(entry.eco, entry.name);
+	}
+}
+
+/**
+ * Returns the base opening name for an ECO code using the lichess openings dataset.
+ * Returns null for unknown codes (e.g. games without a recognized opening).
+ */
+export function lookupOpeningName(eco: string): string | null {
+	return ECO_TO_NAME.get(eco) ?? null;
+}
+
 // ── PGN Header Parsing ─────────────────────────────────────────────────
 
 /**
@@ -47,15 +77,16 @@ function extractPgnHeader(pgn: string, header: string): string | null {
 
 /**
  * Parses opening info from PGN headers.
- * Returns null values for games without ECO/Opening headers (e.g. Chess960).
- * Note: chess.com PGNs typically only have [ECO], not [Opening].
+ * Uses the [Opening] header if present, then falls back to looking up the
+ * [ECO] code in the lichess openings dataset.
+ * Returns null values for games without recognized openings (e.g. Chess960).
  */
 export function parseOpeningFromPgn(pgn: string): {
 	eco: string | null;
 	name: string | null;
 } {
-	return {
-		eco: extractPgnHeader(pgn, "ECO"),
-		name: extractPgnHeader(pgn, "Opening"),
-	};
+	const eco = extractPgnHeader(pgn, "ECO");
+	const name =
+		extractPgnHeader(pgn, "Opening") ?? (eco ? lookupOpeningName(eco) : null);
+	return { eco, name };
 }

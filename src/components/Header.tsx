@@ -7,7 +7,7 @@ export default function Header() {
 			<nav className="mx-auto flex max-w-5xl items-center justify-between py-3">
 				<Link
 					to="/"
-					className="text-lg font-bold tracking-tight text-foreground no-underline"
+					className="text-lg font-semibold tracking-tight text-foreground no-underline"
 				>
 					Chess Analyzer
 				</Link>

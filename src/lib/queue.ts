@@ -21,7 +21,13 @@ export async function getBoss(): Promise<PgBoss> {
 	}
 
 	if (!_startPromise) {
-		_startPromise = _boss.start().then(() => _boss as PgBoss);
+		_startPromise = _boss
+			.start()
+			.then(() => _boss as PgBoss)
+			.catch((err) => {
+				_startPromise = null; // Clear so the next call retries
+				throw err;
+			});
 	}
 
 	await _startPromise;

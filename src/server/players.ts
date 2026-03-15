@@ -22,37 +22,50 @@ export const registerPlayer = createServerFn({ method: "POST" })
 		const { username } = data;
 		const normalizedUsername = username.toLowerCase().trim();
 
-		// 1. Check if player already exists
-		const [existing] = await db
-			.select()
-			.from(players)
-			.where(eq(players.username, normalizedUsername));
+		try {
+			// 1. Check if player already exists
+			const [existing] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, normalizedUsername));
 
-		if (existing) {
-			// Player exists — enqueue a re-sync and redirect
-			await enqueueSyncJob(existing.id, normalizedUsername, existing.platform);
-			return { username: normalizedUsername, isNew: false };
+			if (existing) {
+				// Player exists — enqueue a re-sync and redirect
+				await enqueueSyncJob(
+					existing.id,
+					normalizedUsername,
+					existing.platform,
+				);
+				return { username: normalizedUsername, isNew: false };
+			}
+
+			// 2. Verify the username exists on chess.com
+			const exists = await verifyChessComPlayer(normalizedUsername);
+			if (!exists) {
+				return { error: "Player not found on chess.com" };
+			}
+
+			// 3. Insert new player
+			const [newPlayer] = await db
+				.insert(players)
+				.values({
+					username: normalizedUsername,
+					platform: "chess.com",
+				})
+				.returning();
+
+			// 4. Enqueue sync job
+			await enqueueSyncJob(
+				newPlayer.id,
+				normalizedUsername,
+				newPlayer.platform,
+			);
+
+			return { username: normalizedUsername, isNew: true };
+		} catch (err) {
+			console.error("[registerPlayer] Error:", err);
+			throw err;
 		}
-
-		// 2. Verify the username exists on chess.com
-		const exists = await verifyChessComPlayer(normalizedUsername);
-		if (!exists) {
-			return { error: "Player not found on chess.com" };
-		}
-
-		// 3. Insert new player
-		const [newPlayer] = await db
-			.insert(players)
-			.values({
-				username: normalizedUsername,
-				platform: "chess.com",
-			})
-			.returning();
-
-		// 4. Enqueue sync job
-		await enqueueSyncJob(newPlayer.id, normalizedUsername, newPlayer.platform);
-
-		return { username: normalizedUsername, isNew: true };
 	});
 
 // ── getPlayerStatus ────────────────────────────────────────────────────
@@ -66,43 +79,48 @@ export const getPlayerStatus = createServerFn({ method: "GET" })
 	.handler(async ({ data }) => {
 		const { username } = data;
 
-		const [player] = await db
-			.select()
-			.from(players)
-			.where(eq(players.username, username.toLowerCase().trim()));
+		try {
+			const [player] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username.toLowerCase().trim()));
 
-		if (!player) {
-			return { found: false as const };
-		}
+			if (!player) {
+				return { found: false as const };
+			}
 
-		// Determine sync status:
-		// - If lastSyncedAt is null, initial sync hasn't completed yet
-		// - Otherwise check for queued/active jobs via findJobs
-		let isSyncing = player.lastSyncedAt === null;
+			// Determine sync status:
+			// - If lastSyncedAt is null, initial sync hasn't completed yet
+			// - Otherwise check for queued/active jobs via findJobs
+			let isSyncing = player.lastSyncedAt === null;
 
-		if (!isSyncing) {
-			await ensureQueue(SYNC_GAMES_QUEUE);
-			const boss = await getBoss();
-			const pendingJobs = await boss.findJobs<SyncGamesPayload>(
-				SYNC_GAMES_QUEUE,
-				{
-					queued: true,
-					data: { playerId: player.id },
+			if (!isSyncing) {
+				await ensureQueue(SYNC_GAMES_QUEUE);
+				const boss = await getBoss();
+				const pendingJobs = await boss.findJobs<SyncGamesPayload>(
+					SYNC_GAMES_QUEUE,
+					{
+						queued: true,
+						data: { playerId: player.id },
+					},
+				);
+				isSyncing = pendingJobs.length > 0;
+			}
+
+			return {
+				found: true as const,
+				player: {
+					id: player.id,
+					username: player.username,
+					platform: player.platform,
+					lastSyncedAt: player.lastSyncedAt?.toISOString() ?? null,
 				},
-			);
-			isSyncing = pendingJobs.length > 0;
+				isSyncing,
+			};
+		} catch (err) {
+			console.error("[getPlayerStatus] Error:", err);
+			throw err;
 		}
-
-		return {
-			found: true as const,
-			player: {
-				id: player.id,
-				username: player.username,
-				platform: player.platform,
-				lastSyncedAt: player.lastSyncedAt?.toISOString() ?? null,
-			},
-			isSyncing,
-		};
 	});
 
 // ── Helpers ────────────────────────────────────────────────────────────

@@ -7,7 +7,8 @@
 - Named exports everywhere (default exports only for route components)
 
 ## Naming
-- Files: kebab-case (e.g. game-provider.ts)
+- Files: kebab-case (e.g. game-provider.ts, use-games.ts)
+- Exception: React component files use PascalCase matching their export (e.g. GameTable.tsx)
 - Types: PascalCase
 - Functions/variables: camelCase
 - DB tables: snake_case (Drizzle convention)

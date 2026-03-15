@@ -12,7 +12,6 @@ function makeGame(overrides: Record<string, unknown> = {}) {
 		pgn: `[Event "Live Chess"]
 [Site "Chess.com"]
 [ECO "B20"]
-[Opening "Sicilian Defense"]
 
 1. e4 c5 *`,
 		end_time: 1700000000,

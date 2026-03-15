@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { games, players } from "#/db/schema";
@@ -66,18 +67,18 @@ async function handleSyncGames(data: SyncGamesPayload) {
 			`[sync-games] Fetched ${rawGames.length} games for ${username}`,
 		);
 
-		// 3. Upsert games (skip duplicates via onConflictDoNothing)
+		// 3. Upsert games and update lastSyncedAt atomically
 		let inserted = 0;
-		for (const raw of rawGames) {
-			const result = await upsertGame(db, raw, playerId, platform);
-			if (result) inserted++;
-		}
-
-		// 4. Update player's lastSyncedAt
-		await db
-			.update(players)
-			.set({ lastSyncedAt: new Date() })
-			.where(eq(players.id, playerId));
+		await db.transaction(async (tx) => {
+			for (const raw of rawGames) {
+				const result = await upsertGame(tx, raw, playerId, platform);
+				if (result) inserted++;
+			}
+			await tx
+				.update(players)
+				.set({ lastSyncedAt: new Date() })
+				.where(eq(players.id, playerId));
+		});
 
 		console.log(
 			`[sync-games] Completed sync for ${username}: ${inserted} new games (${rawGames.length - inserted} duplicates skipped)`,
@@ -91,7 +92,7 @@ async function handleSyncGames(data: SyncGamesPayload) {
 // ── Helpers ────────────────────────────────────────────────────────────
 
 async function upsertGame(
-	db: ReturnType<typeof drizzle>,
+	db: NodePgDatabase,
 	raw: RawGame,
 	playerId: string,
 	platform: "chess.com" | "lichess",

@@ -160,10 +160,9 @@ export function createChessComProvider(): GameProvider {
 				const monthRes = await fetchWithRetry(url);
 
 				if (!monthRes.ok) {
-					console.error(
-						`[chess.com] Failed to fetch ${url}: ${monthRes.status}, skipping month`,
+					throw new Error(
+						`[chess.com] Failed to fetch archive ${url}: HTTP ${monthRes.status}`,
 					);
-					continue;
 				}
 
 				const monthData = (await monthRes.json()) as ChessComGamesResponse;
