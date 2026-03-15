@@ -64,7 +64,7 @@ export const registerPlayer = createServerFn({ method: "POST" })
 			return { username: normalizedUsername, isNew: true };
 		} catch (err) {
 			console.error("[registerPlayer] Error:", err);
-			throw err;
+			return { error: "Failed to register player" };
 		}
 	});
 
@@ -119,7 +119,32 @@ export const getPlayerStatus = createServerFn({ method: "GET" })
 			};
 		} catch (err) {
 			console.error("[getPlayerStatus] Error:", err);
-			throw err;
+			return { error: "Failed to get player status" };
+		}
+	});
+
+// ── syncPlayer ─────────────────────────────────────────────────────────
+
+export const syncPlayer = createServerFn({ method: "POST" })
+	.inputValidator(z.object({ username: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const { username } = data;
+
+		try {
+			const [player] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username.toLowerCase().trim()));
+
+			if (!player) {
+				return { error: "Player not found" };
+			}
+
+			await enqueueSyncJob(player.id, player.username, player.platform);
+			return { enqueued: true };
+		} catch (err) {
+			console.error("[syncPlayer] Error:", err);
+			return { error: "Failed to sync player" };
 		}
 	});
 

@@ -1,6 +1,7 @@
 import {
 	doublePrecision,
 	integer,
+	jsonb,
 	pgEnum,
 	pgTable,
 	text,
@@ -22,6 +23,21 @@ export const timeControlClassEnum = pgEnum("time_control_class", [
 ]);
 
 export const playerColorEnum = pgEnum("player_color", ["white", "black"]);
+
+export const moveClassificationEnum = pgEnum("move_classification", [
+	"brilliant",
+	"best",
+	"good",
+	"inaccuracy",
+	"mistake",
+	"blunder",
+]);
+
+export const analysisStatusEnum = pgEnum("analysis_status", [
+	"pending",
+	"complete",
+	"failed",
+]);
 
 // ── Tables ─────────────────────────────────────────────────────────────
 
@@ -59,3 +75,47 @@ export const games = pgTable(
 	},
 	(t) => [unique().on(t.platform, t.platformGameId)],
 );
+
+// ── MoveAnalysis JSONB shape (not a table) ─────────────────────────────
+
+export type MoveClassification =
+	| "brilliant"
+	| "best"
+	| "good"
+	| "inaccuracy"
+	| "mistake"
+	| "blunder";
+
+export type MoveAnalysis = {
+	ply: number;
+	san: string;
+	uci: string;
+	fen_before: string;
+	fen_after: string;
+	eval_before: number;
+	eval_after: number;
+	eval_delta: number;
+	best_move_uci: string;
+	best_move_san: string;
+	classification: MoveClassification;
+	is_player_move: boolean;
+};
+
+export const gameAnalyses = pgTable("game_analyses", {
+	id: uuid().primaryKey().defaultRandom(),
+	gameId: uuid("game_id")
+		.references(() => games.id)
+		.unique()
+		.notNull(),
+	engine: text().notNull(),
+	depth: integer().notNull(),
+	accuracyWhite: doublePrecision("accuracy_white"),
+	accuracyBlack: doublePrecision("accuracy_black"),
+	moves: jsonb().$type<MoveAnalysis[]>().notNull(),
+	status: analysisStatusEnum().notNull().default("pending"),
+	movesAnalyzed: integer("moves_analyzed").notNull().default(0),
+	totalMoves: integer("total_moves"),
+	errorMessage: text("error_message"),
+	analyzedAt: timestamp("analyzed_at"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});

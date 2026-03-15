@@ -231,8 +231,9 @@ describe("ChessComProvider", () => {
 		});
 
 		// Should only fetch December archive
-		const fetchedUrls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
-			.calls.map((call: unknown[]) => call[0] as string);
+		const fetchedUrls = (
+			globalThis.fetch as ReturnType<typeof vi.fn>
+		).mock.calls.map((call: unknown[]) => call[0] as string);
 		expect(fetchedUrls.some((u) => u.includes("/2023/10"))).toBe(false);
 		expect(fetchedUrls.some((u) => u.includes("/2023/11"))).toBe(false);
 		expect(fetchedUrls.some((u) => u.includes("/2023/12"))).toBe(true);

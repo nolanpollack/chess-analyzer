@@ -28,12 +28,24 @@ as a separate component with `biome-ignore lint/security/noDangerouslySetInnerHt
 This prevents FOUC by setting the dark class before React hydration.
 
 ## Chess board
-react-chessboard is the only chess board component used.
-Always pass position as FEN string via the `position` prop.
-Use `customArrows` prop for engine best-move arrows.
-Use `customSquareStyles` for move classification highlighting.
-Match board colors to shadcn theme via customDarkSquareStyle /
-customLightSquareStyle using CSS variables.
+react-chessboard v5 uses a single `options` prop (breaking change from v4).
+All configuration is passed inside `options`:
+```tsx
+<Chessboard options={{
+  position: fenString,
+  boardOrientation: "white",
+  arrows: [{ startSquare: "e2", endSquare: "e4", color: "green" }],
+  squareStyles: { e4: { backgroundColor: "rgba(0,255,0,0.3)" } },
+  darkSquareStyle: { backgroundColor: "hsl(var(--muted))" },
+  lightSquareStyle: { backgroundColor: "hsl(var(--background))" },
+  boardStyle: { borderRadius: "var(--radius)", border: "1px solid hsl(var(--border))" },
+  animationDurationInMs: 200,
+  allowDragging: false,
+}} />
+```
+The Arrow type is `{ startSquare: string; endSquare: string; color: string }`.
+There is no `boardWidth` prop in v5 — sizing is handled by the container.
+The Arrow type is not exported from the package; define it locally.
 
 ## Theming
 Use shadcn CSS variables (e.g. hsl(var(--primary))) for all colors.

@@ -2,8 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { games, players } from "#/db/schema";
-import { getResultDetails } from "#/lib/chess-utils";
+import { gameAnalyses, games, players } from "#/db/schema";
+import { getResultDetails, lookupOpeningName } from "#/lib/chess-utils";
 
 // ── listGames ──────────────────────────────────────────────────────────
 
@@ -75,8 +75,10 @@ export const listGames = createServerFn({ method: "GET" })
 						openingName: games.openingName,
 						accuracyWhite: games.accuracyWhite,
 						accuracyBlack: games.accuracyBlack,
+						analysisStatus: gameAnalyses.status,
 					})
 					.from(games)
+					.leftJoin(gameAnalyses, eq(games.id, gameAnalyses.gameId))
 					.where(whereClause)
 					.orderBy(desc(games.playedAt))
 					.limit(pageSize)
@@ -84,10 +86,13 @@ export const listGames = createServerFn({ method: "GET" })
 				db.select({ count: count() }).from(games).where(whereClause),
 			]);
 
-			// Serialize dates for transport
+			// Serialize dates and fill in missing opening names from the ECO dataset
 			const serializedGames = gameRows.map((g) => ({
 				...g,
 				playedAt: g.playedAt.toISOString(),
+				openingName:
+					g.openingName ??
+					(g.openingEco ? lookupOpeningName(g.openingEco) : null),
 			}));
 
 			return {
@@ -98,6 +103,45 @@ export const listGames = createServerFn({ method: "GET" })
 			};
 		} catch (err) {
 			console.error("[listGames] Database error:", err);
-			throw err;
+			return { error: "Failed to load games" };
+		}
+	});
+
+// ── getGame ────────────────────────────────────────────────────────────
+
+export const getGame = createServerFn({ method: "GET" })
+	.inputValidator(
+		z.object({
+			gameId: z.string().uuid(),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { gameId } = data;
+
+		try {
+			const [game] = await db.select().from(games).where(eq(games.id, gameId));
+
+			if (!game) {
+				return null;
+			}
+
+			// Also look up the player username for URL construction
+			const [player] = await db
+				.select({ username: players.username })
+				.from(players)
+				.where(eq(players.id, game.playerId));
+
+			return {
+				...game,
+				playedAt: game.playedAt.toISOString(),
+				fetchedAt: game.fetchedAt.toISOString(),
+				openingName:
+					game.openingName ??
+					(game.openingEco ? lookupOpeningName(game.openingEco) : null),
+				playerUsername: player?.username ?? null,
+			};
+		} catch (err) {
+			console.error("[getGame] Error:", err);
+			return { error: "Failed to load game" };
 		}
 	});

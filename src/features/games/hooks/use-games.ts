@@ -24,8 +24,8 @@ export function useGames({
 
 	const query = useQuery({
 		queryKey: ["games", username, page, timeControlClass, result, playerColor],
-		queryFn: () =>
-			listGames({
+		queryFn: async () => {
+			const result_ = await listGames({
 				data: {
 					username,
 					page,
@@ -34,7 +34,10 @@ export function useGames({
 					result,
 					playerColor,
 				},
-			}),
+			});
+			if ("error" in result_) throw new Error(result_.error);
+			return result_;
+		},
 		enabled,
 		placeholderData: keepPreviousData,
 	});
@@ -53,8 +56,8 @@ export function useGames({
 				result,
 				playerColor,
 			],
-			queryFn: () =>
-				listGames({
+			queryFn: async () => {
+				const r = await listGames({
 					data: {
 						username,
 						page: page + 1,
@@ -63,7 +66,10 @@ export function useGames({
 						result,
 						playerColor,
 					},
-				}),
+				});
+				if ("error" in r) throw new Error(r.error);
+				return r;
+			},
 		});
 	}, [
 		query.data,

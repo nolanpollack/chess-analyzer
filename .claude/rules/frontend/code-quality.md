@@ -38,11 +38,18 @@ If a file exceeds ~150 lines it likely needs to be split. A component file
 should contain one exported component and at most one or two small private
 helpers (<20 lines each). Extract multiple components into separate files.
 
+A route file may define at most one small private helper (<15 lines JSX).
+Anything larger belongs in the feature's `components/` directory. Route files
+should target ~30-50 lines: params, hook calls, and composition only.
+
 ## Custom hooks
 
 Every `useQuery` / `useMutation` call lives in a custom hook inside the
 feature's `hooks/` directory, not inline in a component. The hook owns the
 query key, query function, options, and return type.
+
+All mutations must use `useMutation` — never manage async loading state manually
+with `useState` + try/finally. This ensures consistent loading/error lifecycle.
 
 ```ts
 // features/games/hooks/use-player-status.ts

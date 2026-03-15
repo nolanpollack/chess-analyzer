@@ -21,6 +21,7 @@
 - pg-boss v12: `PgBoss` is a named export (`import { PgBoss }`)
 - v12 `work()` handler receives `Job<T>[]` (array), not a single job
 - Polling option is `pollingIntervalSeconds` (not `newJobCheckInterval`)
+- Concurrency option is `batchSize` (not `teamSize` which was removed in v12)
 - v12 requires explicit queue creation via `boss.createQueue(name)` before
   `send()` or `work()` — it is idempotent (no-ops if already exists)
 - Server-side enqueueing: a shared lazy `PgBoss` singleton in `src/lib/queue.ts`
@@ -50,13 +51,27 @@
   the handler receives `{ data }` with the validated input
 - Server functions return discriminated results (e.g. `{ username }` | `{ error }`)
   rather than throwing — callers check `"error" in result`
+- Server function catch blocks MUST return `{ error: string }` — never re-throw.
+  Callers (query hooks / mutation hooks) check `"error" in result` and throw for
+  React Query or display the message. Worker job handlers are the only exception:
+  they re-throw so pg-boss can retry.
 
 ## External API rules
 - Chess.com: public API, no auth required
 - Lichess cloud eval: primary engine (free, no compute cost)
-- Stockfish binary: fallback only when Lichess cache misses
+- Stockfish WASM: local engine for analysis, spawned as a child process
+  via `stockfish-18-single.js` from the `stockfish` npm package
 - Anthropic API: called ONLY from worker job handlers, never from
   server functions or route loaders
+
+## Analysis pipeline
+- sync-games job returns new game IDs, enqueues analyze-game for each
+- analyze-game job: creates its own DB connection, uses StockfishWasmEngine,
+  walks PGN, evaluates each position, classifies moves, computes accuracy
+- analysis_status enum: `pending`, `complete`, `failed` (no `analyzing` value)
+- Progress tracking: `moves_analyzed` / `total_moves` updated during analysis
+- Configuration: `src/config/analysis.ts` — depth, thresholds, eval clamp
+- Classification thresholds: blunder >= 200cp, mistake >= 100cp, inaccuracy >= 50cp
 
 ## Provider interfaces
 All external integrations are hidden behind interfaces:
@@ -65,3 +80,9 @@ All external integrations are hidden behind interfaces:
 - InsightProvider → src/providers/insight-provider.ts
 Add new platforms/engines as new implementations, not by modifying
 existing ones.
+
+## Route structure
+- `$username.tsx` is a layout route (renders `<Outlet />`)
+- `$username/index.tsx` is the dashboard (game list + filters)
+- `$username/games/$gameId.tsx` is the game detail (analysis view)
+- Feature modules: `src/features/{feature}/` with components/, hooks/, types.ts, utils.ts

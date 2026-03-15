@@ -6,6 +6,10 @@ import { games, players } from "#/db/schema";
 import { env } from "#/env";
 import { createChessComProvider } from "#/providers/chess-com-provider";
 import type { RawGame } from "#/providers/game-provider";
+import {
+	ANALYZE_GAME_QUEUE,
+	type AnalyzeGamePayload,
+} from "#/worker/jobs/analyze-game";
 
 // ── Job Types ──────────────────────────────────────────────────────────
 
@@ -25,13 +29,13 @@ export function registerSyncGamesJob(boss: PgBoss) {
 		{ pollingIntervalSeconds: 2 },
 		async (jobs) => {
 			for (const job of jobs) {
-				await handleSyncGames(job.data);
+				await handleSyncGames(job.data, boss);
 			}
 		},
 	);
 }
 
-async function handleSyncGames(data: SyncGamesPayload) {
+async function handleSyncGames(data: SyncGamesPayload, boss: PgBoss) {
 	const { playerId, username, platform } = data;
 	console.log(`[sync-games] Starting sync for ${username} (${platform})`);
 
@@ -69,16 +73,32 @@ async function handleSyncGames(data: SyncGamesPayload) {
 
 		// 3. Upsert games and update lastSyncedAt atomically
 		let inserted = 0;
+		const newGameIds: string[] = [];
 		await db.transaction(async (tx) => {
 			for (const raw of rawGames) {
 				const result = await upsertGame(tx, raw, playerId, platform);
-				if (result) inserted++;
+				if (result) {
+					inserted++;
+					newGameIds.push(result);
+				}
 			}
 			await tx
 				.update(players)
 				.set({ lastSyncedAt: new Date() })
 				.where(eq(players.id, playerId));
 		});
+
+		// 4. Enqueue analysis for each new game
+		if (newGameIds.length > 0) {
+			for (const gameId of newGameIds) {
+				await boss.send(ANALYZE_GAME_QUEUE, {
+					gameId,
+				} satisfies AnalyzeGamePayload);
+			}
+			console.log(
+				`[sync-games] Enqueued analysis for ${newGameIds.length} new games`,
+			);
+		}
 
 		console.log(
 			`[sync-games] Completed sync for ${username}: ${inserted} new games (${rawGames.length - inserted} duplicates skipped)`,
@@ -96,7 +116,7 @@ async function upsertGame(
 	raw: RawGame,
 	playerId: string,
 	platform: "chess.com" | "lichess",
-): Promise<boolean> {
+): Promise<string | null> {
 	const result = await db
 		.insert(games)
 		.values({
@@ -122,5 +142,5 @@ async function upsertGame(
 		})
 		.returning({ id: games.id });
 
-	return result.length > 0;
+	return result.length > 0 ? result[0].id : null;
 }

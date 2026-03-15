@@ -28,6 +28,8 @@ refined. Every screen should feel calm and intentional. When in doubt, remove â€
 - **Every pixel earns its place.** If removing an element doesn't hurt comprehension,
   remove it.
 
+All designs must be responsive and should look good in both desktop and mobile
+
 ---
 
 ## Colors

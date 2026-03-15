@@ -50,10 +50,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<ThemeScript />
 				<HeadContent />
 			</head>
-			<body className="min-h-screen bg-background font-sans text-foreground antialiased">
+			<body className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground antialiased">
 				<TanStackQueryProvider>
 					<Header />
-					<main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+					<main className="mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-auto px-2 py-6 md:px-4 md:py-8">
+						{children}
+					</main>
 				</TanStackQueryProvider>
 				<Scripts />
 			</body>

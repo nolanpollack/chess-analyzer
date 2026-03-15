@@ -1,16 +1,14 @@
-import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
-import { Skeleton } from "#/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
-	TableCell,
 	TableHead,
 	TableHeader,
 	TableRow,
 } from "#/components/ui/table";
-import type { Game, GamesResult } from "#/features/games/types";
-import { classifyResult } from "#/lib/chess-utils";
+import { GameRow } from "#/features/games/components/GameRow";
+import { GameTableSkeleton } from "#/features/games/components/GameTableSkeleton";
+import type { GamesResult } from "#/features/games/types";
 
 // ── GameTable ───────────────────────────────────────────────────────────
 
@@ -20,6 +18,7 @@ type GameTableProps = {
 	isSyncing: boolean;
 	page: number;
 	onPageChange: (page: number) => void;
+	username: string;
 };
 
 export function GameTable({
@@ -28,6 +27,7 @@ export function GameTable({
 	isSyncing,
 	page,
 	onPageChange,
+	username,
 }: GameTableProps) {
 	// Only show skeleton on the very first load (no data at all yet).
 	// During pagination, keepPreviousData keeps gamesData populated so we
@@ -56,27 +56,35 @@ export function GameTable({
 				<Table>
 					<TableHeader>
 						<TableRow>
-							{[
-								"Date",
-								"Result",
-								"Color",
-								"Opponent",
-								"Rating",
-								"Opening",
-								"Speed",
-							].map((h) => (
-								<TableHead
-									key={h}
-									className="text-xs text-muted-foreground uppercase tracking-wide"
-								>
-									{h}
-								</TableHead>
-							))}
+							<TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
+								Date
+							</TableHead>
+							<TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
+								Result
+							</TableHead>
+							<TableHead className="hidden text-xs text-muted-foreground uppercase tracking-wide sm:table-cell">
+								Color
+							</TableHead>
+							<TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
+								Opponent
+							</TableHead>
+							<TableHead className="hidden text-xs text-muted-foreground uppercase tracking-wide md:table-cell">
+								Rating
+							</TableHead>
+							<TableHead className="hidden text-xs text-muted-foreground uppercase tracking-wide lg:table-cell">
+								Opening
+							</TableHead>
+							<TableHead className="hidden text-xs text-muted-foreground uppercase tracking-wide sm:table-cell">
+								Speed
+							</TableHead>
+							<TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
+								Analysis
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{gamesData.games.map((game) => (
-							<GameRow key={game.id} game={game} />
+							<GameRow key={game.id} game={game} username={username} />
 						))}
 					</TableBody>
 				</Table>
@@ -109,69 +117,6 @@ export function GameTable({
 					</Button>
 				</div>
 			</div>
-		</div>
-	);
-}
-
-// ── GameRow ─────────────────────────────────────────────────────────────
-
-function GameRow({ game }: { game: Game }) {
-	let resultCategory: string;
-	try {
-		resultCategory = classifyResult(game.resultDetail);
-	} catch (e) {
-		console.warn(`Unknown result code: ${game.resultDetail}`, e);
-		resultCategory = game.resultDetail;
-	}
-
-	const resultVariant =
-		resultCategory === "win"
-			? "default"
-			: resultCategory === "loss"
-				? "destructive"
-				: "secondary";
-
-	return (
-		<TableRow>
-			<TableCell className="whitespace-nowrap">
-				{new Date(game.playedAt).toLocaleDateString()}
-			</TableCell>
-			<TableCell>
-				<Badge variant={resultVariant} className="capitalize">
-					{resultCategory}
-				</Badge>
-			</TableCell>
-			<TableCell className="capitalize">{game.playerColor}</TableCell>
-			<TableCell>{game.opponentUsername}</TableCell>
-			<TableCell className="text-right tabular-nums">
-				{game.playerRating} vs {game.opponentRating}
-			</TableCell>
-			<TableCell
-				className="max-w-[200px] truncate"
-				title={game.openingName ?? undefined}
-			>
-				{game.openingEco && (
-					<span className="mr-1 font-mono text-xs text-muted-foreground">
-						{game.openingEco}
-					</span>
-				)}
-				{game.openingName ?? (game.openingEco ? null : "Unknown")}
-			</TableCell>
-			<TableCell className="capitalize">{game.timeControlClass}</TableCell>
-		</TableRow>
-	);
-}
-
-// ── Skeleton ────────────────────────────────────────────────────────────
-
-function GameTableSkeleton() {
-	return (
-		<div className="space-y-2">
-			{"sk-0 sk-1 sk-2 sk-3 sk-4 sk-5 sk-6 sk-7 sk-8 sk-9"
-				.split(" ")
-				.map((k) => (
-					<Skeleton key={k} className="h-12 w-full" />
-				))}
 		</div>
 	);
 }
