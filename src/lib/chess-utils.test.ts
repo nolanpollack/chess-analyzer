@@ -41,7 +41,10 @@ describe("classifyResult", () => {
 describe("lookupOpeningName", () => {
 	it("returns the base opening name for a known ECO code", () => {
 		expect(lookupOpeningName("B20")).toBe("Sicilian Defense");
-		expect(lookupOpeningName("C69")).toBe("Ruy Lopez: Exchange Variation");
+		// C69 has no bare entry — every line has a variation suffix
+		expect(lookupOpeningName("C69")).toBe(
+			"Ruy Lopez: Exchange Variation, Normal Variation",
+		);
 	});
 
 	it("returns null for unknown ECO codes", () => {

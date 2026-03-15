@@ -46,12 +46,16 @@ export function getResultDetails(category: ResultCategory): string[] {
 
 // ── ECO Opening Lookup ─────────────────────────────────────────────────
 
-// Build ECO → name map from the lichess dataset (first entry per ECO = base name,
-// since the dataset is ordered from fewest moves to most within each ECO code).
+// Build ECO → name map from the lichess dataset.
+// For each ECO code, keep the entry with the shortest PGN — that's the base
+// opening without any specific variation line.
 const ECO_TO_NAME = new Map<string, string>();
+const ecoBestPgnLength = new Map<string, number>();
 for (const entry of openings) {
-	if (!ECO_TO_NAME.has(entry.eco)) {
+	const current = ecoBestPgnLength.get(entry.eco);
+	if (current === undefined || entry.pgn.length < current) {
 		ECO_TO_NAME.set(entry.eco, entry.name);
+		ecoBestPgnLength.set(entry.eco, entry.pgn.length);
 	}
 }
 

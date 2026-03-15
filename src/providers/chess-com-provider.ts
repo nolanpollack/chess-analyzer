@@ -84,8 +84,8 @@ function filterArchiveUrls(
 
 	if (since) {
 		// Filter to archives that could contain games after `since`
-		const sinceYear = since.getFullYear();
-		const sinceMonth = since.getMonth() + 1; // 1-indexed
+		const sinceYear = since.getUTCFullYear();
+		const sinceMonth = since.getUTCMonth() + 1; // 1-indexed, UTC
 		return archives.filter((url) => {
 			const parts = url.split("/");
 			const year = Number(parts[parts.length - 2]);

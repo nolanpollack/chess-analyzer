@@ -213,7 +213,16 @@ describe("ChessComProvider", () => {
 						"https://api.chess.com/pub/player/testplayer/games/2023/12",
 					],
 				}),
-			"/games/2023/12": () => Response.json({ games: [makeGame()] }),
+			"/games/2023/10": () => Response.json({ games: [] }),
+			"/games/2023/11": () => Response.json({ games: [] }),
+			"/games/2023/12": () =>
+				Response.json({
+					games: [
+						makeGame({
+							end_time: Math.floor(new Date("2023-12-15").getTime() / 1000),
+						}),
+					],
+				}),
 		});
 
 		const provider = createChessComProvider();
@@ -222,12 +231,12 @@ describe("ChessComProvider", () => {
 		});
 
 		// Should only fetch December archive
-		const fetchCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
-			.calls;
-		const fetchedUrls = fetchCalls.map((call: unknown[]) => call[0] as string);
-		expect(fetchedUrls).not.toContain(expect.stringContaining("/2023/10"));
-		expect(fetchedUrls).not.toContain(expect.stringContaining("/2023/11"));
-		expect(games.length).toBeGreaterThanOrEqual(0);
+		const fetchedUrls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+			.calls.map((call: unknown[]) => call[0] as string);
+		expect(fetchedUrls.some((u) => u.includes("/2023/10"))).toBe(false);
+		expect(fetchedUrls.some((u) => u.includes("/2023/11"))).toBe(false);
+		expect(fetchedUrls.some((u) => u.includes("/2023/12"))).toBe(true);
+		expect(games).toHaveLength(1);
 	});
 
 	it("filters individual games by since date", async () => {
