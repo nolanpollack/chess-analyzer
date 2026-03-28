@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -35,13 +36,14 @@ export function DashboardHeader({
 					{new Date(playerStatus.player.lastSyncedAt).toLocaleString()}
 				</span>
 			)}
-			<Button
-				variant="outline"
-				size="sm"
-				className="ml-auto"
-				disabled={isSyncing}
-				onClick={onSync}
+			<Link
+				to="/$username/profile"
+				params={{ username: playerStatus.player.username }}
+				className="ml-auto text-sm text-primary hover:underline"
 			>
+				Profile
+			</Link>
+			<Button variant="outline" size="sm" disabled={isSyncing} onClick={onSync}>
 				<RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />
 				Sync
 			</Button>

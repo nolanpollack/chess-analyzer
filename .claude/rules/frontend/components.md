@@ -8,6 +8,14 @@ After installing shadcn components, always run `bunx biome check --write`
 on the generated files — shadcn outputs spaces instead of tabs and may
 omit semicolons.
 
+## Prefer shared components
+Before creating a feature-specific wrapper, check if shadcn already
+provides the component (Card, Badge, Button, etc.). Use the shadcn
+component directly — customise via `className` overrides, not by
+wrapping it in a feature-scoped abstraction. If a pattern is truly
+reused across features and is not covered by shadcn, place the shared
+component in `src/components/` (not inside a feature directory).
+
 ## Forms
 Use react-hook-form (v7) for all forms. Pattern:
 - Define a `FormValues` type

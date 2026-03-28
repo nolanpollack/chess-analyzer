@@ -12,7 +12,9 @@ src/
 │   │   ├── components/   GameTable.tsx, GameFilters.tsx, …
 │   │   ├── hooks/        use-games.ts, use-player-status.ts, …
 │   │   └── types.ts
-│   └── analysis/         ← future phase
+│   ├── analysis/         components/hooks for game analysis view
+│   ├── explanations/     LLM move explanation UI
+│   └── profile/          player profile & game performance
 ├── components/           shared/generic only (Header, ThemeToggle, ui/)
 ├── lib/                  shared utilities
 └── routes/               thin composition files
@@ -120,9 +122,28 @@ Each component does one thing. Signs it needs to be split:
 Prefer passing data and callbacks as props. The feature's top-level component
 or hook owns the data; children receive it via props.
 
+## Extract shared logic, don't duplicate
+
+When the same logic appears in 2+ files, extract it to a shared location:
+- UI utilities (result classification, display helpers): `src/lib/` (e.g. `getResultDisplay` in chess-utils.ts)
+- Data transformations used by components: feature `utils.ts` (e.g. `groupMovesIntoPairs`, `buildEvalGraphData`)
+- Shared visual components used across features: `src/components/` (e.g. `AccuracyBar`)
+
+## Typography hierarchy
+
+Use consistent text sizes and weights for each role:
+- Page headings (`h1`): `text-2xl font-semibold tracking-tight`
+- Card titles: `text-[15px] font-medium` (via shadcn CardTitle)
+- Section labels: `text-sm font-medium text-muted-foreground`
+- Data values: `text-sm font-medium`
+- Body/muted text: `text-[13px] text-muted-foreground` or `text-xs text-muted-foreground`
+- Tiny badges (weakest, etc.): `text-[11px]` via shadcn Badge with custom className
+
 ## Avoid
 
 - Inline type definitions for data from the server — always derive
 - Multiple exported components in one file
 - Business logic or data fetching in route files
 - Prop drilling more than 2 levels deep — restructure or use composition
+- Raw `<div className="rounded-lg border bg-card">` when shadcn Card exists
+- Duplicating classification/display logic — extract to shared utilities

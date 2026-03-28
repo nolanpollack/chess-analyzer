@@ -6,6 +6,7 @@ export const ANALYSIS_CONFIG = {
 	multiPv: 1,
 
 	/**
+	 * These are flat centipawn thresholds. A future improvement is to convert engine evals to win probability using a rating-adjusted model (similar to chess.com's Expected Points Model), which would make classification thresholds feel more appropriate across different rating levels. For now, flat thresholds work for MVP.
 	 * Move classification thresholds (centipawn loss from player's perspective).
 	 * A move is classified by the worst threshold it exceeds.
 	 */

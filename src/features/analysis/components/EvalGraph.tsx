@@ -7,32 +7,19 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import type { MoveAnalysis } from "#/db/schema";
-import { formatEvalDisplay } from "#/features/analysis/utils";
-
-/**
- * Maps centipawns to [-1, 1] using a tanh sigmoid.
- * 0 = equal, +1 = player winning, -1 = player losing.
- * +400cp ≈ +0.76, +200cp ≈ +0.46, 0cp = 0
- */
-function evalToWinPct(cp: number): number {
-	return Math.tanh(cp / 400);
-}
+import {
+	buildEvalGraphData,
+	type EvalDataPoint,
+	formatEvalDisplay,
+} from "#/features/analysis/utils";
 
 type EvalGraphProps = {
 	moves: MoveAnalysis[];
 	currentPly: number;
 	onClickMove: (ply: number) => void;
-	/** Whether to display eval from the player's perspective */
 	playerIsWhite: boolean;
-};
-
-type DataPoint = {
-	ply: number;
-	moveNumber: string;
-	eval: number; // win probability [0, 1]
-	evalCp: number; // raw centipawns for tooltip
-	classification: string;
 };
 
 export function EvalGraph({
@@ -41,45 +28,27 @@ export function EvalGraph({
 	onClickMove,
 	playerIsWhite,
 }: EvalGraphProps) {
-	const data: DataPoint[] = moves.map((move) => {
-		const evalCp = playerIsWhite ? move.eval_after : -move.eval_after;
-
-		return {
-			ply: move.ply,
-			moveNumber:
-				move.ply % 2 === 1
-					? `${Math.ceil(move.ply / 2)}.`
-					: `${Math.ceil(move.ply / 2)}...`,
-			eval: evalToWinPct(evalCp),
-			evalCp,
-			classification: move.classification,
-		};
-	});
-
-	function handleClick(point: DataPoint | null) {
-		if (point) {
-			onClickMove(point.ply);
-		}
-	}
+	const data = buildEvalGraphData(moves, playerIsWhite);
 
 	return (
-		<div className="flex h-[160px] flex-col rounded-lg border bg-card px-4 py-3">
-			<p className="mb-2 shrink-0 text-sm font-medium text-muted-foreground">
-				Evaluation
-			</p>
-			{/* Absolute wrapper is required: ResponsiveContainer height="100%" doesn't resolve from flex-1 parents */}
-			<div className="relative min-h-0 flex-1 w-full">
-				<div className="absolute inset-0 [&_svg]:outline-none">
+		<Card className="flex h-[160px] flex-col gap-0 py-0">
+			<CardHeader className="px-4 pt-3 pb-2">
+				<CardTitle className="text-sm font-medium text-muted-foreground">
+					Evaluation
+				</CardTitle>
+			</CardHeader>
+			<CardContent className="relative min-h-0 flex-1 px-4 pb-3">
+				<div className="absolute inset-0 px-4 pb-3 [&_svg]:outline-none">
 					<ResponsiveContainer width="100%" height="100%">
 						<AreaChart
 							data={data}
 							margin={{ top: 2, right: 4, bottom: 2, left: 4 }}
 							onClick={(e: Record<string, unknown>) => {
 								const payload = e?.activePayload as
-									| { payload: DataPoint }[]
+									| { payload: EvalDataPoint }[]
 									| undefined;
 								if (payload?.[0]) {
-									handleClick(payload[0].payload);
+									onClickMove(payload[0].payload.ply);
 								}
 							}}
 						>
@@ -111,7 +80,6 @@ export function EvalGraph({
 								tickLine={false}
 								width={0}
 							/>
-							{/* Equal position reference line at 50% */}
 							<ReferenceLine
 								y={0}
 								stroke="var(--color-border)"
@@ -128,7 +96,7 @@ export function EvalGraph({
 							<Tooltip
 								content={({ active, payload }) => {
 									if (!active || !payload?.[0]) return null;
-									const point = payload[0].payload as DataPoint;
+									const point = payload[0].payload as EvalDataPoint;
 									return (
 										<div className="rounded-md border bg-card px-3 py-1.5 text-xs shadow-sm">
 											<span className="text-muted-foreground">
@@ -151,7 +119,7 @@ export function EvalGraph({
 									const { cx, cy, payload } = props as {
 										cx: number;
 										cy: number;
-										payload: DataPoint;
+										payload: EvalDataPoint;
 									};
 									if (
 										payload.classification === "blunder" ||
@@ -185,7 +153,7 @@ export function EvalGraph({
 						</AreaChart>
 					</ResponsiveContainer>
 				</div>
-			</div>
-		</div>
+			</CardContent>
+		</Card>
 	);
 }

@@ -1,0 +1,1034 @@
+{
+  "id": "ec62a608-8836-444c-a91f-91ba1419c7e8",
+  "prevId": "65767e3a-0ecf-4728-8ab9-0a6471c8f1f3",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.game_analyses": {
+      "name": "game_analyses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "game_id": {
+          "name": "game_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "engine": {
+          "name": "engine",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "depth": {
+          "name": "depth",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accuracy_white": {
+          "name": "accuracy_white",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accuracy_black": {
+          "name": "accuracy_black",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "moves": {
+          "name": "moves",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "analysis_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "moves_analyzed": {
+          "name": "moves_analyzed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_moves": {
+          "name": "total_moves",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analyzed_at": {
+          "name": "analyzed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "game_analyses_game_id_games_id_fk": {
+          "name": "game_analyses_game_id_games_id_fk",
+          "tableFrom": "game_analyses",
+          "tableTo": "games",
+          "columnsFrom": [
+            "game_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "game_analyses_game_id_unique": {
+          "name": "game_analyses_game_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "game_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.game_performance": {
+      "name": "game_performance",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "game_analysis_id": {
+          "name": "game_analysis_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "overall_accuracy": {
+          "name": "overall_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "overall_avg_cp_loss": {
+          "name": "overall_avg_cp_loss",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opening_accuracy": {
+          "name": "opening_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opening_avg_cp_loss": {
+          "name": "opening_avg_cp_loss",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opening_move_count": {
+          "name": "opening_move_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "middlegame_accuracy": {
+          "name": "middlegame_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "middlegame_avg_cp_loss": {
+          "name": "middlegame_avg_cp_loss",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "middlegame_move_count": {
+          "name": "middlegame_move_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "endgame_accuracy": {
+          "name": "endgame_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endgame_avg_cp_loss": {
+          "name": "endgame_avg_cp_loss",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endgame_move_count": {
+          "name": "endgame_move_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "piece_stats": {
+          "name": "piece_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "concept_stats": {
+          "name": "concept_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explained_move_count": {
+          "name": "explained_move_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "computed_at": {
+          "name": "computed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "game_performance_game_analysis_id_game_analyses_id_fk": {
+          "name": "game_performance_game_analysis_id_game_analyses_id_fk",
+          "tableFrom": "game_performance",
+          "tableTo": "game_analyses",
+          "columnsFrom": [
+            "game_analysis_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "game_performance_player_id_players_id_fk": {
+          "name": "game_performance_player_id_players_id_fk",
+          "tableFrom": "game_performance",
+          "tableTo": "players",
+          "columnsFrom": [
+            "player_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "game_performance_game_analysis_id_unique": {
+          "name": "game_performance_game_analysis_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "game_analysis_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.games": {
+      "name": "games",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "platform",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_game_id": {
+          "name": "platform_game_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pgn": {
+          "name": "pgn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "played_at": {
+          "name": "played_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_control": {
+          "name": "time_control",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_control_class": {
+          "name": "time_control_class",
+          "type": "time_control_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "result_detail": {
+          "name": "result_detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "player_color": {
+          "name": "player_color",
+          "type": "player_color",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "player_rating": {
+          "name": "player_rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opponent_username": {
+          "name": "opponent_username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opponent_rating": {
+          "name": "opponent_rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opening_eco": {
+          "name": "opening_eco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opening_name": {
+          "name": "opening_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accuracy_white": {
+          "name": "accuracy_white",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accuracy_black": {
+          "name": "accuracy_black",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "games_player_id_players_id_fk": {
+          "name": "games_player_id_players_id_fk",
+          "tableFrom": "games",
+          "tableTo": "players",
+          "columnsFrom": [
+            "player_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "games_platform_platform_game_id_unique": {
+          "name": "games_platform_platform_game_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "platform",
+            "platform_game_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.llm_logs": {
+      "name": "llm_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "job_type": {
+          "name": "job_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "input": {
+          "name": "input",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "output": {
+          "name": "output",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_version": {
+          "name": "prompt_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "latency_ms": {
+          "name": "latency_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_count_input": {
+          "name": "token_count_input",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_count_output": {
+          "name": "token_count_output",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.move_explanations": {
+      "name": "move_explanations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "game_analysis_id": {
+          "name": "game_analysis_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ply": {
+          "name": "ply",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "explanation": {
+          "name": "explanation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "principle": {
+          "name": "principle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt_version": {
+          "name": "prompt_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "move_explanations_game_analysis_id_game_analyses_id_fk": {
+          "name": "move_explanations_game_analysis_id_game_analyses_id_fk",
+          "tableFrom": "move_explanations",
+          "tableTo": "game_analyses",
+          "columnsFrom": [
+            "game_analysis_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "move_explanations_game_analysis_id_ply_unique": {
+          "name": "move_explanations_game_analysis_id_ply_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "game_analysis_id",
+            "ply"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.move_tags": {
+      "name": "move_tags",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "game_analysis_id": {
+          "name": "game_analysis_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ply": {
+          "name": "ply",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "game_phase": {
+          "name": "game_phase",
+          "type": "game_phase",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pieces_involved": {
+          "name": "pieces_involved",
+          "type": "chess_piece[]",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opening_eco": {
+          "name": "opening_eco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "opening_name": {
+          "name": "opening_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "concepts": {
+          "name": "concepts",
+          "type": "concept[]",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "move_tags_game_analysis_id_game_analyses_id_fk": {
+          "name": "move_tags_game_analysis_id_game_analyses_id_fk",
+          "tableFrom": "move_tags",
+          "tableTo": "game_analyses",
+          "columnsFrom": [
+            "game_analysis_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "move_tags_player_id_players_id_fk": {
+          "name": "move_tags_player_id_players_id_fk",
+          "tableFrom": "move_tags",
+          "tableTo": "players",
+          "columnsFrom": [
+            "player_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "move_tags_game_analysis_id_ply_unique": {
+          "name": "move_tags_game_analysis_id_ply_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "game_analysis_id",
+            "ply"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.player_profile": {
+      "name": "player_profile",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "player_id": {
+          "name": "player_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "games_analyzed": {
+          "name": "games_analyzed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_moves_analyzed": {
+          "name": "total_moves_analyzed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "overall_accuracy": {
+          "name": "overall_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "overall_avg_cp_loss": {
+          "name": "overall_avg_cp_loss",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opening_accuracy": {
+          "name": "opening_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "middlegame_accuracy": {
+          "name": "middlegame_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endgame_accuracy": {
+          "name": "endgame_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "piece_stats": {
+          "name": "piece_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opening_stats": {
+          "name": "opening_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category_stats": {
+          "name": "category_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "concept_stats": {
+          "name": "concept_stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_explained_moves": {
+          "name": "total_explained_moves",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "recent_accuracy": {
+          "name": "recent_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "older_accuracy": {
+          "name": "older_accuracy",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "weaknesses": {
+          "name": "weaknesses",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "study_recommendations": {
+          "name": "study_recommendations",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "computed_at": {
+          "name": "computed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "player_profile_player_id_players_id_fk": {
+          "name": "player_profile_player_id_players_id_fk",
+          "tableFrom": "player_profile",
+          "tableTo": "players",
+          "columnsFrom": [
+            "player_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "player_profile_player_id_unique": {
+          "name": "player_profile_player_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "player_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.players": {
+      "name": "players",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "platform",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'chess.com'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "players_username_unique": {
+          "name": "players_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.analysis_status": {
+      "name": "analysis_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "complete",
+        "failed"
+      ]
+    },
+    "public.chess_piece": {
+      "name": "chess_piece",
+      "schema": "public",
+      "values": [
+        "pawn",
+        "knight",
+        "bishop",
+        "rook",
+        "queen",
+        "king"
+      ]
+    },
+    "public.concept": {
+      "name": "concept",
+      "schema": "public",
+      "values": [
+        "hanging-piece",
+        "fork",
+        "pin",
+        "skewer",
+        "discovered-attack",
+        "back-rank",
+        "overloaded-piece",
+        "deflection",
+        "mating-pattern",
+        "piece-activity",
+        "pawn-structure",
+        "weak-square",
+        "open-file",
+        "bishop-pair",
+        "outpost",
+        "space-advantage",
+        "king-safety",
+        "development",
+        "premature-attack",
+        "piece-coordination",
+        "rook-activation",
+        "passed-pawn",
+        "prophylaxis",
+        "trade-evaluation",
+        "king-activation",
+        "opposition",
+        "pawn-promotion",
+        "rook-endgame"
+      ]
+    },
+    "public.game_phase": {
+      "name": "game_phase",
+      "schema": "public",
+      "values": [
+        "opening",
+        "middlegame",
+        "endgame"
+      ]
+    },
+    "public.move_classification": {
+      "name": "move_classification",
+      "schema": "public",
+      "values": [
+        "brilliant",
+        "best",
+        "good",
+        "inaccuracy",
+        "mistake",
+        "blunder"
+      ]
+    },
+    "public.platform": {
+      "name": "platform",
+      "schema": "public",
+      "values": [
+        "chess.com",
+        "lichess"
+      ]
+    },
+    "public.player_color": {
+      "name": "player_color",
+      "schema": "public",
+      "values": [
+        "white",
+        "black"
+      ]
+    },
+    "public.time_control_class": {
+      "name": "time_control_class",
+      "schema": "public",
+      "values": [
+        "bullet",
+        "blitz",
+        "rapid",
+        "classical",
+        "daily"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -1,7 +1,7 @@
 /**
- * Analysis UI utilities: eval formatting, classification colors, etc.
+ * Analysis UI utilities: eval formatting, classification colors, move grouping, etc.
  */
-import type { MoveClassification } from "#/db/schema";
+import type { MoveAnalysis, MoveClassification } from "#/db/schema";
 
 // ── Eval Formatting ────────────────────────────────────────────────────
 
@@ -96,6 +96,71 @@ export function getClassificationStyle(
 	classification: MoveClassification,
 ): ClassificationStyle {
 	return CLASSIFICATION_STYLES[classification];
+}
+
+// ── Move Pairing ──────────────────────────────────────────────────────
+
+export type MovePair = {
+	moveNumber: number;
+	white?: MoveAnalysis;
+	black?: MoveAnalysis;
+};
+
+export function groupMovesIntoPairs(moves: MoveAnalysis[]): MovePair[] {
+	const pairs: MovePair[] = [];
+
+	for (const move of moves) {
+		const moveNumber = Math.ceil(move.ply / 2);
+		const isWhite = move.ply % 2 === 1;
+
+		let pair = pairs.find((p) => p.moveNumber === moveNumber);
+		if (!pair) {
+			pair = { moveNumber };
+			pairs.push(pair);
+		}
+
+		if (isWhite) {
+			pair.white = move;
+		} else {
+			pair.black = move;
+		}
+	}
+
+	return pairs;
+}
+
+// ── Eval Graph Data ───────────────────────────────────────────────────
+
+export type EvalDataPoint = {
+	ply: number;
+	moveNumber: string;
+	eval: number;
+	evalCp: number;
+	classification: string;
+};
+
+function evalToWinPct(cp: number): number {
+	return Math.tanh(cp / 400);
+}
+
+export function buildEvalGraphData(
+	moves: MoveAnalysis[],
+	playerIsWhite: boolean,
+): EvalDataPoint[] {
+	return moves.map((move) => {
+		const evalCp = playerIsWhite ? move.eval_after : -move.eval_after;
+
+		return {
+			ply: move.ply,
+			moveNumber:
+				move.ply % 2 === 1
+					? `${Math.ceil(move.ply / 2)}.`
+					: `${Math.ceil(move.ply / 2)}...`,
+			eval: evalToWinPct(evalCp),
+			evalCp,
+			classification: move.classification,
+		};
+	});
 }
 
 /**

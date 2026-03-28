@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsernameRouteImport } from './routes/$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsernameIndexRouteImport } from './routes/$username/index'
+import { Route as UsernameProfileRouteImport } from './routes/$username/profile'
 import { Route as UsernameGamesGameIdRouteImport } from './routes/$username/games/$gameId'
 
 const UsernameRoute = UsernameRouteImport.update({
@@ -29,6 +30,11 @@ const UsernameIndexRoute = UsernameIndexRouteImport.update({
   path: '/',
   getParentRoute: () => UsernameRoute,
 } as any)
+const UsernameProfileRoute = UsernameProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => UsernameRoute,
+} as any)
 const UsernameGamesGameIdRoute = UsernameGamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
@@ -38,11 +44,13 @@ const UsernameGamesGameIdRoute = UsernameGamesGameIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$username': typeof UsernameRouteWithChildren
+  '/$username/profile': typeof UsernameProfileRoute
   '/$username/': typeof UsernameIndexRoute
   '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$username/profile': typeof UsernameProfileRoute
   '/$username': typeof UsernameIndexRoute
   '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
 }
@@ -50,18 +58,25 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$username': typeof UsernameRouteWithChildren
+  '/$username/profile': typeof UsernameProfileRoute
   '/$username/': typeof UsernameIndexRoute
   '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$username' | '/$username/' | '/$username/games/$gameId'
+  fullPaths:
+    | '/'
+    | '/$username'
+    | '/$username/profile'
+    | '/$username/'
+    | '/$username/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$username' | '/$username/games/$gameId'
+  to: '/' | '/$username/profile' | '/$username' | '/$username/games/$gameId'
   id:
     | '__root__'
     | '/'
     | '/$username'
+    | '/$username/profile'
     | '/$username/'
     | '/$username/games/$gameId'
   fileRoutesById: FileRoutesById
@@ -94,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsernameIndexRouteImport
       parentRoute: typeof UsernameRoute
     }
+    '/$username/profile': {
+      id: '/$username/profile'
+      path: '/profile'
+      fullPath: '/$username/profile'
+      preLoaderRoute: typeof UsernameProfileRouteImport
+      parentRoute: typeof UsernameRoute
+    }
     '/$username/games/$gameId': {
       id: '/$username/games/$gameId'
       path: '/games/$gameId'
@@ -105,11 +127,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface UsernameRouteChildren {
+  UsernameProfileRoute: typeof UsernameProfileRoute
   UsernameIndexRoute: typeof UsernameIndexRoute
   UsernameGamesGameIdRoute: typeof UsernameGamesGameIdRoute
 }
 
 const UsernameRouteChildren: UsernameRouteChildren = {
+  UsernameProfileRoute: UsernameProfileRoute,
   UsernameIndexRoute: UsernameIndexRoute,
   UsernameGamesGameIdRoute: UsernameGamesGameIdRoute,
 }

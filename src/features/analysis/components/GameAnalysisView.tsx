@@ -2,6 +2,7 @@ import { Button } from "#/components/ui/button";
 import { BoardControls } from "#/features/analysis/components/BoardControls";
 import { EvalGraph } from "#/features/analysis/components/EvalGraph";
 import { GameBoard } from "#/features/analysis/components/GameBoard";
+import { GamePerformanceSummary } from "#/features/analysis/components/GamePerformanceSummary";
 import { MoveDetailPanel } from "#/features/analysis/components/MoveDetailPanel";
 import { MoveList } from "#/features/analysis/components/MoveList";
 import { useMoveNavigation } from "#/features/analysis/hooks/use-move-navigation";
@@ -86,6 +87,7 @@ export function GameAnalysisView({
 						move={navigation.currentMove}
 						gameAnalysisId={gameAnalysisId}
 					/>
+					<GamePerformanceSummary gameAnalysisId={gameAnalysisId} />
 				</div>
 			</div>
 		</>

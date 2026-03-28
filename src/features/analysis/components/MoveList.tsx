@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import type { MoveAnalysis } from "#/db/schema";
 import {
 	formatEvalDisplay,
 	getClassificationStyle,
+	groupMovesIntoPairs,
 } from "#/features/analysis/utils";
 import { cn } from "#/lib/utils";
 
@@ -34,36 +36,16 @@ export function MoveList({ moves, currentPly, onSelectMove }: MoveListProps) {
 		}
 	}, [currentPly]);
 
-	// Group moves into pairs (white + black per move number)
-	const movePairs: {
-		moveNumber: number;
-		white?: MoveAnalysis;
-		black?: MoveAnalysis;
-	}[] = [];
-
-	for (const move of moves) {
-		const moveNumber = Math.ceil(move.ply / 2);
-		const isWhite = move.ply % 2 === 1;
-
-		let pair = movePairs.find((p) => p.moveNumber === moveNumber);
-		if (!pair) {
-			pair = { moveNumber };
-			movePairs.push(pair);
-		}
-
-		if (isWhite) {
-			pair.white = move;
-		} else {
-			pair.black = move;
-		}
-	}
+	const movePairs = groupMovesIntoPairs(moves);
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card">
-			<div className="px-4 pt-3 pb-2">
-				<p className="text-sm font-medium text-muted-foreground">Moves</p>
-			</div>
-			<div
+		<Card className="flex min-h-0 flex-1 flex-col gap-0 py-0">
+			<CardHeader className="px-4 pt-3 pb-2">
+				<CardTitle className="text-sm font-medium text-muted-foreground">
+					Moves
+				</CardTitle>
+			</CardHeader>
+			<CardContent
 				ref={containerRef}
 				className="min-h-0 flex-1 overflow-y-auto px-4 pb-3"
 			>
@@ -127,8 +109,8 @@ export function MoveList({ moves, currentPly, onSelectMove }: MoveListProps) {
 						})}
 					</tbody>
 				</table>
-			</div>
-		</div>
+			</CardContent>
+		</Card>
 	);
 }
 

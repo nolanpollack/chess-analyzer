@@ -3,23 +3,10 @@ import { Badge } from "#/components/ui/badge";
 import { TableCell, TableRow } from "#/components/ui/table";
 import { AnalysisStatusBadge } from "#/features/games/components/AnalysisStatusBadge";
 import type { Game } from "#/features/games/types";
-import { classifyResult } from "#/lib/chess-utils";
+import { getResultDisplay } from "#/lib/chess-utils";
 
 export function GameRow({ game, username }: { game: Game; username: string }) {
-	let resultCategory: string;
-	try {
-		resultCategory = classifyResult(game.resultDetail);
-	} catch (e) {
-		console.warn(`Unknown result code: ${game.resultDetail}`, e);
-		resultCategory = game.resultDetail;
-	}
-
-	const resultVariant =
-		resultCategory === "win"
-			? "default"
-			: resultCategory === "loss"
-				? "destructive"
-				: "secondary";
+	const result = getResultDisplay(game.resultDetail);
 
 	return (
 		<TableRow className="cursor-pointer transition-colors duration-150 hover:bg-muted/50">
@@ -38,8 +25,8 @@ export function GameRow({ game, username }: { game: Game; username: string }) {
 					params={{ username, gameId: game.id }}
 					className="block px-4 py-2"
 				>
-					<Badge variant={resultVariant} className="capitalize">
-						{resultCategory}
+					<Badge variant={result.variant} className="capitalize">
+						{result.label}
 					</Badge>
 				</Link>
 			</TableCell>

@@ -32,6 +32,16 @@
 - t3-env runtimeEnv uses `process.env` (not `import.meta.env`) so the worker
   (plain Bun process) can also use the same env module
 
+## Function decomposition
+- Each function should have one job. If you need section comments (e.g.
+  `// Step 1: …`, `// Step 2: …`) to break up a function, extract those
+  sections into named helper functions instead.
+- Long orchestration functions should compose helpers, not implement all
+  logic inline. The top-level function reads like a table of contents;
+  the helpers contain the implementation detail.
+- Applies especially to worker job handlers, server functions, and
+  computation pipelines.
+
 ## Formatting
 - Biome handles all formatting and linting (no ESLint/Prettier)
 - Indent style: tabs

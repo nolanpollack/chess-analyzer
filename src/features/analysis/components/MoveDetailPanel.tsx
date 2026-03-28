@@ -1,4 +1,5 @@
 import { Badge } from "#/components/ui/badge";
+import { Card, CardContent } from "#/components/ui/card";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
 import type { MoveAnalysis } from "#/db/schema";
 import {
@@ -20,7 +21,7 @@ export function MoveDetailPanel({
 
 	// Always render a fixed-height card to prevent layout shifts in the parent
 	if (!move) {
-		return <div className="shrink-0 rounded-lg border bg-card p-4 h-[88px]" />;
+		return <Card className="shrink-0 h-[88px] p-4" />;
 	}
 
 	const style = getClassificationStyle(move.classification);
@@ -40,47 +41,48 @@ export function MoveDetailPanel({
 	}
 
 	return (
-		<div className="shrink-0 rounded-lg border bg-card p-4">
-			<div className="flex items-center justify-between gap-3">
-				<div className="flex items-center gap-2">
-					<span className="text-lg font-semibold">{move.san}</span>
-					<Badge variant="secondary" className={`${style.bg} ${style.text}`}>
-						{style.label}
-					</Badge>
-				</div>
-				<div className="text-right">
-					<p className="text-lg font-semibold tabular-nums">
-						{formatEvalDisplay(move.eval_after, clamp)}
-					</p>
-					{move.eval_delta !== 0 && (
-						<span
-							className={`text-xs tabular-nums ${move.eval_delta > 0 ? "text-win" : "text-loss"}`}
-						>
-							{formatEvalDisplay(move.eval_delta)}
-						</span>
-					)}
-				</div>
-			</div>
-			{/* Always reserve one line so height stays stable as moves change */}
-			<p className="mt-3 min-h-[1lh] text-sm text-muted-foreground">
-				{subText &&
-					(!isGoodOrBetter ? (
-						<>
-							Best:{" "}
-							<span className="font-medium text-foreground">
-								{move.best_move_san}
-							</span>{" "}
-							<span className="tabular-nums">
-								({formatEvalDisplay(move.eval_before, clamp)})
+		<Card className="shrink-0 gap-0 py-0">
+			<CardContent className="p-4">
+				<div className="flex items-center justify-between gap-3">
+					<div className="flex items-center gap-2">
+						<span className="text-lg font-semibold">{move.san}</span>
+						<Badge variant="secondary" className={`${style.bg} ${style.text}`}>
+							{style.label}
+						</Badge>
+					</div>
+					<div className="text-right">
+						<p className="text-lg font-semibold tabular-nums">
+							{formatEvalDisplay(move.eval_after, clamp)}
+						</p>
+						{move.eval_delta !== 0 && (
+							<span
+								className={`text-xs tabular-nums ${move.eval_delta > 0 ? "text-win" : "text-loss"}`}
+							>
+								{formatEvalDisplay(move.eval_delta)}
 							</span>
-						</>
-					) : (
-						subText
-					))}
-			</p>
+						)}
+					</div>
+				</div>
+				{/* Always reserve one line so height stays stable as moves change */}
+				<p className="mt-3 min-h-[1lh] text-sm text-muted-foreground">
+					{subText &&
+						(!isGoodOrBetter ? (
+							<>
+								Best:{" "}
+								<span className="font-medium text-foreground">
+									{move.best_move_san}
+								</span>{" "}
+								<span className="tabular-nums">
+									({formatEvalDisplay(move.eval_before, clamp)})
+								</span>
+							</>
+						) : (
+							subText
+						))}
+				</p>
 
-			{/* Explanation panel — handles all states (empty, loading, loaded, error) */}
-			<ExplanationPanel gameAnalysisId={gameAnalysisId} move={move} />
-		</div>
+				<ExplanationPanel gameAnalysisId={gameAnalysisId} move={move} />
+			</CardContent>
+		</Card>
 	);
 }

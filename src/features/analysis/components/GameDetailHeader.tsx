@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "#/components/ui/badge";
-import { classifyResult } from "#/lib/chess-utils";
+import { getResultDisplay } from "#/lib/chess-utils";
 
 type GameDetailHeaderProps = {
 	game: {
@@ -16,19 +16,7 @@ type GameDetailHeaderProps = {
 };
 
 export function GameDetailHeader({ game, username }: GameDetailHeaderProps) {
-	let resultCategory: string;
-	try {
-		resultCategory = classifyResult(game.resultDetail);
-	} catch {
-		resultCategory = game.resultDetail;
-	}
-
-	const resultVariant =
-		resultCategory === "win"
-			? "default"
-			: resultCategory === "loss"
-				? "destructive"
-				: "secondary";
+	const result = getResultDisplay(game.resultDetail);
 
 	return (
 		<div className="space-y-2">
@@ -44,8 +32,8 @@ export function GameDetailHeader({ game, username }: GameDetailHeaderProps) {
 				<h1 className="text-2xl font-semibold tracking-tight">
 					vs {game.opponentUsername}
 				</h1>
-				<Badge variant={resultVariant} className="capitalize">
-					{resultCategory}
+				<Badge variant={result.variant} className="capitalize">
+					{result.label}
 				</Badge>
 				<span className="text-sm text-muted-foreground capitalize">
 					{game.playerColor} · {game.timeControlClass}

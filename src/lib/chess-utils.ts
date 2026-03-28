@@ -35,6 +35,31 @@ export function classifyResult(resultDetail: string): ResultCategory {
 }
 
 /**
+ * Safely classifies a result and returns the badge variant for display.
+ * Falls back to the raw result detail and "secondary" variant on unknown codes.
+ */
+export function getResultDisplay(resultDetail: string): {
+	label: string;
+	variant: "default" | "destructive" | "secondary";
+} {
+	let category: string;
+	try {
+		category = classifyResult(resultDetail);
+	} catch {
+		category = resultDetail;
+	}
+
+	const variant =
+		category === "win"
+			? "default"
+			: category === "loss"
+				? "destructive"
+				: "secondary";
+
+	return { label: category, variant };
+}
+
+/**
  * Returns all result_detail codes that belong to a given category.
  * Use this for filtering queries instead of maintaining a separate map.
  */

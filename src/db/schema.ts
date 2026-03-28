@@ -250,6 +250,136 @@ export const moveExplanations = pgTable(
 	(t) => [unique().on(t.gameAnalysisId, t.ply)],
 );
 
+// ── Game Performance (one row per analyzed game) ──────────────────────
+
+export type PieceStats = Record<
+	ChessPiece,
+	{ accuracy: number; avgCpLoss: number; moveCount: number }
+>;
+
+export type ConceptStat = {
+	hitCount: number;
+	missCount: number;
+	total: number;
+};
+export type ConceptStats = Record<string, ConceptStat>;
+
+export const gamePerformance = pgTable("game_performance", {
+	id: uuid().primaryKey().defaultRandom(),
+	gameAnalysisId: uuid("game_analysis_id")
+		.references(() => gameAnalyses.id)
+		.unique()
+		.notNull(),
+	playerId: uuid("player_id")
+		.references(() => players.id)
+		.notNull(),
+
+	// Overall
+	overallAccuracy: doublePrecision("overall_accuracy").notNull(),
+	overallAvgCpLoss: doublePrecision("overall_avg_cp_loss").notNull(),
+
+	// By phase
+	openingAccuracy: doublePrecision("opening_accuracy"),
+	openingAvgCpLoss: doublePrecision("opening_avg_cp_loss"),
+	openingMoveCount: integer("opening_move_count").notNull().default(0),
+	middlegameAccuracy: doublePrecision("middlegame_accuracy"),
+	middlegameAvgCpLoss: doublePrecision("middlegame_avg_cp_loss"),
+	middlegameMoveCount: integer("middlegame_move_count").notNull().default(0),
+	endgameAccuracy: doublePrecision("endgame_accuracy"),
+	endgameAvgCpLoss: doublePrecision("endgame_avg_cp_loss"),
+	endgameMoveCount: integer("endgame_move_count").notNull().default(0),
+
+	// By piece (JSONB)
+	pieceStats: jsonb("piece_stats").$type<PieceStats>().notNull(),
+
+	// Concept stats (from explained moves only)
+	conceptStats: jsonb("concept_stats").$type<ConceptStats>(),
+	explainedMoveCount: integer("explained_move_count").notNull().default(0),
+
+	computedAt: timestamp("computed_at").defaultNow().notNull(),
+});
+
+// ── Player Profile (aggregated across all games) ──────────────────────
+
+export type OpeningStat = {
+	name: string;
+	accuracy: number;
+	avgCpLoss: number;
+	gameCount: number;
+	moveCount: number;
+};
+export type OpeningStats = Record<string, OpeningStat>;
+
+export type CategoryStats = Record<
+	string,
+	{ accuracy: number; moveCount: number }
+>;
+
+export type Weakness = {
+	dimension: string;
+	key: string;
+	label: string;
+	accuracy: number;
+	overallAccuracy: number;
+	moveCount: number;
+	severity: number;
+	description: string;
+	examples: { gameId: string; ply: number; description: string }[];
+};
+
+export type StudyRecommendation = {
+	title: string;
+	description: string;
+	weakness: string;
+};
+
+export const playerProfile = pgTable("player_profile", {
+	id: uuid().primaryKey().defaultRandom(),
+	playerId: uuid("player_id")
+		.references(() => players.id)
+		.unique()
+		.notNull(),
+
+	gamesAnalyzed: integer("games_analyzed").notNull(),
+	totalMovesAnalyzed: integer("total_moves_analyzed").notNull(),
+
+	// Overall
+	overallAccuracy: doublePrecision("overall_accuracy").notNull(),
+	overallAvgCpLoss: doublePrecision("overall_avg_cp_loss").notNull(),
+
+	// By phase
+	openingAccuracy: doublePrecision("opening_accuracy"),
+	middlegameAccuracy: doublePrecision("middlegame_accuracy"),
+	endgameAccuracy: doublePrecision("endgame_accuracy"),
+
+	// By piece (JSONB)
+	pieceStats: jsonb("piece_stats").$type<PieceStats>().notNull(),
+
+	// By opening
+	openingStats: jsonb("opening_stats").$type<OpeningStats>().notNull(),
+
+	// By concept category (from explained moves)
+	categoryStats: jsonb("category_stats").$type<CategoryStats>(),
+
+	// Individual concept stats
+	conceptStats: jsonb("concept_stats").$type<ConceptStats>(),
+
+	// Explained moves
+	totalExplainedMoves: integer("total_explained_moves").notNull().default(0),
+
+	// Trends
+	recentAccuracy: doublePrecision("recent_accuracy"),
+	olderAccuracy: doublePrecision("older_accuracy"),
+
+	// Recommendations
+	weaknesses: jsonb().$type<Weakness[]>(),
+	studyRecommendations: jsonb("study_recommendations").$type<
+		StudyRecommendation[]
+	>(),
+
+	computedAt: timestamp("computed_at").defaultNow().notNull(),
+});
+
 // ── LLM Logs ───────────────────────────────────────────────────────────
 
 export const llmLogs = pgTable("llm_logs", {
