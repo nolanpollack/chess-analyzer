@@ -47,8 +47,9 @@
 - Loaders call server functions directly (no HTTP round-trip)
 - Client components use TanStack Query for mutations/caching
 - Server functions live in src/server/ organized by domain
-- Server functions use `.validator(zodSchema)` for input validation;
+- Server functions use `.inputValidator(zodSchema)` for input validation;
   the handler receives `{ data }` with the validated input
+  (note: TanStack Start uses `inputValidator`, not `validator`)
 - Server functions return discriminated results (e.g. `{ username }` | `{ error }`)
   rather than throwing — callers check `"error" in result`
 - Server function catch blocks MUST return `{ error: string }` — never re-throw.
@@ -61,17 +62,28 @@
 - Lichess cloud eval: primary engine (free, no compute cost)
 - Stockfish WASM: local engine for analysis, spawned as a child process
   via `stockfish-18-single.js` from the `stockfish` npm package
-- Anthropic API: called ONLY from worker job handlers, never from
-  server functions or route loaders
+- Anthropic API / OpenAI-compatible API: used for LLM features (move explanations).
+  Provider is swappable via env vars (see src/config/llm.ts).
+  Supports local LLMs (Ollama, LM Studio) via the "openai" provider with LLM_BASE_URL.
 
 ## Analysis pipeline
 - sync-games job returns new game IDs, enqueues analyze-game for each
 - analyze-game job: creates its own DB connection, uses StockfishWasmEngine,
   walks PGN, evaluates each position, classifies moves, computes accuracy
+- After engine analysis, the job generates `move_tags` rows (deterministic
+  game_phase + pieces_involved for each move)
 - analysis_status enum: `pending`, `complete`, `failed` (no `analyzing` value)
 - Progress tracking: `moves_analyzed` / `total_moves` updated during analysis
 - Configuration: `src/config/analysis.ts` — depth, thresholds, eval clamp
 - Classification thresholds: blunder >= 200cp, mistake >= 100cp, inaccuracy >= 50cp
+
+## Move explanations
+- On-demand LLM-generated explanations for individual moves
+- Server functions: `src/server/explanations.ts` (getExplanation, generateExplanation)
+- Explanations are cached in `move_explanations` table — generate once, serve forever
+- Deterministic tags (game_phase, pieces_involved) come from `move_tags` (set during analysis)
+- LLM concept tags are stored on the explanation row itself
+- Feature module: `src/features/explanations/` (components, hooks, types)
 
 ## Provider interfaces
 All external integrations are hidden behind interfaces:

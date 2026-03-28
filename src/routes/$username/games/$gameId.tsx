@@ -56,6 +56,7 @@ function GameDetailPage() {
 			{analysisComplete ? (
 				<GameAnalysisView
 					gameId={gameId}
+					gameAnalysisId={analysis?.id ?? ""}
 					moves={moves}
 					playerColor={game.playerColor as "white" | "black"}
 					accuracyWhite={analysis?.accuracyWhite ?? null}

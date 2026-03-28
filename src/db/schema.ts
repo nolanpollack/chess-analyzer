@@ -39,6 +39,56 @@ export const analysisStatusEnum = pgEnum("analysis_status", [
 	"failed",
 ]);
 
+export const gamePhaseEnum = pgEnum("game_phase", [
+	"opening",
+	"middlegame",
+	"endgame",
+]);
+
+export const chessPieceEnum = pgEnum("chess_piece", [
+	"pawn",
+	"knight",
+	"bishop",
+	"rook",
+	"queen",
+	"king",
+]);
+
+export const conceptEnum = pgEnum("concept", [
+	// Tactical
+	"hanging-piece",
+	"fork",
+	"pin",
+	"skewer",
+	"discovered-attack",
+	"back-rank",
+	"overloaded-piece",
+	"deflection",
+	"mating-pattern",
+	// Positional
+	"piece-activity",
+	"pawn-structure",
+	"weak-square",
+	"open-file",
+	"bishop-pair",
+	"outpost",
+	"space-advantage",
+	"king-safety",
+	// Strategic
+	"development",
+	"premature-attack",
+	"piece-coordination",
+	"rook-activation",
+	"passed-pawn",
+	"prophylaxis",
+	"trade-evaluation",
+	// Endgame
+	"king-activation",
+	"opposition",
+	"pawn-promotion",
+	"rook-endgame",
+]);
+
 // ── Tables ─────────────────────────────────────────────────────────────
 
 export const players = pgTable("players", {
@@ -117,5 +167,100 @@ export const gameAnalyses = pgTable("game_analyses", {
 	totalMoves: integer("total_moves"),
 	errorMessage: text("error_message"),
 	analyzedAt: timestamp("analyzed_at"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Move Tags (one row per analyzed move) ──────────────────────────────
+
+export type GamePhase = "opening" | "middlegame" | "endgame";
+export type ChessPiece =
+	| "pawn"
+	| "knight"
+	| "bishop"
+	| "rook"
+	| "queen"
+	| "king";
+export type Concept =
+	| "hanging-piece"
+	| "fork"
+	| "pin"
+	| "skewer"
+	| "discovered-attack"
+	| "back-rank"
+	| "overloaded-piece"
+	| "deflection"
+	| "mating-pattern"
+	| "piece-activity"
+	| "pawn-structure"
+	| "weak-square"
+	| "open-file"
+	| "bishop-pair"
+	| "outpost"
+	| "space-advantage"
+	| "king-safety"
+	| "development"
+	| "premature-attack"
+	| "piece-coordination"
+	| "rook-activation"
+	| "passed-pawn"
+	| "prophylaxis"
+	| "trade-evaluation"
+	| "king-activation"
+	| "opposition"
+	| "pawn-promotion"
+	| "rook-endgame";
+
+export const moveTags = pgTable(
+	"move_tags",
+	{
+		id: uuid().primaryKey().defaultRandom(),
+		gameAnalysisId: uuid("game_analysis_id")
+			.references(() => gameAnalyses.id)
+			.notNull(),
+		playerId: uuid("player_id")
+			.references(() => players.id)
+			.notNull(),
+		ply: integer().notNull(),
+		gamePhase: gamePhaseEnum("game_phase").notNull(),
+		piecesInvolved: chessPieceEnum("pieces_involved").array().notNull(),
+		openingEco: text("opening_eco"),
+		openingName: text("opening_name"),
+		concepts: conceptEnum("concepts").array(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [unique().on(t.gameAnalysisId, t.ply)],
+);
+
+// ── Move Explanations (generated on-demand) ────────────────────────────
+
+export const moveExplanations = pgTable(
+	"move_explanations",
+	{
+		id: uuid().primaryKey().defaultRandom(),
+		gameAnalysisId: uuid("game_analysis_id")
+			.references(() => gameAnalyses.id)
+			.notNull(),
+		ply: integer().notNull(),
+		explanation: text().notNull(),
+		principle: text(),
+		model: text().notNull(),
+		promptVersion: text("prompt_version").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [unique().on(t.gameAnalysisId, t.ply)],
+);
+
+// ── LLM Logs ───────────────────────────────────────────────────────────
+
+export const llmLogs = pgTable("llm_logs", {
+	id: uuid().primaryKey().defaultRandom(),
+	jobType: text("job_type").notNull(),
+	input: jsonb().notNull(),
+	output: jsonb().notNull(),
+	model: text().notNull(),
+	promptVersion: text("prompt_version").notNull(),
+	latencyMs: integer("latency_ms").notNull(),
+	tokenCountInput: integer("token_count_input"),
+	tokenCountOutput: integer("token_count_output"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });

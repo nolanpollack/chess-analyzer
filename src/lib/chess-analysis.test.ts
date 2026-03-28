@@ -3,6 +3,8 @@ import {
 	classifyMove,
 	computeAccuracy,
 	computeEvalDelta,
+	getGamePhase,
+	getPiecesInvolved,
 	walkPgn,
 } from "./chess-analysis";
 
@@ -169,5 +171,177 @@ describe("walkPgn", () => {
 		for (let i = 0; i < moves.length - 1; i++) {
 			expect(moves[i].fenAfter).toBe(moves[i + 1].fenBefore);
 		}
+	});
+});
+
+// ── getGamePhase ───────────────────────────────────────────────────────
+
+describe("getGamePhase", () => {
+	// Standard starting position — all pieces on board, material = 62
+	const STARTING_FEN =
+		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+	it("returns 'opening' for early game with full material", () => {
+		expect(getGamePhase(1, STARTING_FEN)).toBe("opening");
+		expect(getGamePhase(10, STARTING_FEN)).toBe("opening");
+		expect(getGamePhase(20, STARTING_FEN)).toBe("opening");
+	});
+
+	it("returns 'middlegame' after ply 20 with full material", () => {
+		expect(getGamePhase(21, STARTING_FEN)).toBe("middlegame");
+		expect(getGamePhase(40, STARTING_FEN)).toBe("middlegame");
+	});
+
+	it("returns 'middlegame' in early game if material dropped below 50 but queens remain", () => {
+		// Queens still on board but lots of minor/major pieces traded.
+		// q(9) + Q(9) + one rook(5) = 23, which is > 13 so not endgame by material.
+		// But ply ≤ 20 and material < 50, so it falls to middlegame (not opening).
+		const reducedMaterialFen = "4qk2/8/8/8/8/8/8/R2QK3 w - - 0 1"; // Q(9) + q(9) + R(5) = 23
+		expect(getGamePhase(10, reducedMaterialFen)).toBe("middlegame");
+	});
+
+	it("returns 'endgame' when queens are off the board", () => {
+		// Both queens removed from starting FEN
+		const noQueensFen =
+			"rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";
+		expect(getGamePhase(30, noQueensFen)).toBe("endgame");
+	});
+
+	it("returns 'endgame' when material is ≤ 13 even with queens", () => {
+		// King + queen vs king + queen = material 18, not endgame
+		// King + rook vs king = material 5, endgame
+		const lowMaterialFen = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
+		expect(getGamePhase(40, lowMaterialFen)).toBe("endgame");
+	});
+
+	it("returns 'endgame' at exactly 13 material points", () => {
+		// Rook (5) + rook (5) + knight (3) = 13
+		const exactThresholdFen = "4k3/8/8/8/8/8/8/RNR1K3 w - - 0 1";
+		expect(getGamePhase(30, exactThresholdFen)).toBe("endgame");
+	});
+
+	it("returns 'middlegame' at 14 material points with queens on", () => {
+		// Queen (9) + rook (5) = 14 > 13, queens on board
+		const aboveThresholdFen = "4k3/8/8/8/8/8/8/R2QK3 w - - 0 1";
+		expect(getGamePhase(30, aboveThresholdFen)).toBe("middlegame");
+	});
+
+	it("returns 'endgame' when only one queen is off (both letters absent)", () => {
+		// Only white queen, but queensOff checks for BOTH q and Q absent
+		const oneQueenFen = "4k3/8/8/8/8/8/8/3QK3 w - - 0 1";
+		// White Q present → queensOff returns false. Material = 9 ≤ 13? Yes, endgame
+		expect(getGamePhase(30, oneQueenFen)).toBe("endgame");
+	});
+});
+
+// ── getPiecesInvolved ──────────────────────────────────────────────────
+
+describe("getPiecesInvolved", () => {
+	const STARTING_FEN =
+		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+	it("identifies a pawn move", () => {
+		const pieces = getPiecesInvolved("e4", "e2e4", STARTING_FEN);
+		expect(pieces).toEqual(["pawn"]);
+	});
+
+	it("identifies a knight move", () => {
+		const pieces = getPiecesInvolved("Nf3", "g1f3", STARTING_FEN);
+		expect(pieces).toEqual(["knight"]);
+	});
+
+	it("identifies a bishop move", () => {
+		const fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+		const pieces = getPiecesInvolved("Bc4", "f1c4", fen);
+		expect(pieces).toEqual(["bishop"]);
+	});
+
+	it("identifies a rook move", () => {
+		const fen = "4k3/8/8/8/8/8/8/R3K3 w - - 0 1";
+		const pieces = getPiecesInvolved("Ra2", "a1a2", fen);
+		expect(pieces).toEqual(["rook"]);
+	});
+
+	it("identifies a queen move", () => {
+		const fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+		const pieces = getPiecesInvolved("Qh5", "d1h5", fen);
+		expect(pieces).toEqual(["queen"]);
+	});
+
+	it("identifies a king move", () => {
+		const fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
+		const pieces = getPiecesInvolved("Ke2", "e1e2", fen);
+		expect(pieces).toEqual(["king"]);
+	});
+
+	it("identifies kingside castling as king + rook", () => {
+		const fen = "4k3/8/8/8/8/8/8/4K2R w K - 0 1";
+		const pieces = getPiecesInvolved("O-O", "e1g1", fen);
+		expect(pieces).toContain("king");
+		expect(pieces).toContain("rook");
+		expect(pieces).toHaveLength(2);
+	});
+
+	it("identifies queenside castling as king + rook", () => {
+		const fen = "4k3/8/8/8/8/8/8/R3K3 w Q - 0 1";
+		const pieces = getPiecesInvolved("O-O-O", "e1c1", fen);
+		expect(pieces).toContain("king");
+		expect(pieces).toContain("rook");
+		expect(pieces).toHaveLength(2);
+	});
+
+	it("identifies a pawn capturing a piece", () => {
+		// White pawn on d4, black pawn on e5
+		const fen = "rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2";
+		const pieces = getPiecesInvolved("dxe5", "d4e5", fen);
+		expect(pieces).toContain("pawn");
+		// Captured piece is also a pawn, so Set deduplicates
+		expect(pieces).toHaveLength(1);
+	});
+
+	it("identifies a knight capturing a pawn", () => {
+		// Knight on f3, pawn on e5
+		const fen =
+			"rnbqkb1r/pppp1ppp/5n2/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+		const pieces = getPiecesInvolved("Nxe5", "f3e5", fen);
+		expect(pieces).toContain("knight");
+		expect(pieces).toContain("pawn");
+		expect(pieces).toHaveLength(2);
+	});
+
+	it("identifies a queen capturing a rook", () => {
+		// Queen on d1, rook on d8
+		const fen = "3rk3/8/8/8/8/8/8/3QK3 w - - 0 1";
+		const pieces = getPiecesInvolved("Qxd8+", "d1d8", fen);
+		expect(pieces).toContain("queen");
+		expect(pieces).toContain("rook");
+		expect(pieces).toHaveLength(2);
+	});
+
+	it("identifies en passant capture (pawn captures empty square)", () => {
+		// White pawn on e5, black pawn just played d7-d5 (en passant target d6)
+		const fen = "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3";
+		const pieces = getPiecesInvolved("exd6", "e5d6", fen);
+		// En passant: moving piece is pawn, captured piece is pawn (on d5, not d6)
+		// Since d6 is empty in fenBefore, the code detects en passant
+		expect(pieces).toContain("pawn");
+		// Set deduplicates, so only one "pawn" entry
+		expect(pieces).toHaveLength(1);
+	});
+
+	it("handles pawn promotion (non-capture)", () => {
+		const fen = "8/P3k3/8/8/8/8/1K6/8 w - - 0 1";
+		const pieces = getPiecesInvolved("a8=Q", "a7a8q", fen);
+		// SAN starts with lowercase-ish a (no piece prefix) → pawn
+		expect(pieces).toEqual(["pawn"]);
+	});
+
+	it("handles pawn promotion with capture", () => {
+		// Pawn on a7, black rook on b8
+		const fen = "1r2k3/P7/8/8/8/8/1K6/8 w - - 0 1";
+		const pieces = getPiecesInvolved("axb8=Q", "a7b8q", fen);
+		expect(pieces).toContain("pawn");
+		expect(pieces).toContain("rook");
+		expect(pieces).toHaveLength(2);
 	});
 });

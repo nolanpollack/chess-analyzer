@@ -10,6 +10,7 @@ import type { AnalysisData } from "#/features/analysis/types";
 
 type GameAnalysisViewProps = {
 	gameId: string;
+	gameAnalysisId: string;
 	moves: AnalysisData["moves"];
 	playerColor: "white" | "black";
 	accuracyWhite: number | null;
@@ -18,6 +19,7 @@ type GameAnalysisViewProps = {
 
 export function GameAnalysisView({
 	gameId,
+	gameAnalysisId,
 	moves,
 	playerColor,
 	accuracyWhite,
@@ -80,7 +82,10 @@ export function GameAnalysisView({
 						currentPly={navigation.currentPly}
 						onSelectMove={navigation.goToPly}
 					/>
-					<MoveDetailPanel move={navigation.currentMove} />
+					<MoveDetailPanel
+						move={navigation.currentMove}
+						gameAnalysisId={gameAnalysisId}
+					/>
 				</div>
 			</div>
 		</>

@@ -5,6 +5,8 @@
 - No `any` — use `unknown` and narrow, or define an explicit type
 - Prefer `type` over `interface` unless declaration merging is needed
 - Named exports everywhere (default exports only for route components)
+- Drizzle supports `.array()` on pgEnum columns for PostgreSQL array types
+  (e.g. `chessPieceEnum('pieces_involved').array()`)
 
 ## Naming
 - Files: kebab-case (e.g. game-provider.ts, use-games.ts)

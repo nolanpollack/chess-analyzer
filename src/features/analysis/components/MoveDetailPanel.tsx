@@ -5,12 +5,17 @@ import {
 	formatEvalDisplay,
 	getClassificationStyle,
 } from "#/features/analysis/utils";
+import { ExplanationPanel } from "#/features/explanations/components/ExplanationPanel";
 
 type MoveDetailPanelProps = {
 	move: MoveAnalysis | null;
+	gameAnalysisId: string;
 };
 
-export function MoveDetailPanel({ move }: MoveDetailPanelProps) {
+export function MoveDetailPanel({
+	move,
+	gameAnalysisId,
+}: MoveDetailPanelProps) {
 	const clamp = ANALYSIS_CONFIG.evalClamp;
 
 	// Always render a fixed-height card to prevent layout shifts in the parent
@@ -73,6 +78,9 @@ export function MoveDetailPanel({ move }: MoveDetailPanelProps) {
 						subText
 					))}
 			</p>
+
+			{/* Explanation panel — handles all states (empty, loading, loaded, error) */}
+			<ExplanationPanel gameAnalysisId={gameAnalysisId} move={move} />
 		</div>
 	);
 }

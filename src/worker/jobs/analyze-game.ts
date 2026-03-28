@@ -2,12 +2,14 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
-import { gameAnalyses, games, type MoveAnalysis } from "#/db/schema";
+import { gameAnalyses, games, type MoveAnalysis, moveTags } from "#/db/schema";
 import { env } from "#/env";
 import {
 	classifyMove,
 	computeAccuracy,
 	computeEvalDelta,
+	getGamePhase,
+	getPiecesInvolved,
 	walkPgn,
 } from "#/lib/chess-analysis";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
@@ -71,11 +73,14 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 		});
 	}
 
-	// 3. Load the game PGN and player color
+	// 3. Load the game PGN, player color, and metadata for tagging
 	const [game] = await db
 		.select({
 			pgn: games.pgn,
 			playerColor: games.playerColor,
+			playerId: games.playerId,
+			openingEco: games.openingEco,
+			openingName: games.openingName,
 		})
 		.from(games)
 		.where(eq(games.id, gameId));
@@ -221,6 +226,33 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 				analyzedAt: new Date(),
 			})
 			.where(eq(gameAnalyses.gameId, gameId));
+
+		// 10. Generate move_tags for deterministic tagging
+		const [analysisRow] = await db
+			.select({ id: gameAnalyses.id })
+			.from(gameAnalyses)
+			.where(eq(gameAnalyses.gameId, gameId));
+
+		if (analysisRow) {
+			const tagRows = moveAnalyses.map((move) => {
+				const phase = getGamePhase(move.ply, move.fen_after);
+				const pieces = getPiecesInvolved(move.san, move.uci, move.fen_before);
+				return {
+					gameAnalysisId: analysisRow.id,
+					playerId: game.playerId,
+					ply: move.ply,
+					gamePhase: phase,
+					piecesInvolved: pieces,
+					openingEco: phase === "opening" ? game.openingEco : null,
+					openingName: phase === "opening" ? game.openingName : null,
+				};
+			});
+
+			// Batch insert all move_tags
+			if (tagRows.length > 0) {
+				await db.insert(moveTags).values(tagRows);
+			}
+		}
 
 		console.log(
 			`[analyze-game] Completed analysis for game ${gameId}: ${totalMoves} moves, white accuracy ${accuracyWhite}%, black accuracy ${accuracyBlack}%`,
