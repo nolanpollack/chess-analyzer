@@ -5,8 +5,9 @@ import {
 	Outlet,
 	Scripts,
 } from "@tanstack/react-router";
-import Header from "#/components/Header";
+import { AppShell } from "#/components/layout/AppShell";
 import ThemeScript from "#/components/ThemeScript";
+import { TooltipProvider } from "#/components/ui/tooltip";
 import TanStackQueryProvider from "../integrations/tanstack-query/root-provider";
 import appCss from "../styles.css?url";
 
@@ -17,22 +18,22 @@ type MyRouterContext = {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	head: () => ({
 		meta: [
-			{
-				charSet: "utf-8",
-			},
-			{
-				name: "viewport",
-				content: "width=device-width, initial-scale=1",
-			},
-			{
-				title: "Chess Analyzer",
-			},
+			{ charSet: "utf-8" },
+			{ name: "viewport", content: "width=device-width, initial-scale=1" },
+			{ title: "Chess Analyzer" },
 		],
 		links: [
+			{ rel: "preconnect", href: "https://fonts.googleapis.com" },
+			{
+				rel: "preconnect",
+				href: "https://fonts.gstatic.com",
+				crossOrigin: "anonymous",
+			},
 			{
 				rel: "stylesheet",
-				href: appCss,
+				href: "https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap",
 			},
+			{ rel: "stylesheet", href: appCss },
 		],
 	}),
 	component: RootComponent,
@@ -50,12 +51,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<ThemeScript />
 				<HeadContent />
 			</head>
-			<body className="flex h-dvh flex-col overflow-hidden bg-background font-sans text-foreground antialiased">
+			<body className="overflow-hidden bg-bg font-sans text-fg antialiased">
 				<TanStackQueryProvider>
-					<Header />
-					<main className="mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-auto px-2 py-6 md:px-4 md:py-8">
-						{children}
-					</main>
+					<TooltipProvider>
+						<AppShell>{children}</AppShell>
+					</TooltipProvider>
 				</TanStackQueryProvider>
 				<Scripts />
 			</body>

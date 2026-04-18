@@ -1,0 +1,150 @@
+import type { Factor, FocusArea } from "#/features/profile/types";
+
+// TODO(missing-backend): Factor breakdown is mocked. We have per-phase/piece/concept
+// accuracy % via getPlayerProfile, but the design wants Elo-scale values. Needs a
+// product decision on the mapping. See MISSING_FEATURES.md#factor-ratings
+export const mockFactors: Factor[] = [
+	{
+		id: "endgame",
+		label: "Endgame",
+		value: 1380,
+		confidence: "high",
+		delta: -14,
+		trend: [1410, 1405, 1398, 1392, 1388, 1385, 1380],
+		group: "phase",
+	},
+	{
+		id: "tactics",
+		label: "Tactics",
+		value: 1712,
+		confidence: "high",
+		delta: 32,
+		trend: [1660, 1668, 1672, 1680, 1690, 1700, 1712],
+		group: "skill",
+	},
+	{
+		id: "knights",
+		label: "Knight play",
+		value: 1448,
+		confidence: "medium",
+		delta: -8,
+		trend: [1470, 1465, 1458, 1455, 1452, 1450, 1448],
+		group: "piece",
+	},
+	{
+		id: "opening",
+		label: "Opening",
+		value: 1680,
+		confidence: "high",
+		delta: 4,
+		trend: [1660, 1665, 1670, 1672, 1675, 1678, 1680],
+		group: "phase",
+	},
+	{
+		id: "middlegame",
+		label: "Middlegame",
+		value: 1625,
+		confidence: "high",
+		delta: 12,
+		trend: [1590, 1598, 1605, 1612, 1618, 1620, 1625],
+		group: "phase",
+	},
+	{
+		id: "positional",
+		label: "Positional",
+		value: 1588,
+		confidence: "high",
+		delta: 6,
+		trend: [1570, 1575, 1578, 1582, 1585, 1586, 1588],
+		group: "skill",
+	},
+	{
+		id: "time",
+		label: "Time management",
+		value: 1492,
+		confidence: "medium",
+		delta: -18,
+		trend: [1540, 1530, 1520, 1510, 1505, 1498, 1492],
+		group: "skill",
+	},
+	{
+		id: "bishops",
+		label: "Bishop play",
+		value: 1694,
+		confidence: "high",
+		delta: 10,
+		trend: [1670, 1678, 1685, 1688, 1690, 1692, 1694],
+		group: "piece",
+	},
+	{
+		id: "rooks",
+		label: "Rook play",
+		value: 1612,
+		confidence: "high",
+		delta: 2,
+		trend: [1600, 1605, 1608, 1610, 1611, 1612, 1612],
+		group: "piece",
+	},
+	{
+		id: "queens",
+		label: "Queen play",
+		value: 1660,
+		confidence: "medium",
+		delta: 8,
+		trend: [1640, 1645, 1650, 1654, 1656, 1658, 1660],
+		group: "piece",
+	},
+	{
+		id: "pawns",
+		label: "Pawn structure",
+		value: 1555,
+		confidence: "high",
+		delta: -4,
+		trend: [1560, 1562, 1560, 1558, 1557, 1556, 1555],
+		group: "skill",
+	},
+	{
+		id: "king",
+		label: "King safety",
+		value: 1620,
+		confidence: "high",
+		delta: 6,
+		trend: [1600, 1605, 1610, 1615, 1618, 1619, 1620],
+		group: "skill",
+	},
+];
+
+// TODO(missing-backend): Focus areas are mocked. Needs LLM generation + new table.
+// See MISSING_FEATURES.md#focus-areas
+export const mockFocusAreas: FocusArea[] = [
+	{
+		id: "endgame-knights",
+		title: "Knight endgames",
+		detail:
+			"Your knight play drops sharply once queens come off. Across 34 endgames with knights, you played like 1280 — 360 below your overall.",
+		factors: ["Endgame", "Knight play"],
+		gap: -362,
+		confidence: "high",
+		positions: 18,
+	},
+	{
+		id: "time-pressure",
+		title: "Decisions under time pressure",
+		detail:
+			"With under 2 minutes on the clock, your accuracy drops by 14%. Mostly lost positions come from clock, not board.",
+		factors: ["Time management"],
+		gap: -150,
+		confidence: "medium",
+		positions: 27,
+	},
+	{
+		id: "closed-positions",
+		title: "Closed middlegame plans",
+		detail:
+			"When central pawns lock, you tend to drift. You play like 1490 in these structures vs 1640 overall.",
+		factors: ["Middlegame", "Positional"],
+		gap: -152,
+		confidence: "high",
+		positions: 22,
+	},
+];

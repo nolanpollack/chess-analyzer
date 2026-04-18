@@ -56,5 +56,38 @@ There is no `boardWidth` prop in v5 — sizing is handled by the container.
 The Arrow type is not exported from the package; define it locally.
 
 ## Theming
-Use shadcn CSS variables (e.g. hsl(var(--primary))) for all colors.
-Never hardcode color values in component files.
+Always use Tailwind utilities for token-based values — never `style={{ color: "var(--fg)" }}` etc.
+Every CSS custom property in `:root` that has a `--color-*` counterpart in `@theme inline` has
+a corresponding Tailwind utility (`text-fg`, `bg-surface-2`, `border-divider`, etc.).
+If a `var(--x)` reference has no Tailwind utility, add it to `styles.css` before using it inline.
+Never hardcode color values, hex codes, or rgb() literals in component files.
+
+Inline `style` props are only acceptable for:
+- Dynamically computed values (JS expressions: widths, positions, conditional values)
+- `fontFeatureSettings` — use the `.mono-nums` utility class instead where possible
+- `fontSize` with non-standard values — use Tailwind arbitrary `text-[64px]`
+- `linear-gradient` / CSS functions that can't be expressed as static tokens (use `.bg-avatar-gradient` utility or add a token)
+- Shadows: `var(--shadow-sm/md/lg)` — still inline until a utility is needed
+
+## ThemeToggle location
+ThemeToggle lives in the Sidebar footer (not the old Header).
+Theme initialization script stays in `src/components/ThemeScript.tsx` (unchanged).
+
+## Token system
+All design tokens are defined in `src/styles.css` using Tailwind v4 `@theme inline`.
+Tokens map to Tailwind utilities: `bg-bg`, `bg-surface`, `bg-surface-2`, `bg-surface-3`,
+`text-fg`, `text-fg-1` through `text-fg-4`, `border-border-token`, `border-border-strong`,
+`border-divider`, `bg-divider`, `text-data-1` through `text-data-6`, `text-brilliant`, `text-blunder`,
+`bg-result-win`, `bg-result-loss`, `bg-tint-blunder`, `bg-tint-data-6`, `bg-topbar-bg`.
+Computed tints (color-mix) are registered as CSS vars in `:root` — they automatically
+adapt to dark mode because they reference other vars that change in `.dark`.
+Custom utility classes: `.mono-nums` (font-feature-settings for JetBrains Mono numbers),
+`.bg-avatar-gradient` (sidebar avatar linear-gradient).
+
+## Layout shell
+The app uses AppShell (CSS grid `240px 1fr`) in `src/components/layout/AppShell.tsx`.
+- `Sidebar` — nav + theme toggle
+- `Topbar` — sticky breadcrumb bar, rendered per-page (not in shell)
+- `PageContainer` — 40px padding, 1280px max-width
+- `PageHeader` — page title + subtitle
+Route files should import these from `#/components/layout/`.

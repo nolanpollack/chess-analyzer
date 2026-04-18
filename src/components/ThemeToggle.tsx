@@ -1,18 +1,13 @@
+import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "#/components/ui/button";
 
 type ThemeMode = "light" | "dark" | "auto";
 
 function getInitialMode(): ThemeMode {
-	if (typeof window === "undefined") {
-		return "auto";
-	}
-
+	if (typeof window === "undefined") return "auto";
 	const stored = window.localStorage.getItem("theme");
-	if (stored === "light" || stored === "dark" || stored === "auto") {
+	if (stored === "light" || stored === "dark" || stored === "auto")
 		return stored;
-	}
-
 	return "auto";
 }
 
@@ -42,17 +37,11 @@ export default function ThemeToggle() {
 	}, []);
 
 	useEffect(() => {
-		if (mode !== "auto") {
-			return;
-		}
-
+		if (mode !== "auto") return;
 		const media = window.matchMedia("(prefers-color-scheme: dark)");
 		const onChange = () => applyThemeMode("auto");
-
 		media.addEventListener("change", onChange);
-		return () => {
-			media.removeEventListener("change", onChange);
-		};
+		return () => media.removeEventListener("change", onChange);
 	}, [mode]);
 
 	function toggleMode() {
@@ -63,14 +52,25 @@ export default function ThemeToggle() {
 		window.localStorage.setItem("theme", nextMode);
 	}
 
-	const label =
-		mode === "auto"
-			? "Theme: auto (system). Click to switch to light."
-			: `Theme: ${mode}. Click to switch.`;
+	const isDark =
+		mode === "dark" ||
+		(mode === "auto" &&
+			typeof window !== "undefined" &&
+			window.matchMedia("(prefers-color-scheme: dark)").matches);
+	const label = `Theme: ${mode}. Click to switch.`;
 
 	return (
-		<Button variant="outline" size="sm" onClick={toggleMode} title={label}>
-			{mode === "auto" ? "Auto" : mode === "dark" ? "Dark" : "Light"}
-		</Button>
+		<button
+			type="button"
+			onClick={toggleMode}
+			title={label}
+			className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-fg-3 transition-all duration-[120ms] hover:bg-surface-2 hover:text-fg"
+		>
+			{isDark ? (
+				<Sun className="h-[14px] w-[14px]" />
+			) : (
+				<Moon className="h-[14px] w-[14px]" />
+			)}
+		</button>
 	);
 }

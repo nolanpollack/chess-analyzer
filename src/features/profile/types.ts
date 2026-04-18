@@ -1,23 +1,51 @@
-import type {
-	getDimensionDrilldown,
-	getGamePerformance,
-	getPlayerProfile,
-} from "#/server/profile";
+export type PlayerSummary = {
+	platform: "chess.com" | "lichess";
+	currentRating: number | null;
+	gameCount: number;
+	analyzedGameCount: number;
+	eloEstimate: number | null;
+	eloDelta30d: number | null;
+};
 
-type GamePerformanceResult = Awaited<ReturnType<typeof getGamePerformance>>;
-type PlayerProfileResult = Awaited<ReturnType<typeof getPlayerProfile>>;
-type DimensionDrilldownResult = Awaited<
-	ReturnType<typeof getDimensionDrilldown>
->;
+export type RatingPoint = {
+	weekStart: string;
+	rating: number;
+};
 
-export type GamePerformanceData = NonNullable<
-	Exclude<GamePerformanceResult, { error: string }>["performance"]
->;
+export type FactorConfidence = "high" | "medium" | "low";
+export type FactorGroup = "phase" | "skill" | "piece";
 
-export type PlayerProfileData = NonNullable<
-	Exclude<PlayerProfileResult, { error: string }>["profile"]
->;
+export type Factor = {
+	id: string;
+	label: string;
+	value: number;
+	confidence: FactorConfidence;
+	delta: number;
+	trend: number[];
+	group: FactorGroup;
+};
 
-export type DimensionDrilldownData = NonNullable<
-	Exclude<DimensionDrilldownResult, { error: string }>["drilldown"]
->;
+export type FocusArea = {
+	id: string;
+	title: string;
+	detail: string;
+	factors: string[];
+	gap: number;
+	confidence: FactorConfidence;
+	positions: number;
+};
+
+export type GameResultLetter = "W" | "L" | "D";
+
+export type RecentGame = {
+	id: string;
+	opp: string;
+	oppElo: number;
+	result: GameResultLetter;
+	color: "white" | "black";
+	score: number | null;
+	acc: number | null;
+	time: string;
+	opening: string;
+	when: string;
+};

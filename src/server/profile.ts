@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 import {
 	type ConceptDimension,
@@ -977,4 +977,156 @@ async function recomputeProfile(playerId: string) {
 		.returning();
 
 	return result;
+}
+
+// ── getPlayerSummary ──────────────────────────────────────────────────
+
+export const getPlayerSummary = createServerFn({ method: "GET" })
+	.inputValidator(
+		z.object({
+			username: z.string().min(1),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { username } = data;
+
+		try {
+			const [player] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username.toLowerCase().trim()));
+
+			if (!player) {
+				return { error: "Player not found" };
+			}
+
+			const gameRows = await db
+				.select({
+					playedAt: games.playedAt,
+					playerRating: games.playerRating,
+				})
+				.from(games)
+				.where(eq(games.playerId, player.id))
+				.orderBy(desc(games.playedAt));
+
+			const [analyzedRow] = await db
+				.select({ count: count() })
+				.from(gameAnalyses)
+				.innerJoin(games, eq(gameAnalyses.gameId, games.id))
+				.where(
+					and(
+						eq(games.playerId, player.id),
+						eq(gameAnalyses.status, "complete"),
+					),
+				);
+
+			const currentRating = gameRows[0]?.playerRating ?? null;
+			const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+			const priorRow = gameRows.find((row) => row.playedAt <= thirtyDaysAgo);
+			const eloDelta30d =
+				currentRating !== null && priorRow
+					? currentRating - priorRow.playerRating
+					: null;
+
+			return {
+				summary: {
+					platform: player.platform,
+					currentRating,
+					gameCount: gameRows.length,
+					analyzedGameCount: analyzedRow.count,
+					eloEstimate: currentRating,
+					eloDelta30d,
+				},
+			};
+		} catch (err) {
+			console.error("[getPlayerSummary] Error:", err);
+			return { error: "Failed to load player summary" };
+		}
+	});
+
+// ── getRatingTrend ────────────────────────────────────────────────────
+
+const trendRangeSchema = z.enum(["4w", "6m", "1y", "all"]);
+export type TrendRange = z.infer<typeof trendRangeSchema>;
+
+export const getRatingTrend = createServerFn({ method: "GET" })
+	.inputValidator(
+		z.object({
+			username: z.string().min(1),
+			range: trendRangeSchema.default("6m"),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { username, range } = data;
+
+		try {
+			const [player] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username.toLowerCase().trim()));
+
+			if (!player) {
+				return { error: "Player not found" };
+			}
+
+			const since = rangeStartDate(range);
+			const conditions = [eq(games.playerId, player.id)];
+			if (since) conditions.push(gte(games.playedAt, since));
+
+			const rows = await db
+				.select({
+					playedAt: games.playedAt,
+					playerRating: games.playerRating,
+				})
+				.from(games)
+				.where(and(...conditions))
+				.orderBy(asc(games.playedAt));
+
+			const weeks = bucketByWeek(rows);
+
+			return { weeks };
+		} catch (err) {
+			console.error("[getRatingTrend] Error:", err);
+			return { error: "Failed to load rating trend" };
+		}
+	});
+
+function rangeStartDate(range: TrendRange): Date | null {
+	const now = Date.now();
+	const day = 24 * 60 * 60 * 1000;
+	if (range === "4w") return new Date(now - 28 * day);
+	if (range === "6m") return new Date(now - 183 * day);
+	if (range === "1y") return new Date(now - 365 * day);
+	return null;
+}
+
+function bucketByWeek(
+	rows: { playedAt: Date; playerRating: number }[],
+): { weekStart: string; rating: number }[] {
+	const buckets = new Map<string, { ratingSum: number; count: number }>();
+
+	for (const row of rows) {
+		const weekStart = startOfWeek(row.playedAt);
+		const key = weekStart.toISOString();
+		const bucket = buckets.get(key) ?? { ratingSum: 0, count: 0 };
+		bucket.ratingSum += row.playerRating;
+		bucket.count += 1;
+		buckets.set(key, bucket);
+	}
+
+	return Array.from(buckets.entries())
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([weekStart, bucket]) => ({
+			weekStart,
+			rating: Math.round(bucket.ratingSum / bucket.count),
+		}));
+}
+
+function startOfWeek(date: Date): Date {
+	const d = new Date(date);
+	d.setUTCHours(0, 0, 0, 0);
+	const day = d.getUTCDay();
+	const diff = (day + 6) % 7; // week starts Monday
+	d.setUTCDate(d.getUTCDate() - diff);
+	return d;
 }

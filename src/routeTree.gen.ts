@@ -12,13 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsernameRouteImport } from './routes/$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsernameIndexRouteImport } from './routes/$username/index'
-import { Route as UsernameProfileRouteImport } from './routes/$username/profile'
-import { Route as UsernameProfileIndexRouteImport } from './routes/$username/profile/index'
-import { Route as UsernameGamesGameIdRouteImport } from './routes/$username/games/$gameId'
-import { Route as UsernameProfilePiecePieceRouteImport } from './routes/$username/profile/piece/$piece'
-import { Route as UsernameProfilePhasePhaseRouteImport } from './routes/$username/profile/phase/$phase'
-import { Route as UsernameProfileOpeningEcoRouteImport } from './routes/$username/profile/opening/$eco'
-import { Route as UsernameProfileCategoryCategoryRouteImport } from './routes/$username/profile/category/$category'
 
 const UsernameRoute = UsernameRouteImport.update({
   id: '/$username',
@@ -35,116 +28,28 @@ const UsernameIndexRoute = UsernameIndexRouteImport.update({
   path: '/',
   getParentRoute: () => UsernameRoute,
 } as any)
-const UsernameProfileRoute = UsernameProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => UsernameRoute,
-} as any)
-const UsernameProfileIndexRoute = UsernameProfileIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => UsernameProfileRoute,
-} as any)
-const UsernameGamesGameIdRoute = UsernameGamesGameIdRouteImport.update({
-  id: '/games/$gameId',
-  path: '/games/$gameId',
-  getParentRoute: () => UsernameRoute,
-} as any)
-const UsernameProfilePiecePieceRoute =
-  UsernameProfilePiecePieceRouteImport.update({
-    id: '/piece/$piece',
-    path: '/piece/$piece',
-    getParentRoute: () => UsernameProfileRoute,
-  } as any)
-const UsernameProfilePhasePhaseRoute =
-  UsernameProfilePhasePhaseRouteImport.update({
-    id: '/phase/$phase',
-    path: '/phase/$phase',
-    getParentRoute: () => UsernameProfileRoute,
-  } as any)
-const UsernameProfileOpeningEcoRoute =
-  UsernameProfileOpeningEcoRouteImport.update({
-    id: '/opening/$eco',
-    path: '/opening/$eco',
-    getParentRoute: () => UsernameProfileRoute,
-  } as any)
-const UsernameProfileCategoryCategoryRoute =
-  UsernameProfileCategoryCategoryRouteImport.update({
-    id: '/category/$category',
-    path: '/category/$category',
-    getParentRoute: () => UsernameProfileRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$username': typeof UsernameRouteWithChildren
-  '/$username/profile': typeof UsernameProfileRouteWithChildren
   '/$username/': typeof UsernameIndexRoute
-  '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
-  '/$username/profile/': typeof UsernameProfileIndexRoute
-  '/$username/profile/category/$category': typeof UsernameProfileCategoryCategoryRoute
-  '/$username/profile/opening/$eco': typeof UsernameProfileOpeningEcoRoute
-  '/$username/profile/phase/$phase': typeof UsernameProfilePhasePhaseRoute
-  '/$username/profile/piece/$piece': typeof UsernameProfilePiecePieceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$username': typeof UsernameIndexRoute
-  '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
-  '/$username/profile': typeof UsernameProfileIndexRoute
-  '/$username/profile/category/$category': typeof UsernameProfileCategoryCategoryRoute
-  '/$username/profile/opening/$eco': typeof UsernameProfileOpeningEcoRoute
-  '/$username/profile/phase/$phase': typeof UsernameProfilePhasePhaseRoute
-  '/$username/profile/piece/$piece': typeof UsernameProfilePiecePieceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$username': typeof UsernameRouteWithChildren
-  '/$username/profile': typeof UsernameProfileRouteWithChildren
   '/$username/': typeof UsernameIndexRoute
-  '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
-  '/$username/profile/': typeof UsernameProfileIndexRoute
-  '/$username/profile/category/$category': typeof UsernameProfileCategoryCategoryRoute
-  '/$username/profile/opening/$eco': typeof UsernameProfileOpeningEcoRoute
-  '/$username/profile/phase/$phase': typeof UsernameProfilePhasePhaseRoute
-  '/$username/profile/piece/$piece': typeof UsernameProfilePiecePieceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/$username'
-    | '/$username/profile'
-    | '/$username/'
-    | '/$username/games/$gameId'
-    | '/$username/profile/'
-    | '/$username/profile/category/$category'
-    | '/$username/profile/opening/$eco'
-    | '/$username/profile/phase/$phase'
-    | '/$username/profile/piece/$piece'
+  fullPaths: '/' | '/$username' | '/$username/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/$username'
-    | '/$username/games/$gameId'
-    | '/$username/profile'
-    | '/$username/profile/category/$category'
-    | '/$username/profile/opening/$eco'
-    | '/$username/profile/phase/$phase'
-    | '/$username/profile/piece/$piece'
-  id:
-    | '__root__'
-    | '/'
-    | '/$username'
-    | '/$username/profile'
-    | '/$username/'
-    | '/$username/games/$gameId'
-    | '/$username/profile/'
-    | '/$username/profile/category/$category'
-    | '/$username/profile/opening/$eco'
-    | '/$username/profile/phase/$phase'
-    | '/$username/profile/piece/$piece'
+  to: '/' | '/$username'
+  id: '__root__' | '/' | '/$username' | '/$username/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -175,88 +80,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsernameIndexRouteImport
       parentRoute: typeof UsernameRoute
     }
-    '/$username/profile': {
-      id: '/$username/profile'
-      path: '/profile'
-      fullPath: '/$username/profile'
-      preLoaderRoute: typeof UsernameProfileRouteImport
-      parentRoute: typeof UsernameRoute
-    }
-    '/$username/profile/': {
-      id: '/$username/profile/'
-      path: '/'
-      fullPath: '/$username/profile/'
-      preLoaderRoute: typeof UsernameProfileIndexRouteImport
-      parentRoute: typeof UsernameProfileRoute
-    }
-    '/$username/games/$gameId': {
-      id: '/$username/games/$gameId'
-      path: '/games/$gameId'
-      fullPath: '/$username/games/$gameId'
-      preLoaderRoute: typeof UsernameGamesGameIdRouteImport
-      parentRoute: typeof UsernameRoute
-    }
-    '/$username/profile/piece/$piece': {
-      id: '/$username/profile/piece/$piece'
-      path: '/piece/$piece'
-      fullPath: '/$username/profile/piece/$piece'
-      preLoaderRoute: typeof UsernameProfilePiecePieceRouteImport
-      parentRoute: typeof UsernameProfileRoute
-    }
-    '/$username/profile/phase/$phase': {
-      id: '/$username/profile/phase/$phase'
-      path: '/phase/$phase'
-      fullPath: '/$username/profile/phase/$phase'
-      preLoaderRoute: typeof UsernameProfilePhasePhaseRouteImport
-      parentRoute: typeof UsernameProfileRoute
-    }
-    '/$username/profile/opening/$eco': {
-      id: '/$username/profile/opening/$eco'
-      path: '/opening/$eco'
-      fullPath: '/$username/profile/opening/$eco'
-      preLoaderRoute: typeof UsernameProfileOpeningEcoRouteImport
-      parentRoute: typeof UsernameProfileRoute
-    }
-    '/$username/profile/category/$category': {
-      id: '/$username/profile/category/$category'
-      path: '/category/$category'
-      fullPath: '/$username/profile/category/$category'
-      preLoaderRoute: typeof UsernameProfileCategoryCategoryRouteImport
-      parentRoute: typeof UsernameProfileRoute
-    }
   }
 }
 
-interface UsernameProfileRouteChildren {
-  UsernameProfileIndexRoute: typeof UsernameProfileIndexRoute
-  UsernameProfileCategoryCategoryRoute: typeof UsernameProfileCategoryCategoryRoute
-  UsernameProfileOpeningEcoRoute: typeof UsernameProfileOpeningEcoRoute
-  UsernameProfilePhasePhaseRoute: typeof UsernameProfilePhasePhaseRoute
-  UsernameProfilePiecePieceRoute: typeof UsernameProfilePiecePieceRoute
-}
-
-const UsernameProfileRouteChildren: UsernameProfileRouteChildren = {
-  UsernameProfileIndexRoute: UsernameProfileIndexRoute,
-  UsernameProfileCategoryCategoryRoute: UsernameProfileCategoryCategoryRoute,
-  UsernameProfileOpeningEcoRoute: UsernameProfileOpeningEcoRoute,
-  UsernameProfilePhasePhaseRoute: UsernameProfilePhasePhaseRoute,
-  UsernameProfilePiecePieceRoute: UsernameProfilePiecePieceRoute,
-}
-
-const UsernameProfileRouteWithChildren = UsernameProfileRoute._addFileChildren(
-  UsernameProfileRouteChildren,
-)
-
 interface UsernameRouteChildren {
-  UsernameProfileRoute: typeof UsernameProfileRouteWithChildren
   UsernameIndexRoute: typeof UsernameIndexRoute
-  UsernameGamesGameIdRoute: typeof UsernameGamesGameIdRoute
 }
 
 const UsernameRouteChildren: UsernameRouteChildren = {
-  UsernameProfileRoute: UsernameProfileRouteWithChildren,
   UsernameIndexRoute: UsernameIndexRoute,
-  UsernameGamesGameIdRoute: UsernameGamesGameIdRoute,
 }
 
 const UsernameRouteWithChildren = UsernameRoute._addFileChildren(
