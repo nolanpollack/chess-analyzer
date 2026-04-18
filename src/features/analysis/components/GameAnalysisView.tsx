@@ -16,6 +16,7 @@ type GameAnalysisViewProps = {
 	playerColor: "white" | "black";
 	accuracyWhite: number | null;
 	accuracyBlack: number | null;
+	initialPly?: number;
 };
 
 export function GameAnalysisView({
@@ -25,9 +26,14 @@ export function GameAnalysisView({
 	playerColor,
 	accuracyWhite,
 	accuracyBlack,
+	initialPly,
 }: GameAnalysisViewProps) {
 	const reanalyze = useReanalyze(gameId);
-	const navigation = useMoveNavigation({ moves, enableKeyboard: true });
+	const navigation = useMoveNavigation({
+		moves,
+		initialPly,
+		enableKeyboard: true,
+	});
 
 	const playerAccuracy =
 		playerColor === "white" ? accuracyWhite : accuracyBlack;

@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import { GameAnalysisView } from "#/features/analysis/components/GameAnalysisView";
 import { GameDetailHeader } from "#/features/analysis/components/GameDetailHeader";
 import { GameDetailSkeleton } from "#/features/analysis/components/GameDetailSkeleton";
@@ -8,11 +9,15 @@ import { useAnalysisStatus } from "#/features/analysis/hooks/use-analysis-status
 import { useGameAnalysis } from "#/features/analysis/hooks/use-game-analysis";
 
 export const Route = createFileRoute("/$username/games/$gameId")({
+	validateSearch: z.object({
+		ply: z.coerce.number().int().positive().optional(),
+	}),
 	component: GameDetailPage,
 });
 
 function GameDetailPage() {
 	const { username, gameId } = Route.useParams();
+	const { ply } = Route.useSearch();
 	const { data, isLoading } = useGameAnalysis(gameId);
 	const analysisStatus = useAnalysisStatus(
 		gameId,
@@ -20,7 +25,27 @@ function GameDetailPage() {
 	);
 
 	const polledStatus =
-		analysisStatus.data?.status ?? data?.analysis?.status ?? null;
+		(
+			analysisStatus.data as
+				| {
+						status: "pending" | "complete" | "failed" | null;
+						movesAnalyzed: number;
+						totalMoves: number | null;
+						error?: string;
+				  }
+				| undefined
+		)?.status ??
+		data?.analysis?.status ??
+		null;
+
+	const polledData = analysisStatus.data as
+		| {
+				status: "pending" | "complete" | "failed" | null;
+				movesAnalyzed: number;
+				totalMoves: number | null;
+				error?: string;
+		  }
+		| undefined;
 	useAnalysisLifecycle(gameId, polledStatus, data?.analysis?.status ?? null);
 
 	if (isLoading) {
@@ -61,21 +86,18 @@ function GameDetailPage() {
 					playerColor={game.playerColor as "white" | "black"}
 					accuracyWhite={analysis?.accuracyWhite ?? null}
 					accuracyBlack={analysis?.accuracyBlack ?? null}
+					initialPly={ply}
 				/>
 			) : (
 				<GamePendingView
 					game={game}
 					gameId={gameId}
-					status={analysisStatus.data?.status ?? analysis?.status ?? null}
+					status={polledData?.status ?? analysis?.status ?? null}
 					movesAnalyzed={
-						analysisStatus.data?.movesAnalyzed ?? analysis?.movesAnalyzed ?? 0
+						polledData?.movesAnalyzed ?? analysis?.movesAnalyzed ?? 0
 					}
-					totalMoves={
-						analysisStatus.data?.totalMoves ?? analysis?.totalMoves ?? null
-					}
-					error={
-						analysisStatus.data?.error ?? analysis?.errorMessage ?? undefined
-					}
+					totalMoves={polledData?.totalMoves ?? analysis?.totalMoves ?? null}
+					error={polledData?.error ?? analysis?.errorMessage ?? undefined}
 					onRetry={() => analysisStatus.refetch()}
 				/>
 			)}

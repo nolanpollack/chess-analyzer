@@ -33,6 +33,7 @@
   (plain Bun process) can also use the same env module
 
 ## Function decomposition
+- Break out separate logic into helper functions and use functions to compose other functions. Avoid monolithic functions.
 - Each function should have one job. If you need section comments (e.g.
   `// Step 1: …`, `// Step 2: …`) to break up a function, extract those
   sections into named helper functions instead.

@@ -1,8 +1,10 @@
+import { Chess } from "chess.js";
 import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
 import {
+	type Concept,
 	gameAnalyses,
 	gamePerformance,
 	games,
@@ -15,6 +17,7 @@ import {
 	classifyMove,
 	computeAccuracy,
 	computeEvalDelta,
+	detectConcepts,
 	getGamePhase,
 	getPiecesInvolved,
 	type PgnMove,
@@ -113,8 +116,13 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 
 		const analysisId = await getAnalysisId(db, gameId);
 		if (analysisId) {
-			const tagRows = buildTagRows(moveAnalyses, analysisId, game);
-			await insertMoveTags(db, tagRows);
+			const tagRows = buildTagRows(
+				positionEvals,
+				moveAnalyses,
+				analysisId,
+				game,
+			);
+			await insertMoveTags(db, analysisId, tagRows);
 			await insertGamePerformance(
 				db,
 				analysisId,
@@ -283,6 +291,11 @@ function buildMoveAnalyses(
 			evalDelta,
 			move.uci,
 			beforeEval.bestMoveUci,
+			beforeEval.evalCp,
+			afterEval.evalCp,
+			move.fenBefore,
+			move.fenAfter,
+			move.isWhite,
 		);
 
 		moveAnalyses.push({
@@ -354,9 +367,11 @@ type TagRow = {
 	piecesInvolved: ("pawn" | "knight" | "bishop" | "rook" | "queen" | "king")[];
 	openingEco: string | null;
 	openingName: string | null;
+	concepts: Concept[];
 };
 
 function buildTagRows(
+	positionEvals: Map<string, PositionEval>,
 	moveAnalyses: MoveAnalysis[],
 	analysisId: string,
 	game: GameData,
@@ -364,6 +379,29 @@ function buildTagRows(
 	return moveAnalyses.map((move) => {
 		const phase = getGamePhase(move.ply, move.fen_after);
 		const pieces = getPiecesInvolved(move.san, move.uci, move.fen_before);
+
+		const beforeEval = positionEvals.get(move.fen_before);
+		let bestMoveFenAfter = move.fen_after;
+		if (beforeEval?.bestMoveUci) {
+			try {
+				const chess = new Chess(move.fen_before);
+				const uci = beforeEval.bestMoveUci;
+				// from+to+promotion
+				chess.move({
+					from: uci.slice(0, 2),
+					to: uci.slice(2, 4),
+					promotion: uci.slice(4, 5) || undefined,
+				});
+				bestMoveFenAfter = chess.fen();
+			} catch (_e) {}
+		}
+		const concepts = detectConcepts(
+			move,
+			move.fen_before,
+			move.fen_after,
+			bestMoveFenAfter,
+		);
+
 		return {
 			gameAnalysisId: analysisId,
 			playerId: game.playerId,
@@ -372,14 +410,17 @@ function buildTagRows(
 			piecesInvolved: pieces,
 			openingEco: phase === "opening" ? game.openingEco : null,
 			openingName: phase === "opening" ? game.openingName : null,
+			concepts,
 		};
 	});
 }
 
 async function insertMoveTags(
 	db: NodePgDatabase,
+	analysisId: string,
 	tagRows: TagRow[],
 ): Promise<void> {
+	await db.delete(moveTags).where(eq(moveTags.gameAnalysisId, analysisId));
 	if (tagRows.length > 0) {
 		await db.insert(moveTags).values(tagRows);
 	}
@@ -398,7 +439,7 @@ async function insertGamePerformance(
 		piecesInvolved: t.piecesInvolved,
 		openingEco: t.openingEco,
 		openingName: t.openingName,
-		concepts: null,
+		concepts: t.concepts,
 	}));
 
 	const perf = computeGamePerformance(moveAnalyses, tagData);

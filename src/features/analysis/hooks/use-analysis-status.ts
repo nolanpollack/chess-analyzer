@@ -1,8 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { getAnalysisStatus } from "#/server/analysis";
 
+type AnalysisStatusData = {
+	status: "pending" | "complete" | "failed" | null;
+	movesAnalyzed: number;
+	totalMoves: number | null;
+	error?: string;
+};
+
 export function useAnalysisStatus(gameId: string, enabled = true) {
-	return useQuery({
+	return useQuery<AnalysisStatusData>({
 		queryKey: ["analysis-status", gameId],
 		queryFn: async () => {
 			const result = await getAnalysisStatus({ data: { gameId } });

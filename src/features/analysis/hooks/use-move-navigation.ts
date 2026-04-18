@@ -3,6 +3,8 @@ import type { MoveAnalysis } from "#/db/schema";
 
 type UseMoveNavigationOptions = {
 	moves: MoveAnalysis[];
+	/** Initial ply to select when the moves load */
+	initialPly?: number;
 	/** Enable keyboard navigation */
 	enableKeyboard?: boolean;
 };
@@ -30,9 +32,15 @@ const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 export function useMoveNavigation({
 	moves,
+	initialPly,
 	enableKeyboard = true,
 }: UseMoveNavigationOptions): UseMoveNavigationReturn {
 	const [currentPly, setCurrentPly] = useState(0);
+
+	useEffect(() => {
+		if (typeof initialPly !== "number") return;
+		setCurrentPly(Math.max(0, Math.min(initialPly, moves.length)));
+	}, [initialPly, moves.length]);
 
 	const goToPly = useCallback(
 		(ply: number) => {

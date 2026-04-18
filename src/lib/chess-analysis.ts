@@ -9,6 +9,35 @@ import type { ChessPiece, GamePhase, MoveClassification } from "#/db/schema";
 
 // ── Move Classification ────────────────────────────────────────────────
 
+function countPlayerMaterial(chess: Chess, playerColor: "w" | "b"): number {
+	let total = 0;
+	for (const row of chess.board()) {
+		for (const piece of row) {
+			if (piece && piece.color === playerColor) {
+				total += PIECE_VALUES[piece.type] || (piece.type === "p" ? 1 : 0);
+			}
+		}
+	}
+	return total;
+}
+
+function isBrilliantMove(
+	chessBefore: Chess,
+	chessAfter: Chess,
+	playerColor: "w" | "b",
+	loss: number,
+	playerAdvantageBefore: number,
+	playerAdvantageAfter: number,
+): boolean {
+	return (
+		countPlayerMaterial(chessAfter, playerColor) <
+			countPlayerMaterial(chessBefore, playerColor) &&
+		loss <= 50 &&
+		playerAdvantageBefore < 300 &&
+		playerAdvantageAfter >= 0
+	);
+}
+
 /**
  * Classify a move based on eval delta and whether it matches the engine's best move.
  *
@@ -20,14 +49,45 @@ export function classifyMove(
 	evalDelta: number,
 	playedUci: string,
 	bestUci: string,
+	evalBefore: number,
+	evalAfter: number,
+	fenBefore: string,
+	fenAfter: string,
+	isWhite: boolean,
 ): MoveClassification {
 	// Player played the engine's best move
 	if (playedUci === bestUci) return "best";
 
-	// Player's move improved eval beyond expectation (rare)
-	if (evalDelta > 10) return "brilliant";
-
 	const loss = Math.abs(evalDelta);
+
+	// Brilliant move detection:
+	// - Piece sacrifice (material decreased)
+	// - Near best move (within 50cp)
+	// - Position not clearly winning before (< 300cp advantage)
+	// - Position not losing after (evalAfter >= 0 or similar for the player)
+	// evalBefore/After are from White's perspective.
+
+	const playerAdvantageBefore = isWhite ? evalBefore : -evalBefore;
+	const playerAdvantageAfter = isWhite ? evalAfter : -evalAfter;
+
+	const chessBefore = new Chess(fenBefore);
+	const chessAfter = new Chess(fenAfter);
+
+	const playerColor = isWhite ? "w" : "b";
+
+	if (
+		isBrilliantMove(
+			chessBefore,
+			chessAfter,
+			playerColor,
+			loss,
+			playerAdvantageBefore,
+			playerAdvantageAfter,
+		)
+	) {
+		return "brilliant";
+	}
+
 	if (loss >= ANALYSIS_CONFIG.classification.blunder) return "blunder";
 	if (loss >= ANALYSIS_CONFIG.classification.mistake) return "mistake";
 	if (loss >= ANALYSIS_CONFIG.classification.inaccuracy) return "inaccuracy";
@@ -286,4 +346,151 @@ export function getPiecesInvolved(
 	}
 
 	return Array.from(pieces);
+}
+
+import type { Concept, MoveAnalysis } from "#/db/schema";
+
+function detectHangingPiece(
+	chessBefore: Chess,
+	chessAfter: Chess,
+	chessBest: Chess,
+	opponentColor: "w" | "b",
+): boolean {
+	const countMaterialColor = (chess: Chess, color: "w" | "b") => {
+		let total = 0;
+		for (const row of chess.board()) {
+			for (const piece of row) {
+				if (piece && piece.color === color) {
+					total += PIECE_VALUES[piece.type] || (piece.type === "p" ? 1 : 0);
+				}
+			}
+		}
+		return total;
+	};
+
+	const opponentMaterialBefore = countMaterialColor(chessBefore, opponentColor);
+	const opponentMaterialBest = countMaterialColor(chessBest, opponentColor);
+	const opponentMaterialPlayed = countMaterialColor(chessAfter, opponentColor);
+
+	return (
+		opponentMaterialBest < opponentMaterialBefore &&
+		opponentMaterialPlayed === opponentMaterialBefore
+	);
+}
+
+function detectDevelopment(
+	moveData: MoveAnalysis,
+	chessBefore: Chess,
+	chessAfter: Chess,
+	chessBest: Chess,
+	playerColor: "w" | "b",
+	isWhite: boolean,
+): boolean {
+	if (moveData.ply > 20) return false;
+
+	const startRank = isWhite ? "1" : "8";
+
+	const countBackRankPieces = (
+		chess: Chess,
+		color: "w" | "b",
+		rank: string,
+	) => {
+		let count = 0;
+		const board = chess.board();
+		const rankIndex = 8 - parseInt(rank, 10); // '1' -> 7, '8' -> 0
+		for (const piece of board[rankIndex]) {
+			if (
+				piece &&
+				piece.color === color &&
+				piece.type !== "p" &&
+				piece.type !== "k" &&
+				piece.type !== "r"
+			) {
+				count++; // counting N and B for development
+			}
+		}
+		return count;
+	};
+
+	const piecesOnStartBefore = countBackRankPieces(
+		chessBefore,
+		playerColor,
+		startRank,
+	);
+	const piecesOnStartBest = countBackRankPieces(
+		chessBest,
+		playerColor,
+		startRank,
+	);
+	const piecesOnStartPlayed = countBackRankPieces(
+		chessAfter,
+		playerColor,
+		startRank,
+	);
+
+	return (
+		piecesOnStartBest < piecesOnStartBefore &&
+		piecesOnStartPlayed === piecesOnStartBefore
+	);
+}
+
+function detectKingSafety(
+	chessAfter: Chess,
+	playerColor: "w" | "b",
+	isWhite: boolean,
+): boolean {
+	const rank2 = isWhite ? "2" : "7";
+	const countPawnsOnRank2 = (chess: Chess, color: "w" | "b", rank: string) => {
+		let count = 0;
+		const board = chess.board();
+		const rankIndex = 8 - parseInt(rank, 10);
+		for (const piece of board[rankIndex]) {
+			if (piece && piece.color === color && piece.type === "p") {
+				count++;
+			}
+		}
+		return count;
+	};
+
+	return countPawnsOnRank2(chessAfter, playerColor, rank2) < 2;
+}
+
+export function detectConcepts(
+	moveData: MoveAnalysis,
+	fenBefore: string,
+	fenAfter: string,
+	bestMoveFenAfter: string,
+): Concept[] {
+	const concepts: Concept[] = [];
+
+	const chessBefore = new Chess(fenBefore);
+	const chessAfter = new Chess(fenAfter);
+	const chessBest = new Chess(bestMoveFenAfter);
+
+	const isWhite = chessBefore.turn() === "w";
+	const playerColor = isWhite ? "w" : "b";
+	const opponentColor = isWhite ? "b" : "w";
+
+	if (detectHangingPiece(chessBefore, chessAfter, chessBest, opponentColor)) {
+		concepts.push("hanging-piece");
+	}
+
+	if (
+		detectDevelopment(
+			moveData,
+			chessBefore,
+			chessAfter,
+			chessBest,
+			playerColor,
+			isWhite,
+		)
+	) {
+		concepts.push("development");
+	}
+
+	if (detectKingSafety(chessAfter, playerColor, isWhite)) {
+		concepts.push("king-safety");
+	}
+
+	return concepts;
 }

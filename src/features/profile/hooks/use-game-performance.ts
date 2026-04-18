@@ -4,8 +4,12 @@ import { getGamePerformance } from "#/server/profile";
 export function useGamePerformance(gameAnalysisId: string | null) {
 	return useQuery({
 		queryKey: ["gamePerformance", gameAnalysisId],
-		queryFn: () =>
-			getGamePerformance({ data: { gameAnalysisId: gameAnalysisId! } }),
+		queryFn: () => {
+			if (!gameAnalysisId) {
+				throw new Error("Missing game analysis id");
+			}
+			return getGamePerformance({ data: { gameAnalysisId } });
+		},
 		enabled: !!gameAnalysisId,
 	});
 }

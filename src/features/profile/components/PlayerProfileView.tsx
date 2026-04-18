@@ -23,7 +23,7 @@ export function PlayerProfileView({
 	onRefresh,
 	isRefreshing,
 }: Props) {
-	const cards = buildCardList(profile);
+	const cards = buildCardList(profile, username);
 
 	return (
 		<div className="space-y-6 p-6">
@@ -62,13 +62,14 @@ export function PlayerProfileView({
 	);
 }
 
-function buildCardList(profile: PlayerProfileData) {
+function buildCardList(profile: PlayerProfileData, username: string) {
 	const cards: React.ReactNode[] = [];
 
-	cards.push(<PhaseCard key="phase" profile={profile} />);
+	cards.push(<PhaseCard key="phase" profile={profile} username={username} />);
 	cards.push(
 		<PieceCard
 			key="piece"
+			username={username}
 			pieceStats={profile.pieceStats}
 			overallAccuracy={profile.overallAccuracy}
 		/>,
@@ -78,6 +79,7 @@ function buildCardList(profile: PlayerProfileData) {
 		cards.push(
 			<CategoryCard
 				key="category"
+				username={username}
 				categoryStats={profile.categoryStats}
 				overallAccuracy={profile.overallAccuracy}
 			/>,
@@ -89,6 +91,7 @@ function buildCardList(profile: PlayerProfileData) {
 		cards.push(
 			<OpeningCard
 				key="opening"
+				username={username}
 				openingStats={profile.openingStats}
 				overallAccuracy={profile.overallAccuracy}
 			/>,
@@ -98,8 +101,14 @@ function buildCardList(profile: PlayerProfileData) {
 	return cards;
 }
 
-function PhaseCard({ profile }: { profile: PlayerProfileData }) {
-	const rows = buildPhaseRows(profile);
+function PhaseCard({
+	profile,
+	username,
+}: {
+	profile: PlayerProfileData;
+	username: string;
+}) {
+	const rows = buildPhaseRows(profile, username);
 	return (
 		<DimensionCard
 			title="By phase"
@@ -109,7 +118,7 @@ function PhaseCard({ profile }: { profile: PlayerProfileData }) {
 	);
 }
 
-function buildPhaseRows(profile: PlayerProfileData) {
+function buildPhaseRows(profile: PlayerProfileData, username: string) {
 	const phases: { key: string; label: string; accuracy: number | null }[] = [
 		{ key: "opening", label: "Opening", accuracy: profile.openingAccuracy },
 		{
@@ -120,23 +129,26 @@ function buildPhaseRows(profile: PlayerProfileData) {
 		{ key: "endgame", label: "Endgame", accuracy: profile.endgameAccuracy },
 	];
 
-	return phases.map((p) => ({
-		key: p.key,
-		label: p.label,
-		accuracy: p.accuracy ?? 0,
+	return phases.map((phase) => ({
+		key: phase.key,
+		label: phase.label,
+		accuracy: phase.accuracy ?? 0,
 		moveCount: 0,
-		extra: p.accuracy === null ? "N/A" : undefined,
+		extra: phase.accuracy === null ? "N/A" : undefined,
+		href: `/${username}/profile/phase/${phase.key}`,
 	}));
 }
 
 function PieceCard({
+	username,
 	pieceStats,
 	overallAccuracy,
 }: {
+	username: string;
 	pieceStats: PieceStats;
 	overallAccuracy: number;
 }) {
-	const rows = buildPieceRows(pieceStats);
+	const rows = buildPieceRows(pieceStats, username);
 	return (
 		<DimensionCard
 			title="By piece"
@@ -146,23 +158,26 @@ function PieceCard({
 	);
 }
 
-function buildPieceRows(pieceStats: PieceStats) {
+function buildPieceRows(pieceStats: PieceStats, username: string) {
 	const pieces = ["pawn", "knight", "bishop", "rook", "queen", "king"] as const;
 	return pieces
-		.filter((p) => pieceStats[p].moveCount > 0)
-		.map((p) => ({
-			key: p,
-			label: p.charAt(0).toUpperCase() + p.slice(1),
-			accuracy: pieceStats[p].accuracy,
-			moveCount: pieceStats[p].moveCount,
-			extra: pluralize(pieceStats[p].moveCount, "move"),
+		.filter((piece) => pieceStats[piece].moveCount > 0)
+		.map((piece) => ({
+			key: piece,
+			label: piece.charAt(0).toUpperCase() + piece.slice(1),
+			accuracy: pieceStats[piece].accuracy,
+			moveCount: pieceStats[piece].moveCount,
+			extra: pluralize(pieceStats[piece].moveCount, "move"),
+			href: `/${username}/profile/piece/${piece}`,
 		}));
 }
 
 function CategoryCard({
+	username,
 	categoryStats,
 	overallAccuracy,
 }: {
+	username: string;
 	categoryStats: CategoryStats | null;
 	overallAccuracy: number;
 }) {
@@ -174,6 +189,7 @@ function CategoryCard({
 		accuracy: stats.accuracy,
 		moveCount: stats.moveCount,
 		extra: pluralize(stats.moveCount, "move"),
+		href: `/${username}/profile/category/${key}`,
 	}));
 
 	return (
@@ -187,9 +203,11 @@ function CategoryCard({
 }
 
 function OpeningCard({
+	username,
 	openingStats,
 	overallAccuracy,
 }: {
+	username: string;
 	openingStats: OpeningStats;
 	overallAccuracy: number;
 }) {
@@ -204,6 +222,7 @@ function OpeningCard({
 			accuracy: stats.accuracy,
 			moveCount: stats.moveCount,
 			extra: pluralize(stats.gameCount, "game"),
+			href: `/${username}/profile/opening/${eco}`,
 		}));
 
 	return (
