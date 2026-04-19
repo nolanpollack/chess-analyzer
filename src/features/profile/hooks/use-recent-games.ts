@@ -4,11 +4,8 @@ import { classifyResult } from "#/lib/chess-utils";
 import { listGames } from "#/server/games";
 
 type ListGamesResult = Awaited<ReturnType<typeof listGames>>;
-type ListGame = (ListGamesResult & {
-	games: unknown;
-})["games"] extends (infer U)[]
-	? U
-	: never;
+type ListGamesOk = Extract<ListGamesResult, { games: unknown }>;
+type ListGame = ListGamesOk["games"][number];
 
 export function useRecentGames(username: string, pageSize = 8) {
 	return useQuery({

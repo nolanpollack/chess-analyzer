@@ -97,14 +97,41 @@ export function classifyMove(
 // ── Accuracy Computation ───────────────────────────────────────────────
 
 /**
- * Compute accuracy as the percentage of moves classified as "good" or better.
+ * Convert a centipawn evaluation to a win probability percentage (0–100).
+ * Uses the same sigmoid Chess.com and Lichess use.
+ * Positive cp = white advantage, negative = black advantage.
  */
-export function computeAccuracy(classifications: MoveClassification[]): number {
-	if (classifications.length === 0) return 0;
-	const goodOrBetter = classifications.filter(
-		(c) => c === "good" || c === "best" || c === "brilliant",
-	).length;
-	return Math.round((goodOrBetter / classifications.length) * 1000) / 10;
+export function cpToWinPct(cp: number): number {
+	return 100 / (1 + Math.exp(-0.00368208 * cp));
+}
+
+export type MoveEvalData = {
+	evalBefore: number;
+	evalAfter: number;
+	isWhite: boolean;
+};
+
+/**
+ * Compute accuracy using Chess.com's win-probability formula.
+ * Each move's accuracy is derived from how much win% was lost, then averaged.
+ * Returns a value 0–100 rounded to one decimal place.
+ */
+export function computeAccuracy(moves: MoveEvalData[]): number {
+	if (moves.length === 0) return 0;
+	let sum = 0;
+	for (const { evalBefore, evalAfter, isWhite } of moves) {
+		const playerEvalBefore = isWhite ? evalBefore : -evalBefore;
+		const playerEvalAfter = isWhite ? evalAfter : -evalAfter;
+		const winPctBefore = cpToWinPct(playerEvalBefore);
+		const winPctAfter = cpToWinPct(playerEvalAfter);
+		const delta = Math.max(0, winPctBefore - winPctAfter);
+		const moveAccuracy = Math.max(
+			0,
+			103.1668 * Math.exp(-0.04354 * delta) - 3.1669,
+		);
+		sum += moveAccuracy;
+	}
+	return Math.round((sum / moves.length) * 10) / 10;
 }
 
 // ── PGN Walking ────────────────────────────────────────────────────────

@@ -53,6 +53,10 @@
   --tint-data-6: color-mix(in srgb, var(--data-6) 12%, transparent);
   --topbar-bg: color-mix(in srgb, var(--bg) 85%, transparent);
 
+  /* Eval bar — theme-independent (white = white to move advantage, dark = black) */
+  --eval-bar-light: #fafafa;
+  --eval-bar-dark: #1a1814;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.04), 0 1px 1px rgba(23, 20, 15, 0.02);
   --shadow-md: 0 2px 4px rgba(23, 20, 15, 0.04), 0 8px 24px rgba(23, 20, 15, 0.06);
@@ -194,6 +198,8 @@
   --color-tint-blunder: var(--tint-blunder);
   --color-tint-data-6: var(--tint-data-6);
   --color-topbar-bg: var(--topbar-bg);
+  --color-eval-bar-light: var(--eval-bar-light);
+  --color-eval-bar-dark: var(--eval-bar-dark);
 
   /* shadcn compat */
   --color-background: var(--background);

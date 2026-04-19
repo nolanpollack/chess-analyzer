@@ -1,14 +1,25 @@
+import { useNavigate } from "@tanstack/react-router";
 import type { RecentGame } from "#/features/profile/types";
 import { GameResultPill } from "./GameResultPill";
 import { GameScoreCell } from "./GameScoreCell";
 
 type RecentGameRowProps = {
 	game: RecentGame;
+	username: string;
 };
 
-export function RecentGameRow({ game }: RecentGameRowProps) {
+export function RecentGameRow({ game, username }: RecentGameRowProps) {
+	const navigate = useNavigate();
 	return (
-		<tr className="cursor-pointer transition-colors duration-[100ms] hover:bg-surface-2">
+		<tr
+			onClick={() =>
+				navigate({
+					to: "/$username/games/$gameId",
+					params: { username, gameId: game.id },
+				})
+			}
+			className="cursor-pointer transition-colors duration-[100ms] hover:bg-surface-2"
+		>
 			<td className="py-[14px] pl-5 pr-3">
 				<GameResultPill result={game.result} />
 			</td>

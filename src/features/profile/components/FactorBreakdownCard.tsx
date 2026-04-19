@@ -1,10 +1,11 @@
+import { BarChart2 } from "lucide-react";
 import type { Factor } from "#/features/profile/types";
 import { FactorRow } from "./FactorRow";
 
 // TODO(missing-backend): Factor ratings — needs Elo-scale per-factor values + deltas.
 // See MISSING_FEATURES.md#factor-ratings
 type FactorBreakdownCardProps = {
-	factors: Factor[];
+	factors: Factor[] | null;
 	playerElo: number | null;
 };
 
@@ -13,9 +14,6 @@ export function FactorBreakdownCard({
 	playerElo,
 }: FactorBreakdownCardProps) {
 	const baseline = playerElo ?? 1500;
-	const sorted = [...factors].sort(
-		(a, b) => a.value - baseline - (b.value - baseline),
-	);
 
 	return (
 		<div className="rounded-[10px] border border-divider bg-surface p-5">
@@ -25,22 +23,40 @@ export function FactorBreakdownCard({
 						Performance by factor
 					</div>
 					<div className="mt-[2px] text-[11.5px] text-fg-3">
-						{playerElo !== null
-							? `Each score shown relative to your overall rating of ${playerElo}. Weakest first.`
-							: "Weakest first."}
+						{factors !== null
+							? playerElo !== null
+								? `Each score shown relative to your overall rating of ${playerElo}. Weakest first.`
+								: "Weakest first."
+							: "Elo-scale ratings across key skill areas"}
 					</div>
 				</div>
-				{playerElo !== null && (
+				{factors !== null && playerElo !== null && (
 					<span className="font-mono text-[11px] text-fg-3">
 						baseline {playerElo}
 					</span>
 				)}
 			</div>
-			<div className="grid grid-cols-2 gap-x-8">
-				{sorted.map((factor) => (
-					<FactorRow key={factor.id} factor={factor} baseline={baseline} />
-				))}
-			</div>
+			{factors === null ? (
+				<div className="flex min-h-[80px] items-center justify-center gap-3 py-4">
+					<BarChart2 className="h-4 w-4 shrink-0 text-fg-4" />
+					<div>
+						<div className="text-[13px] text-fg-3">
+							Factor breakdown coming soon
+						</div>
+						<div className="mt-[2px] text-[12px] text-fg-4">
+							Per-factor Elo ratings will appear once the scoring model is built
+						</div>
+					</div>
+				</div>
+			) : (
+				<div className="grid grid-cols-2 gap-x-8">
+					{[...factors]
+						.sort((a, b) => a.value - baseline - (b.value - baseline))
+						.map((factor) => (
+							<FactorRow key={factor.id} factor={factor} baseline={baseline} />
+						))}
+				</div>
+			)}
 		</div>
 	);
 }

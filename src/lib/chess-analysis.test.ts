@@ -3,6 +3,7 @@ import {
 	classifyMove,
 	computeAccuracy,
 	computeEvalDelta,
+	cpToWinPct,
 	getGamePhase,
 	getPiecesInvolved,
 	walkPgn,
@@ -71,40 +72,71 @@ describe("classifyMove", () => {
 	});
 });
 
+describe("cpToWinPct", () => {
+	it("returns 50 at 0 centipawns (equal position)", () => {
+		expect(cpToWinPct(0)).toBeCloseTo(50, 5);
+	});
+
+	it("returns >50 for positive eval (white advantage)", () => {
+		expect(cpToWinPct(100)).toBeGreaterThan(50);
+	});
+
+	it("returns <50 for negative eval (black advantage)", () => {
+		expect(cpToWinPct(-100)).toBeLessThan(50);
+	});
+
+	it("is symmetric around 50", () => {
+		expect(cpToWinPct(200) + cpToWinPct(-200)).toBeCloseTo(100, 5);
+	});
+});
+
 describe("computeAccuracy", () => {
 	it("returns 0 for an empty array", () => {
 		expect(computeAccuracy([])).toBe(0);
 	});
 
-	it("returns 100 when all moves are best", () => {
-		expect(computeAccuracy(["best", "best", "best"])).toBe(100);
+	it("returns ~100 when eval is unchanged (perfect move)", () => {
+		const moves = [{ evalBefore: 100, evalAfter: 100, isWhite: true }];
+		expect(computeAccuracy(moves)).toBeCloseTo(100, 0);
 	});
 
-	it("returns 0 when all moves are blunders", () => {
-		expect(computeAccuracy(["blunder", "blunder"])).toBe(0);
+	it("returns low accuracy for a catastrophic blunder", () => {
+		// White had +500cp advantage, drops to -500cp
+		const moves = [{ evalBefore: 500, evalAfter: -500, isWhite: true }];
+		expect(computeAccuracy(moves)).toBeLessThan(10);
 	});
 
-	it("counts brilliant, best, and good as accurate", () => {
-		expect(computeAccuracy(["brilliant", "best", "good"])).toBe(100);
+	it("returns ~100 for a position-improving move", () => {
+		// Player gained advantage — should not be penalized
+		const moves = [{ evalBefore: 0, evalAfter: 200, isWhite: true }];
+		expect(computeAccuracy(moves)).toBeCloseTo(100, 0);
 	});
 
-	it("counts inaccuracy, mistake, blunder as inaccurate", () => {
-		// 3 good + 3 bad = 50%
-		expect(
-			computeAccuracy([
-				"best",
-				"good",
-				"brilliant",
-				"inaccuracy",
-				"mistake",
-				"blunder",
-			]),
-		).toBe(50);
+	it("correctly uses black's perspective for black moves", () => {
+		// Black's move: eval goes from +100 (white advantage) to -100 (black advantage) — black improved
+		const improved = [{ evalBefore: 100, evalAfter: -100, isWhite: false }];
+		// Black's move: eval goes from -100 (black advantage) to +100 (white advantage) — black blundered
+		const blundered = [{ evalBefore: -100, evalAfter: 100, isWhite: false }];
+		expect(computeAccuracy(improved)).toBeGreaterThan(
+			computeAccuracy(blundered),
+		);
+	});
+
+	it("averages accuracy across multiple moves", () => {
+		const perfect = { evalBefore: 0, evalAfter: 0, isWhite: true };
+		const blunder = { evalBefore: 300, evalAfter: -300, isWhite: true };
+		const mixed = computeAccuracy([perfect, blunder]);
+		expect(mixed).toBeGreaterThan(0);
+		expect(mixed).toBeLessThan(100);
 	});
 
 	it("rounds to one decimal place", () => {
-		// 1 out of 3 = 33.333...% → 33.3
-		expect(computeAccuracy(["best", "blunder", "blunder"])).toBe(33.3);
+		const moves = [
+			{ evalBefore: 50, evalAfter: 20, isWhite: true },
+			{ evalBefore: 100, evalAfter: 50, isWhite: true },
+		];
+		const result = computeAccuracy(moves);
+		expect(result).toBe(Math.round(result * 10) / 10);
 	});
 });
 

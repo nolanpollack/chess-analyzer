@@ -9,7 +9,6 @@ import {
 	gamePerformance,
 	games,
 	type MoveAnalysis,
-	type MoveClassification,
 	moveTags,
 } from "#/db/schema";
 import { env } from "#/env";
@@ -20,6 +19,7 @@ import {
 	detectConcepts,
 	getGamePhase,
 	getPiecesInvolved,
+	type MoveEvalData,
 	type PgnMove,
 	walkPgn,
 } from "#/lib/chess-analysis";
@@ -270,8 +270,8 @@ function buildMoveAnalyses(
 } {
 	const isPlayerWhite = playerColor === "white";
 	const moveAnalyses: MoveAnalysis[] = [];
-	const whiteClassifications: MoveClassification[] = [];
-	const blackClassifications: MoveClassification[] = [];
+	const whiteMoveEvals: MoveEvalData[] = [];
+	const blackMoveEvals: MoveEvalData[] = [];
 
 	for (const move of pgnMoves) {
 		const beforeEval = positionEvals.get(move.fenBefore);
@@ -313,17 +313,22 @@ function buildMoveAnalyses(
 			is_player_move: move.isWhite === isPlayerWhite,
 		});
 
+		const evalData: MoveEvalData = {
+			evalBefore: beforeEval.evalCp,
+			evalAfter: afterEval.evalCp,
+			isWhite: move.isWhite,
+		};
 		if (move.isWhite) {
-			whiteClassifications.push(classification);
+			whiteMoveEvals.push(evalData);
 		} else {
-			blackClassifications.push(classification);
+			blackMoveEvals.push(evalData);
 		}
 	}
 
 	return {
 		moveAnalyses,
-		accuracyWhite: computeAccuracy(whiteClassifications),
-		accuracyBlack: computeAccuracy(blackClassifications),
+		accuracyWhite: computeAccuracy(whiteMoveEvals),
+		accuracyBlack: computeAccuracy(blackMoveEvals),
 	};
 }
 

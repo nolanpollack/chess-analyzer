@@ -1,0 +1,105 @@
+import { MetricLabel, MetricValue } from "#/components/ui/metric";
+import { Tag } from "#/components/ui/tag";
+import { classifyResult } from "#/lib/chess-utils";
+
+type GameHeaderGame = {
+	playerUsername: string;
+	opponentUsername: string;
+	opponentRating: number;
+	playerColor: "white" | "black";
+	resultDetail: string;
+	openingName: string | null;
+	openingEco: string | null;
+	timeControl: string;
+};
+
+type GamePageHeaderProps = {
+	game: GameHeaderGame;
+	moveCount: number;
+	gameScore: number | null;
+	overallElo: number | null;
+	accuracy: number | null;
+};
+
+const RESULT_STYLE = {
+	win: "bg-result-win text-data-6",
+	loss: "bg-result-loss text-blunder",
+	draw: "bg-surface-2 text-fg-2",
+} as const;
+
+const RESULT_LABEL = { win: "WIN", loss: "LOSS", draw: "DRAW" } as const;
+
+export function GamePageHeader({
+	game,
+	moveCount,
+	gameScore,
+	overallElo,
+	accuracy,
+}: GamePageHeaderProps) {
+	const category = classifyResult(game.resultDetail);
+	const opening = game.openingName ?? game.openingEco ?? "Unknown opening";
+
+	return (
+		<div className="mb-6 flex flex-wrap items-start justify-between gap-6">
+			<div className="min-w-0 flex-[1_1_420px]">
+				<div className="mb-2 flex flex-wrap items-center gap-[10px]">
+					<span
+						className={`rounded-[4px] px-2 py-[3px] font-mono text-[11px] font-semibold ${RESULT_STYLE[category]}`}
+					>
+						{RESULT_LABEL[category]}
+					</span>
+					<Tag>{opening}</Tag>
+					<Tag>{game.timeControl}</Tag>
+					<span className="mono-nums font-mono text-[12px] text-fg-3">
+						{moveCount} moves
+					</span>
+				</div>
+				<h1 className="text-[24px] font-semibold tracking-[-0.025em] text-fg">
+					{game.playerUsername}{" "}
+					<span className="font-normal text-fg-3">vs</span>{" "}
+					{game.opponentUsername}{" "}
+					<span className="mono-nums font-mono text-[16px] font-normal text-fg-3">
+						· {game.opponentRating}
+					</span>
+				</h1>
+				<p className="mt-2 max-w-[640px] text-[13.5px] text-fg-2">
+					You played {game.playerColor} ·{" "}
+					{category === "win"
+						? "a winning result"
+						: category === "loss"
+							? "a loss"
+							: "a draw"}
+					.
+				</p>
+			</div>
+			<div className="flex gap-7">
+				<div>
+					<MetricLabel>Game score</MetricLabel>
+					<div className="mt-1">
+						<MetricValue size="md">{gameScore ?? "—"}</MetricValue>
+					</div>
+					{overallElo !== null && (
+						<div className="mt-1 mono-nums font-mono text-[11px] text-fg-3">
+							vs {overallElo} overall
+						</div>
+					)}
+				</div>
+				<div>
+					<MetricLabel>Accuracy</MetricLabel>
+					<div className="mt-1">
+						<MetricValue size="md">
+							{accuracy !== null ? (
+								<>
+									{accuracy.toFixed(1)}
+									<span className="text-[16px] text-fg-3">%</span>
+								</>
+							) : (
+								"—"
+							)}
+						</MetricValue>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+}

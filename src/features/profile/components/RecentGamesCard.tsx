@@ -69,7 +69,9 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 							</td>
 						</tr>
 					) : (
-						games.map((game) => <RecentGameRow key={game.id} game={game} />)
+						games.map((game) => (
+							<RecentGameRow key={game.id} game={game} username={username} />
+						))
 					)}
 				</tbody>
 			</table>

@@ -107,3 +107,29 @@ Items marked **[REAL]** are already wired to real backend data.
 - Updated `getPlayerSummary` to return accounts for all platforms.
 
 **Current state:** Lichess support is fully removed from the UI. Chess.com only.
+
+---
+
+## game-page-factor-linking
+
+**What the UI shows (future):** Clicking a factor row on the game page (e.g. "Endgame" or "Knight") should highlight the corresponding moves in the move list and eval graph.
+
+**What's needed:**
+- Batch-load `move_tags` for all plies of the current game analysis (phase + pieces_involved).
+- Wire a shared "selected factor" state on the game page; derive highlighted plies from the tags query.
+- Render highlights on `MoveCell` and the eval graph.
+
+**Current state:** `FactorBreakdownCard` on the game page displays rows but they are not interactive.
+
+---
+
+## multi-pv-best-alternatives
+
+**What the UI shows (future):** Two or three strong alternative moves with evals on the game page explanation card.
+
+**What's needed:**
+- Engine changes: Stockfish run with MultiPV > 1; store the top-N moves in `MoveAnalysis`.
+- Schema change: `best_moves: { uci; san; eval }[]` replacing the single `best_move_*` fields (or additive).
+- Update the analyze-game job and re-run on existing analyses.
+
+**Current state:** Only a single best move is captured per position. Game page shows one "Best move" row.
