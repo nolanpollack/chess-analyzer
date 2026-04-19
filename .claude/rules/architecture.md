@@ -46,7 +46,8 @@
 ## Server functions + loaders
 - Loaders call server functions directly (no HTTP round-trip)
 - Client components use TanStack Query for mutations/caching
-- Server functions live in src/server/ organized by domain
+- Feature-specific server functions live in `src/features/{domain}/server/`
+- Cross-cutting server functions (touching multiple domains) live in `src/server/`
 - Server functions use `.inputValidator(zodSchema)` for input validation;
   the handler receives `{ data }` with the validated input
   (note: TanStack Start uses `inputValidator`, not `validator`)

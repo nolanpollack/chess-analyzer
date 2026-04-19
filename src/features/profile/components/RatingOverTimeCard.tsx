@@ -2,8 +2,8 @@ import { useState } from "react";
 import { LineChart } from "#/components/charts/LineChart";
 import { Segmented } from "#/components/ui/segmented";
 import { useRatingTrend } from "#/features/profile/hooks/use-rating-trend";
+import type { TrendRange } from "#/features/profile/server/profile";
 import type { RatingPoint } from "#/features/profile/types";
-import type { TrendRange } from "#/server/profile";
 
 type RatingOverTimeCardProps = {
 	username: string;

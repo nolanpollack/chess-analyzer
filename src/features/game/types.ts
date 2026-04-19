@@ -1,6 +1,6 @@
 import type { MoveAnalysis } from "#/db/schema";
+import type { getGamePerformance } from "#/features/profile/server/profile";
 import type { getGameWithAnalysis } from "#/server/analysis";
-import type { getGamePerformance } from "#/server/profile";
 
 export type GameDetailResult = Awaited<ReturnType<typeof getGameWithAnalysis>>;
 export type GameDetailOk = Extract<GameDetailResult, { game: unknown }>;

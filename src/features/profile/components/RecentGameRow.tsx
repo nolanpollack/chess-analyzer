@@ -18,37 +18,37 @@ export function RecentGameRow({ game, username }: RecentGameRowProps) {
 					params: { username, gameId: game.id },
 				})
 			}
-			className="cursor-pointer transition-colors duration-[100ms] hover:bg-surface-2"
+			className="cursor-pointer transition-colors duration-100 hover:bg-surface-2"
 		>
-			<td className="py-[14px] pl-5 pr-3">
+			<td className="py-3.5 pl-5 pr-3">
 				<GameResultPill result={game.result} />
 			</td>
-			<td className="px-3 py-[14px]">
+			<td className="px-3 py-3.5">
 				<div className="flex items-center gap-2">
 					<span
 						className={`h-2 w-2 shrink-0 rounded-[2px] border border-border-strong ${game.color === "white" ? "bg-surface-3" : "bg-fg-1"}`}
 					/>
 					<span className="text-[13px] font-medium text-fg-1">{game.opp}</span>
-					<span className="mono-nums font-mono text-[12px] text-fg-3">
+					<span className="mono-nums font-mono text-xs text-fg-3">
 						{game.oppElo}
 					</span>
 				</div>
 			</td>
-			<td className="px-3 py-[14px] text-[13px] text-fg-2">{game.opening}</td>
-			<td className="px-3 py-[14px]">
-				<span className="mono-nums font-mono text-[12px] text-fg-2">
+			<td className="px-3 py-3.5 text-[13px] text-fg-2">{game.opening}</td>
+			<td className="px-3 py-3.5">
+				<span className="mono-nums font-mono text-xs text-fg-2">
 					{game.time}
 				</span>
 			</td>
-			<td className="px-3 py-[14px] text-right">
+			<td className="px-3 py-3.5 text-right">
 				<span className="mono-nums font-mono text-[13px]">
 					{game.acc !== null ? `${game.acc.toFixed(1)}%` : "—"}
 				</span>
 			</td>
-			<td className="px-3 py-[14px] text-right">
+			<td className="px-3 py-3.5 text-right">
 				<GameScoreCell score={game.score} />
 			</td>
-			<td className="py-[14px] pl-3 pr-5 text-right text-[12px] text-fg-3">
+			<td className="py-3.5 pl-3 pr-5 text-right text-xs text-fg-3">
 				{game.when}
 			</td>
 		</tr>

@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
+import { cn } from "#/lib/utils";
 
 type PageContainerProps = {
-	children: ReactNode;
+  className?: string;
+  children: ReactNode;
 };
 
-export function PageContainer({ children }: PageContainerProps) {
-	return (
-		<div className="mx-auto max-w-[1280px] px-10 pb-20 pt-10">{children}</div>
-	);
+export function PageContainer({ className, children }: PageContainerProps) {
+  return (
+    <div className={cn("mx-auto max-w-7xl px-10 pb-20 pt-10", className)}>{children}</div>
+  );
 }

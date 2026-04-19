@@ -25,7 +25,7 @@ export function FactorRow({ factor, baseline }: FactorRowProps) {
 				: "bg-surface-2";
 
 	return (
-		<div className="grid cursor-pointer items-center gap-4 rounded-[6px] px-3 py-[10px] transition-colors duration-[100ms] hover:bg-surface-2 grid-cols-[160px_1fr_60px_70px]">
+		<div className="grid cursor-pointer items-center gap-4 rounded-sm px-3 py-2.5 transition-colors duration-100 hover:bg-surface-2 grid-cols-[160px_1fr_60px_70px]">
 			{/* Label */}
 			<div className="flex items-center gap-2">
 				<span className="text-[13.5px] font-[450] text-fg-1">
@@ -65,7 +65,7 @@ export function FactorRow({ factor, baseline }: FactorRowProps) {
 			{/* Delta */}
 			<div className="text-right">
 				<span
-					className={`mono-nums inline-flex items-center rounded-[4px] px-[6px] py-[2px] font-mono text-[11px] font-medium ${deltaColorClass} ${deltaBgClass}`}
+					className={`mono-nums inline-flex items-center rounded-[4px] px-1.5 py-0.5 font-mono text-[11px] font-medium ${deltaColorClass} ${deltaBgClass}`}
 				>
 					{factor.delta > 0 ? `+${factor.delta}` : factor.delta}
 				</span>

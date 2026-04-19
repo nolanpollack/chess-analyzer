@@ -12,24 +12,24 @@ export function FocusAreaTile({ area, index, isLast }: FocusAreaTileProps) {
 	return (
 		<div
 			className={[
-				"cursor-pointer p-6 transition-colors duration-[120ms] hover:bg-surface-2",
+				"cursor-pointer p-6 transition-colors duration-100 hover:bg-surface-2",
 				!isLast ? "border-r border-divider" : "",
 			].join(" ")}
 		>
-			<div className="mb-[10px] flex items-center gap-2">
+			<div className="mb-2.5 flex items-center gap-2">
 				<span className="font-mono text-[11px] text-fg-4">0{index + 1}</span>
-				<span className="ml-auto inline-flex items-center gap-1 rounded-[4px] bg-tint-blunder px-[6px] py-[2px] font-mono text-[11px] font-medium text-blunder">
-					<ArrowDown className="h-[10px] w-[10px]" />
+				<span className="ml-auto inline-flex items-center gap-1 rounded-[4px] bg-tint-blunder px-1.5 py-0.5 font-mono text-[11px] font-medium text-blunder">
+					<ArrowDown className="size-2.5" />
 					{area.gap} vs overall
 				</span>
 			</div>
-			<div className="mb-2 text-[16px] font-medium leading-tight tracking-[-0.01em] text-fg">
+			<div className="mb-2 text-base font-medium leading-tight tracking-[-0.01em] text-fg">
 				{area.title}
 			</div>
-			<p className="mb-[14px] text-[12.5px] leading-[1.55] text-fg-2">
+			<p className="mb-3.5 text-[12.5px] leading-[1.55] text-fg-2">
 				{area.detail}
 			</p>
-			<div className="flex flex-wrap items-center gap-[6px]">
+			<div className="flex flex-wrap items-center gap-1.5">
 				{area.factors.map((factor) => (
 					<Tag key={factor}>{factor}</Tag>
 				))}
