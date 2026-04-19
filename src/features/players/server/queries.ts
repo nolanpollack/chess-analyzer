@@ -51,7 +51,6 @@ export const getPlayerStatus = createServerFn({ method: "GET" })
         player: {
           id: player.id,
           username: player.username,
-          platform: player.platform,
           lastSyncedAt: player.lastSyncedAt?.toISOString() ?? null,
         },
         isSyncing,
