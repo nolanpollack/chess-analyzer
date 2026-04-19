@@ -1,5 +1,4 @@
 export type PlayerSummary = {
-	platform: "chess.com" | "lichess";
 	currentRating: number | null;
 	gameCount: number;
 	analyzedGameCount: number;

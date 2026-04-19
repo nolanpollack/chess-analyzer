@@ -10,11 +10,20 @@ type RatingOverTimeCardProps = {
 };
 
 const RANGE_OPTIONS: { value: TrendRange; label: string }[] = [
-	{ value: "4w", label: "4w" },
-	{ value: "6m", label: "6m" },
-	{ value: "1y", label: "1y" },
+	{ value: "1m", label: "1M" },
+	{ value: "3m", label: "3M" },
+	{ value: "6m", label: "6M" },
+	{ value: "1y", label: "1Y" },
 	{ value: "all", label: "All" },
 ];
+
+const RANGE_SUBTITLES: Record<TrendRange, string> = {
+	"1m": "Past month",
+	"3m": "Past 3 months",
+	"6m": "Past 6 months",
+	"1y": "Past year",
+	all: "All time",
+};
 
 export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
 	const [range, setRange] = useState<TrendRange>("6m");
@@ -24,7 +33,7 @@ export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
 		? "Loading…"
 		: weeks.length === 0
 			? "No data yet"
-			: `Past ${weeks.length} week${weeks.length === 1 ? "" : "s"}`;
+			: RANGE_SUBTITLES[range];
 
 	return (
 		<div className="overflow-hidden rounded-[10px] border border-divider bg-surface">
@@ -44,7 +53,7 @@ export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
 						w={560}
 						h={200}
 						color="var(--data-5)"
-						xLabels={buildXLabels(weeks)}
+						xTicks={buildXTicks(weeks, range)}
 					/>
 				) : (
 					<div className="flex h-[200px] items-center justify-center text-[12px] text-fg-3">
@@ -56,15 +65,37 @@ export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
 	);
 }
 
-function buildXLabels(weeks: RatingPoint[]): string[] {
+function dateFormat(range: TrendRange): Intl.DateTimeFormatOptions {
+	if (range === "1m" || range === "3m")
+		return { month: "short", day: "numeric" };
+	if (range === "1y") return { month: "short", year: "2-digit" };
+	if (range === "all") return { month: "short", year: "2-digit" };
+	return { month: "short" };
+}
+
+function buildXTicks(
+	weeks: RatingPoint[],
+	range: TrendRange,
+): { dataIndex: number; label: string }[] {
 	if (weeks.length === 0) return [];
 	const tickCount = Math.min(6, weeks.length);
-	const step = Math.max(1, Math.floor((weeks.length - 1) / (tickCount - 1)));
-	const labels: string[] = [];
-	for (let i = 0; i < weeks.length; i += step) {
-		const date = new Date(weeks[i].weekStart);
-		labels.push(date.toLocaleDateString(undefined, { month: "short" }));
-		if (labels.length >= tickCount) break;
+	const fmt = dateFormat(range);
+	const indices = pickTickIndices(weeks.length, tickCount);
+	const seen = new Set<string>();
+	const result: { dataIndex: number; label: string }[] = [];
+	for (const i of indices) {
+		const label = new Date(weeks[i].weekStart).toLocaleDateString("en-US", fmt);
+		if (!seen.has(label)) {
+			seen.add(label);
+			result.push({ dataIndex: i, label });
+		}
 	}
-	return labels;
+	return result;
+}
+
+function pickTickIndices(total: number, count: number): number[] {
+	if (total <= count) return Array.from({ length: total }, (_, i) => i);
+	return Array.from({ length: count }, (_, i) =>
+		Math.round((i / (count - 1)) * (total - 1)),
+	);
 }

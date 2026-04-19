@@ -36,9 +36,7 @@ function toRecentGame(game: ListGame): RecentGame {
 		oppElo: game.opponentRating,
 		result,
 		color: game.playerColor,
-		// TODO(missing-backend): Elo-scale per-game score.
-		// See MISSING_FEATURES.md#game-score
-		score: null,
+		score: game.gameScore ?? null,
 		acc: accuracy,
 		time: game.timeControl,
 		opening: game.openingName ?? "—",

@@ -2,8 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { gameAnalyses, games, players } from "#/db/schema";
+import { gameAnalyses, gamePerformance, games, players } from "#/db/schema";
 import { getResultDetails, lookupOpeningName } from "#/lib/chess-utils";
+import { accuracyToElo } from "#/lib/elo-estimate";
 
 // ── listGames ──────────────────────────────────────────────────────────
 
@@ -76,9 +77,14 @@ export const listGames = createServerFn({ method: "GET" })
 						accuracyWhite: games.accuracyWhite,
 						accuracyBlack: games.accuracyBlack,
 						analysisStatus: gameAnalyses.status,
+						overallAccuracy: gamePerformance.overallAccuracy,
 					})
 					.from(games)
 					.leftJoin(gameAnalyses, eq(games.id, gameAnalyses.gameId))
+					.leftJoin(
+						gamePerformance,
+						eq(gameAnalyses.id, gamePerformance.gameAnalysisId),
+					)
 					.where(whereClause)
 					.orderBy(desc(games.playedAt))
 					.limit(pageSize)
@@ -86,13 +92,15 @@ export const listGames = createServerFn({ method: "GET" })
 				db.select({ count: count() }).from(games).where(whereClause),
 			]);
 
-			// Serialize dates and fill in missing opening names from the ECO dataset
+			// Serialize dates, fill in missing opening names, compute game score
 			const serializedGames = gameRows.map((g) => ({
 				...g,
 				playedAt: g.playedAt.toISOString(),
 				openingName:
 					g.openingName ??
 					(g.openingEco ? lookupOpeningName(g.openingEco) : null),
+				gameScore:
+					g.overallAccuracy !== null ? accuracyToElo(g.overallAccuracy) : null,
 			}));
 
 			return {

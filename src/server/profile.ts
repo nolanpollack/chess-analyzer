@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, count, desc, eq, gte } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
 	type ConceptDimension,
@@ -20,6 +20,7 @@ import {
 	playerProfile,
 	players,
 } from "#/db/schema";
+import { accuracyToElo } from "#/lib/elo-estimate";
 import {
 	aggregatePlayerProfile,
 	type GamePerformanceRow,
@@ -1000,41 +1001,39 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 				return { error: "Player not found" };
 			}
 
-			const gameRows = await db
-				.select({
-					playedAt: games.playedAt,
-					playerRating: games.playerRating,
-				})
-				.from(games)
-				.where(eq(games.playerId, player.id))
-				.orderBy(desc(games.playedAt));
+			const [gameCountRow, perfRows] = await Promise.all([
+				// Total game count + current chess.com rating (for imported-rating display)
+				db
+					.select({ playerRating: games.playerRating })
+					.from(games)
+					.where(eq(games.playerId, player.id))
+					.orderBy(desc(games.playedAt)),
+				// Analyzed games with our accuracy metric
+				db
+					.select({
+						overallAccuracy: gamePerformance.overallAccuracy,
+						playedAt: games.playedAt,
+					})
+					.from(gamePerformance)
+					.innerJoin(
+						gameAnalyses,
+						eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
+					)
+					.innerJoin(games, eq(gameAnalyses.gameId, games.id))
+					.where(eq(gamePerformance.playerId, player.id))
+					.orderBy(desc(games.playedAt)),
+			]);
 
-			const [analyzedRow] = await db
-				.select({ count: count() })
-				.from(gameAnalyses)
-				.innerJoin(games, eq(gameAnalyses.gameId, games.id))
-				.where(
-					and(
-						eq(games.playerId, player.id),
-						eq(gameAnalyses.status, "complete"),
-					),
-				);
-
-			const currentRating = gameRows[0]?.playerRating ?? null;
-			const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-			const priorRow = gameRows.find((row) => row.playedAt <= thirtyDaysAgo);
-			const eloDelta30d =
-				currentRating !== null && priorRow
-					? currentRating - priorRow.playerRating
-					: null;
+			const currentRating = gameCountRow[0]?.playerRating ?? null;
+			const eloEstimate = computeEloEstimate(perfRows);
+			const eloDelta30d = computeEloDelta30d(perfRows);
 
 			return {
 				summary: {
-					platform: player.platform,
 					currentRating,
-					gameCount: gameRows.length,
-					analyzedGameCount: analyzedRow.count,
-					eloEstimate: currentRating,
+					gameCount: gameCountRow.length,
+					analyzedGameCount: perfRows.length,
+					eloEstimate,
 					eloDelta30d,
 				},
 			};
@@ -1046,7 +1045,7 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 
 // ── getRatingTrend ────────────────────────────────────────────────────
 
-const trendRangeSchema = z.enum(["4w", "6m", "1y", "all"]);
+const trendRangeSchema = z.enum(["1m", "3m", "6m", "1y", "all"]);
 export type TrendRange = z.infer<typeof trendRangeSchema>;
 
 export const getRatingTrend = createServerFn({ method: "GET" })
@@ -1069,20 +1068,25 @@ export const getRatingTrend = createServerFn({ method: "GET" })
 				return { error: "Player not found" };
 			}
 
-			const since = rangeStartDate(range);
-			const conditions = [eq(games.playerId, player.id)];
-			if (since) conditions.push(gte(games.playedAt, since));
-
 			const rows = await db
 				.select({
 					playedAt: games.playedAt,
-					playerRating: games.playerRating,
+					overallAccuracy: gamePerformance.overallAccuracy,
 				})
-				.from(games)
-				.where(and(...conditions))
+				.from(gamePerformance)
+				.innerJoin(
+					gameAnalyses,
+					eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
+				)
+				.innerJoin(games, eq(gameAnalyses.gameId, games.id))
+				.where(eq(gamePerformance.playerId, player.id))
 				.orderBy(asc(games.playedAt));
 
-			const weeks = bucketByWeek(rows);
+			const allWeeks = computeRollingRatings(rows);
+			const since = rangeStartDate(range);
+			const weeks = since
+				? allWeeks.filter((w) => new Date(w.weekStart) >= since)
+				: allWeeks;
 
 			return { weeks };
 		} catch (err) {
@@ -1091,35 +1095,38 @@ export const getRatingTrend = createServerFn({ method: "GET" })
 		}
 	});
 
+const TREND_TRAILING_WINDOW = 20;
+
 function rangeStartDate(range: TrendRange): Date | null {
 	const now = Date.now();
 	const day = 24 * 60 * 60 * 1000;
-	if (range === "4w") return new Date(now - 28 * day);
+	if (range === "1m") return new Date(now - 30 * day);
+	if (range === "3m") return new Date(now - 91 * day);
 	if (range === "6m") return new Date(now - 183 * day);
 	if (range === "1y") return new Date(now - 365 * day);
 	return null;
 }
 
-function bucketByWeek(
-	rows: { playedAt: Date; playerRating: number }[],
+function computeRollingRatings(
+	rows: { playedAt: Date; overallAccuracy: number }[],
 ): { weekStart: string; rating: number }[] {
-	const buckets = new Map<string, { ratingSum: number; count: number }>();
+	if (rows.length === 0) return [];
 
-	for (const row of rows) {
-		const weekStart = startOfWeek(row.playedAt);
-		const key = weekStart.toISOString();
-		const bucket = buckets.get(key) ?? { ratingSum: 0, count: 0 };
-		bucket.ratingSum += row.playerRating;
-		bucket.count += 1;
-		buckets.set(key, bucket);
-	}
+	const weekKeys = [
+		...new Set(rows.map((r) => startOfWeek(r.playedAt).toISOString())),
+	].sort();
 
-	return Array.from(buckets.entries())
-		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([weekStart, bucket]) => ({
-			weekStart,
-			rating: Math.round(bucket.ratingSum / bucket.count),
-		}));
+	return weekKeys.map((weekStart) => {
+		const weekEnd = new Date(weekStart);
+		weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+		const gamesUpToWeek = rows
+			.filter((r) => r.playedAt < weekEnd)
+			.slice(-TREND_TRAILING_WINDOW);
+		const avgAcc =
+			gamesUpToWeek.reduce((sum, r) => sum + r.overallAccuracy, 0) /
+			gamesUpToWeek.length;
+		return { weekStart, rating: accuracyToElo(avgAcc) };
+	});
 }
 
 function startOfWeek(date: Date): Date {
@@ -1129,4 +1136,35 @@ function startOfWeek(date: Date): Date {
 	const diff = (day + 6) % 7; // week starts Monday
 	d.setUTCDate(d.getUTCDate() - diff);
 	return d;
+}
+
+type PerfRow = { overallAccuracy: number; playedAt: Date };
+
+function avgAccuracy(rows: PerfRow[]): number | null {
+	if (rows.length === 0) return null;
+	return rows.reduce((sum, r) => sum + r.overallAccuracy, 0) / rows.length;
+}
+
+function computeEloEstimate(rows: PerfRow[]): number | null {
+	const avg = avgAccuracy(rows);
+	return avg !== null ? accuracyToElo(avg) : null;
+}
+
+// Size of each trailing window used for the 30d delta comparison.
+const TRAILING_WINDOW = 20;
+
+function computeEloDelta30d(rows: PerfRow[]): number | null {
+	// rows are ordered desc(playedAt) — most recent first
+	const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+	const before30d = rows.filter((r) => r.playedAt < thirtyDaysAgo);
+
+	if (rows.length === 0 || before30d.length === 0) return null;
+
+	// Trailing N games anchored at today vs trailing N games anchored at 30d ago
+	const windowNow = rows.slice(0, TRAILING_WINDOW);
+	const window30d = before30d.slice(0, TRAILING_WINDOW);
+
+	const avgNow = avgAccuracy(windowNow) as number;
+	const avg30d = avgAccuracy(window30d) as number;
+	return accuracyToElo(avgNow) - accuracyToElo(avg30d);
 }

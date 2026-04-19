@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 
+type XTick = { dataIndex: number; label: string };
+
 type LineChartProps = {
 	data: number[];
 	w?: number;
@@ -7,7 +9,7 @@ type LineChartProps = {
 	color?: string;
 	yLabel?: boolean;
 	yTicks?: number;
-	xLabels?: string[];
+	xTicks?: XTick[];
 };
 
 export function LineChart({
@@ -17,7 +19,7 @@ export function LineChart({
 	color = "var(--accent-brand)",
 	yLabel = true,
 	yTicks = 4,
-	xLabels = [],
+	xTicks = [],
 }: LineChartProps) {
 	const { pts, d, fillD, ticks, gradId } = useMemo(() => {
 		const pad = { l: 36, r: 8, t: 12, b: 22 };
@@ -128,11 +130,11 @@ export function LineChart({
 				/>
 			)}
 
-			{xLabels.map((label, i) => {
-				const x = pad.l + (i / (xLabels.length - 1)) * iw;
+			{xTicks.map((tick) => {
+				const x = pad.l + (tick.dataIndex / (data.length - 1)) * iw;
 				return (
 					<text
-						key={label}
+						key={tick.dataIndex}
 						x={x}
 						y={h - 6}
 						fontSize="10"
@@ -140,7 +142,7 @@ export function LineChart({
 						fontFamily="JetBrains Mono"
 						textAnchor="middle"
 					>
-						{label}
+						{tick.label}
 					</text>
 				);
 			})}

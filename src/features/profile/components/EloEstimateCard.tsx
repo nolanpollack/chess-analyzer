@@ -32,10 +32,8 @@ export function EloEstimateCard({ summary, isLoading }: EloEstimateCardProps) {
 				</div>
 				<p className="mt-[10px] max-w-[340px] text-[12.5px] leading-[1.5] text-fg-2">
 					{analyzedCount > 0
-						? `Based on your chess.com rating across ${analyzedCount} analyzed game${analyzedCount === 1 ? "" : "s"}.`
+						? `Computed from ${analyzedCount} game${analyzedCount === 1 ? "" : "s"} analyzed across your connected accounts.`
 						: "No analyzed games yet."}
-					{/* TODO(missing-backend): Replace chess.com rating with a unified cross-platform
-					    Elo estimate. See MISSING_FEATURES.md#elo-estimate */}
 				</p>
 			</div>
 
