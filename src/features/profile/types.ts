@@ -35,16 +35,3 @@ export type FocusArea = {
 };
 
 export type GameResultLetter = "W" | "L" | "D";
-
-export type RecentGame = {
-	id: string;
-	opp: string;
-	oppElo: number;
-	result: GameResultLetter;
-	color: "white" | "black";
-	score: number | null;
-	acc: number | null;
-	time: string;
-	opening: string;
-	when: string;
-};

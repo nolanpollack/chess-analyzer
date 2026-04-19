@@ -3,7 +3,6 @@ import { LineChart } from "#/components/charts/LineChart";
 import { Segmented } from "#/components/ui/segmented";
 import { useRatingTrend } from "#/features/profile/hooks/use-rating-trend";
 import type { TrendRange } from "#/features/profile/server/profile";
-import type { RatingPoint } from "#/features/profile/types";
 
 type RatingOverTimeCardProps = {
   username: string;
@@ -61,8 +60,7 @@ export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
         {weeks.length >= 2 ? (
           <LineChart
             data={chartData}
-            color="var(--data-5)"
-            className="h-50"
+            className="h-64"
           />
         ) : (
           <div className="flex h-50 items-center justify-center text-[12px] text-fg-3">

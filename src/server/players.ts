@@ -1,15 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
-import { z } from "zod";
-import { db } from "#/db/index";
-import { players } from "#/db/schema";
-import { ensureQueue, getBoss } from "#/lib/queue";
-import { verifyChessComPlayer } from "#/providers/chess-com-provider";
-import {
-	SYNC_GAMES_QUEUE,
-	type SyncGamesPayload,
-} from "#/worker/jobs/sync-games";
-
 // ── registerPlayer ─────────────────────────────────────────────────────
 
 // TODO: Remove or figure out how we should really do this

@@ -3,7 +3,7 @@ import { LineChart as RechartLineChart, Line, XAxis, YAxis, CartesianGrid, Toolt
 
 type DataPoint = { label: string; value: number };
 
-type AppLineChartProps = {
+type LineChartProps = {
   data: DataPoint[];
   color?: string;
   className?: string;
@@ -11,9 +11,9 @@ type AppLineChartProps = {
 
 export function LineChart({
   data,
-  color = "var(--accent-brand)",
+  color = "var(--accent-color)",
   className,
-}: AppLineChartProps) {
+}: LineChartProps) {
   return (
     <div className={className}>
       <ResponsiveContainer width="100%" height="100%">

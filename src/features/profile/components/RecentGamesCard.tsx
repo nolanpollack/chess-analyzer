@@ -1,5 +1,5 @@
 import { ChevronRight, Filter } from "lucide-react";
-import { useRecentGames } from "#/features/profile/hooks/use-recent-games";
+import { useRecentGames } from "#/features/games/hooks/use-recent-games";
 import { RecentGameRow } from "./RecentGameRow";
 
 type RecentGamesCardProps = {

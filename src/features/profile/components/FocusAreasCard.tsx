@@ -11,7 +11,7 @@ type FocusAreasCardProps = {
 
 export function FocusAreasCard({ username }: FocusAreasCardProps) {
   const { data: summary } = usePlayerSummary(username);
-  const focusAreas = null;
+  const focusAreas: FocusArea[] | null = null as FocusArea[] | null;
   const playerElo = summary?.eloEstimate ?? null;
 
   return (

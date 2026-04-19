@@ -1,12 +1,14 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Play } from "lucide-react";
-import { useRecentGame } from "#/features/profile/hooks/use-recent-game";
+import { useRecentGames } from "#/features/games/hooks/use-recent-games";
 
 type Props = { username: string };
 
 export function ReviewLastGameButton({ username }: Props) {
 	const navigate = useNavigate();
-	const { data: recentGameId } = useRecentGame(username);
+	const { data: recentGames } = useRecentGames(username);
+
+  const recentGameId = recentGames?.[0]?.id ?? null;
 
 	return (
 		<button
