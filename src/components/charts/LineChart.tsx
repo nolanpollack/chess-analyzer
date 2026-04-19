@@ -29,6 +29,7 @@ export function LineChart({
             tick={{ fontSize: 10, fill: "var(--fg-3)", fontFamily: "JetBrains Mono" }}
             axisLine={false}
             tickLine={false}
+            domain={['auto', 'auto']}
             width={36}
           />
           <Tooltip
