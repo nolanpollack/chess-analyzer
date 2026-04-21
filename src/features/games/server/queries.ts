@@ -2,11 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { gameAnalyses, gamePerformance, games, players } from "#/db/schema";
-import type { Game } from "#/features/games/types";
+import {
+	type AnalysisStatus,
+	gameAnalyses,
+	gamePerformance,
+	games,
+	players,
+} from "#/db/schema";
 import { getResultDetails, lookupOpeningName } from "#/lib/chess-utils";
 import { accuracyToElo } from "#/lib/elo-estimate";
-import type { Paginated } from "#/lib/pagination";
 
 export const getGame = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -14,7 +18,7 @@ export const getGame = createServerFn({ method: "GET" })
 			gameId: z.string().uuid(),
 		}),
 	)
-	.handler(async ({ data }): Promise<Game | null> => {
+	.handler(async ({ data }) => {
 		const { gameId } = data;
 
 		const [game] = await db.select().from(games).where(eq(games.id, gameId));
@@ -40,9 +44,9 @@ export const getGame = createServerFn({ method: "GET" })
 				(game.openingEco ? lookupOpeningName(game.openingEco) : null),
 			accuracyWhite: game.accuracyWhite,
 			accuracyBlack: game.accuracyBlack,
-			analysisStatus: null,
-			overallAccuracy: null,
-			gameScore: null,
+			analysisStatus: null as AnalysisStatus | null,
+			overallAccuracy: null as number | null,
+			gameScore: null as number | null,
 		};
 	});
 
@@ -61,7 +65,7 @@ export type ListGamesInput = z.infer<typeof listGamesInput>;
 
 export const listGames = createServerFn({ method: "GET" })
 	.inputValidator(listGamesInput)
-	.handler(async ({ data }): Promise<Paginated<Game>> => {
+	.handler(async ({ data }) => {
 		const { username, page, pageSize, timeControlClass, result, playerColor } =
 			data;
 
@@ -125,11 +129,12 @@ export const listGames = createServerFn({ method: "GET" })
 			db.select({ count: count() }).from(games).where(whereClause),
 		]);
 
-		const items: Game[] = gameRows.map((g) => ({
+		const items = gameRows.map((g) => ({
 			...g,
 			playedAt: g.playedAt.toISOString(),
 			openingName:
-				g.openingName ?? (g.openingEco ? lookupOpeningName(g.openingEco) : null),
+				g.openingName ??
+				(g.openingEco ? lookupOpeningName(g.openingEco) : null),
 			gameScore:
 				g.overallAccuracy !== null ? accuracyToElo(g.overallAccuracy) : null,
 		}));

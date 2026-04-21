@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { listGames } from "#/features/games/server/queries";
-import type { Game, GameResultLetter, GameSummary } from "#/features/games/types";
+import type {
+	Game,
+	GameResultLetter,
+	GameSummary,
+} from "#/features/games/types";
 import { classifyResult } from "#/lib/chess-utils";
 
 export function useRecentGames(username: string, pageSize = 8) {

@@ -9,7 +9,7 @@ import {
 	type DimensionDrilldownData,
 	type DimensionType,
 	type DrilldownTaggedMoveRow,
-} from "#/features/profile/server/profile";
+} from "#/features/profile/server/queries";
 
 describe("profile drilldown helpers", () => {
 	it("phase drilldown includes piece/concept/opening and omits phase", () => {

@@ -1,4 +1,4 @@
-import type { GameResultLetter } from "#/features/profile/types";
+import type { GameResultLetter } from "#/features/games/types";
 
 type GameResultPillProps = {
 	result: GameResultLetter;

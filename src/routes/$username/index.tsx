@@ -11,33 +11,33 @@ import { ReviewLastGameButton } from "#/features/profile/components/ReviewLastGa
 import { SyncStatusButton } from "#/features/profile/components/SyncStatusButton";
 
 export const Route = createFileRoute("/$username/")({
-  component: ProfilePage,
+	component: ProfilePage,
 });
 
 function ProfilePage() {
-  const { username } = Route.useParams();
+	const { username } = Route.useParams();
 
-  return (
-    <>
-      <Topbar
-        crumbs={[{ label: "Profile" }]}
-        actions={
-          <>
-            <SyncStatusButton username={username} />
-            <ReviewLastGameButton username={username} />
-          </>
-        }
-      />
-      <PageContainer className="space-y-4">
-        <ProfilePageHeader username={username} />
-        <div className="grid grid-cols-[1fr_1.3fr] gap-4">
-          <EloEstimateCard username={username} />
-          <RatingOverTimeCard username={username} />
-        </div>
-        <FocusAreasCard username={username} />
-        <FactorBreakdownCard username={username} />
-        <RecentGamesCard username={username} />
-      </PageContainer>
-    </>
-  );
+	return (
+		<>
+			<Topbar
+				crumbs={[{ label: "Profile" }]}
+				actions={
+					<>
+						<SyncStatusButton username={username} />
+						<ReviewLastGameButton username={username} />
+					</>
+				}
+			/>
+			<PageContainer className="space-y-4">
+				<ProfilePageHeader username={username} />
+				<div className="grid grid-cols-[1fr_1.3fr] gap-4">
+					<EloEstimateCard username={username} />
+					<RatingOverTimeCard username={username} />
+				</div>
+				<FocusAreasCard username={username} />
+				<FactorBreakdownCard username={username} />
+				<RecentGamesCard username={username} />
+			</PageContainer>
+		</>
+	);
 }

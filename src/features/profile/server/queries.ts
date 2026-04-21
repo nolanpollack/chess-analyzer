@@ -20,11 +20,8 @@ import {
 	playerProfile,
 	players,
 } from "#/db/schema";
+import { recomputeProfile } from "#/features/profile/server/recompute";
 import { accuracyToElo } from "#/lib/elo-estimate";
-import {
-	aggregatePlayerProfile,
-	type GamePerformanceRow,
-} from "#/lib/performance";
 
 const GOOD_OR_BETTER_CLASSIFICATIONS: Set<MoveClassification> = new Set([
 	"brilliant",
@@ -125,47 +122,8 @@ function emptyBucket(): Bucket {
 	return { total: 0, good: 0, cpLossSum: 0 };
 }
 
-// ── getGamePerformance ────────────────────────────────────────────────
-
-export const getGamePerformance = createServerFn({ method: "GET" })
-	.inputValidator(
-		z.object({
-			gameAnalysisId: z.string().uuid(),
-		}),
-	)
-	.handler(async ({ data }) => {
-		const { gameAnalysisId } = data;
-
-		try {
-			const [row] = await db
-				.select()
-				.from(gamePerformance)
-				.where(eq(gamePerformance.gameAnalysisId, gameAnalysisId));
-
-			if (!row) {
-				return { performance: null };
-			}
-
-			return {
-				performance: {
-					...row,
-					computedAt: row.computedAt.toISOString(),
-				},
-			};
-		} catch (err) {
-			console.error("[getGamePerformance] Error:", err);
-			return { error: "Failed to load game performance" };
-		}
-	});
-
-// ── getPlayerProfile ──────────────────────────────────────────────────
-
 export const getPlayerProfile = createServerFn({ method: "GET" })
-	.inputValidator(
-		z.object({
-			username: z.string().min(1),
-		}),
-	)
+	.inputValidator(z.object({ username: z.string().min(1) }))
 	.handler(async ({ data }) => {
 		const { username } = data;
 
@@ -179,7 +137,6 @@ export const getPlayerProfile = createServerFn({ method: "GET" })
 				return { error: "Player not found" };
 			}
 
-			// Check for existing profile
 			const [existing] = await db
 				.select()
 				.from(playerProfile)
@@ -194,7 +151,6 @@ export const getPlayerProfile = createServerFn({ method: "GET" })
 				};
 			}
 
-			// No profile exists — compute it
 			const result = await recomputeProfile(player.id);
 			if (!result) {
 				return { profile: null };
@@ -212,52 +168,8 @@ export const getPlayerProfile = createServerFn({ method: "GET" })
 		}
 	});
 
-// ── refreshPlayerProfile ──────────────────────────────────────────────
-
-export const refreshPlayerProfile = createServerFn({ method: "POST" })
-	.inputValidator(
-		z.object({
-			username: z.string().min(1),
-		}),
-	)
-	.handler(async ({ data }) => {
-		const { username } = data;
-
-		try {
-			const [player] = await db
-				.select()
-				.from(players)
-				.where(eq(players.username, username.toLowerCase().trim()));
-
-			if (!player) {
-				return { error: "Player not found" };
-			}
-
-			const result = await recomputeProfile(player.id);
-			if (!result) {
-				return { profile: null };
-			}
-
-			return {
-				profile: {
-					...result,
-					computedAt: result.computedAt.toISOString(),
-				},
-			};
-		} catch (err) {
-			console.error("[refreshPlayerProfile] Error:", err);
-			return { error: "Failed to refresh profile" };
-		}
-	});
-
-// ── getAccuracyTrend ─────────────────────────────────────────────────
-
 export const getAccuracyTrend = createServerFn({ method: "GET" })
-	.inputValidator(
-		z.object({
-			username: z.string().min(1),
-		}),
-	)
+	.inputValidator(z.object({ username: z.string().min(1) }))
 	.handler(async ({ data }) => {
 		const { username } = data;
 
@@ -300,8 +212,6 @@ export const getAccuracyTrend = createServerFn({ method: "GET" })
 			return { error: "Failed to load accuracy trend" };
 		}
 	});
-
-// ── getDimensionDrilldown ─────────────────────────────────────────────
 
 export const getDimensionDrilldown = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -361,7 +271,112 @@ export const getDimensionDrilldown = createServerFn({ method: "GET" })
 		}
 	});
 
-// ── Helpers ───────────────────────────────────────────────────────────
+export const getPlayerSummary = createServerFn({ method: "GET" })
+	.inputValidator(z.object({ username: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const { username } = data;
+
+		try {
+			const [player] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username.toLowerCase().trim()));
+
+			if (!player) {
+				return { error: "Player not found" };
+			}
+
+			const [gameCountRow, perfRows] = await Promise.all([
+				db
+					.select({ playerRating: games.playerRating })
+					.from(games)
+					.where(eq(games.playerId, player.id))
+					.orderBy(desc(games.playedAt)),
+				db
+					.select({
+						overallAccuracy: gamePerformance.overallAccuracy,
+						playedAt: games.playedAt,
+					})
+					.from(gamePerformance)
+					.innerJoin(
+						gameAnalyses,
+						eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
+					)
+					.innerJoin(games, eq(gameAnalyses.gameId, games.id))
+					.where(eq(gamePerformance.playerId, player.id))
+					.orderBy(desc(games.playedAt)),
+			]);
+
+			const currentRating = gameCountRow[0]?.playerRating ?? null;
+			const eloEstimate = computeEloEstimate(perfRows);
+			const eloDelta30d = computeEloDelta30d(perfRows);
+
+			return {
+				summary: {
+					currentRating,
+					gameCount: gameCountRow.length,
+					analyzedGameCount: perfRows.length,
+					eloEstimate,
+					eloDelta30d,
+				},
+			};
+		} catch (err) {
+			console.error("[getPlayerSummary] Error:", err);
+			return { error: "Failed to load player summary" };
+		}
+	});
+
+const trendRangeSchema = z.enum(["1m", "3m", "6m", "1y", "all"]);
+export type TrendRange = z.infer<typeof trendRangeSchema>;
+
+export const getRatingTrend = createServerFn({ method: "GET" })
+	.inputValidator(
+		z.object({
+			username: z.string().min(1),
+			range: trendRangeSchema.default("6m"),
+		}),
+	)
+	.handler(async ({ data }) => {
+		const { username, range } = data;
+
+		try {
+			const [player] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username.toLowerCase().trim()));
+
+			if (!player) {
+				return { error: "Player not found" };
+			}
+
+			const rows = await db
+				.select({
+					playedAt: games.playedAt,
+					overallAccuracy: gamePerformance.overallAccuracy,
+				})
+				.from(gamePerformance)
+				.innerJoin(
+					gameAnalyses,
+					eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
+				)
+				.innerJoin(games, eq(gameAnalyses.gameId, games.id))
+				.where(eq(gamePerformance.playerId, player.id))
+				.orderBy(asc(games.playedAt));
+
+			const allWeeks = computeRollingRatings(rows);
+			const since = rangeStartDate(range);
+			const weeks = since
+				? allWeeks.filter((w) => new Date(w.weekStart) >= since)
+				: allWeeks;
+
+			return { weeks };
+		} catch (err) {
+			console.error("[getRatingTrend] Error:", err);
+			return { error: "Failed to load rating trend" };
+		}
+	});
+
+// ── Drill-down helpers ────────────────────────────────────────────────
 
 function normalizeDimensionValue(
 	dimension: DimensionType,
@@ -898,202 +913,7 @@ export const __profileDrilldownTestUtils = {
 
 export type DrilldownTaggedMoveRow = TaggedMoveRow;
 
-async function recomputeProfile(playerId: string) {
-	// Load all game_performance rows with game metadata
-	const perfRows = await db
-		.select({
-			gameAnalysisId: gamePerformance.gameAnalysisId,
-			gameId: games.id,
-			playedAt: games.playedAt,
-			openingEco: games.openingEco,
-			openingName: games.openingName,
-			overallAccuracy: gamePerformance.overallAccuracy,
-			overallAvgCpLoss: gamePerformance.overallAvgCpLoss,
-			openingAccuracy: gamePerformance.openingAccuracy,
-			openingAvgCpLoss: gamePerformance.openingAvgCpLoss,
-			openingMoveCount: gamePerformance.openingMoveCount,
-			middlegameAccuracy: gamePerformance.middlegameAccuracy,
-			middlegameAvgCpLoss: gamePerformance.middlegameAvgCpLoss,
-			middlegameMoveCount: gamePerformance.middlegameMoveCount,
-			endgameAccuracy: gamePerformance.endgameAccuracy,
-			endgameAvgCpLoss: gamePerformance.endgameAvgCpLoss,
-			endgameMoveCount: gamePerformance.endgameMoveCount,
-			pieceStats: gamePerformance.pieceStats,
-			conceptStats: gamePerformance.conceptStats,
-			explainedMoveCount: gamePerformance.explainedMoveCount,
-		})
-		.from(gamePerformance)
-		.innerJoin(
-			gameAnalyses,
-			eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
-		)
-		.innerJoin(games, eq(gameAnalyses.gameId, games.id))
-		.where(eq(gamePerformance.playerId, playerId))
-		.orderBy(desc(games.playedAt));
-
-	if (perfRows.length === 0) {
-		return null;
-	}
-
-	// Map to GamePerformanceRow
-	const rows: GamePerformanceRow[] = perfRows.map((r) => ({
-		gameAnalysisId: r.gameAnalysisId,
-		gameId: r.gameId,
-		playedAt: r.playedAt.toISOString(),
-		openingEco: r.openingEco,
-		openingName: r.openingName,
-		overallAccuracy: r.overallAccuracy,
-		overallAvgCpLoss: r.overallAvgCpLoss,
-		openingAccuracy: r.openingAccuracy,
-		openingAvgCpLoss: r.openingAvgCpLoss,
-		openingMoveCount: r.openingMoveCount,
-		middlegameAccuracy: r.middlegameAccuracy,
-		middlegameAvgCpLoss: r.middlegameAvgCpLoss,
-		middlegameMoveCount: r.middlegameMoveCount,
-		endgameAccuracy: r.endgameAccuracy,
-		endgameAvgCpLoss: r.endgameAvgCpLoss,
-		endgameMoveCount: r.endgameMoveCount,
-		pieceStats: r.pieceStats,
-		conceptStats: r.conceptStats,
-		explainedMoveCount: r.explainedMoveCount,
-	}));
-
-	const profile = aggregatePlayerProfile(rows);
-
-	// Upsert player_profile
-	const [result] = await db
-		.insert(playerProfile)
-		.values({
-			playerId,
-			...profile,
-			computedAt: new Date(),
-		})
-		.onConflictDoUpdate({
-			target: playerProfile.playerId,
-			set: {
-				...profile,
-				computedAt: new Date(),
-			},
-		})
-		.returning();
-
-	return result;
-}
-
-// ── getPlayerSummary ──────────────────────────────────────────────────
-
-export const getPlayerSummary = createServerFn({ method: "GET" })
-	.inputValidator(
-		z.object({
-			username: z.string().min(1),
-		}),
-	)
-	.handler(async ({ data }) => {
-		const { username } = data;
-
-		try {
-			const [player] = await db
-				.select()
-				.from(players)
-				.where(eq(players.username, username.toLowerCase().trim()));
-
-			if (!player) {
-				return { error: "Player not found" };
-			}
-
-			const [gameCountRow, perfRows] = await Promise.all([
-				// Total game count + current chess.com rating (for imported-rating display)
-				db
-					.select({ playerRating: games.playerRating })
-					.from(games)
-					.where(eq(games.playerId, player.id))
-					.orderBy(desc(games.playedAt)),
-				// Analyzed games with our accuracy metric
-				db
-					.select({
-						overallAccuracy: gamePerformance.overallAccuracy,
-						playedAt: games.playedAt,
-					})
-					.from(gamePerformance)
-					.innerJoin(
-						gameAnalyses,
-						eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
-					)
-					.innerJoin(games, eq(gameAnalyses.gameId, games.id))
-					.where(eq(gamePerformance.playerId, player.id))
-					.orderBy(desc(games.playedAt)),
-			]);
-
-			const currentRating = gameCountRow[0]?.playerRating ?? null;
-			const eloEstimate = computeEloEstimate(perfRows);
-			const eloDelta30d = computeEloDelta30d(perfRows);
-
-			return {
-				summary: {
-					currentRating,
-					gameCount: gameCountRow.length,
-					analyzedGameCount: perfRows.length,
-					eloEstimate,
-					eloDelta30d,
-				},
-			};
-		} catch (err) {
-			console.error("[getPlayerSummary] Error:", err);
-			return { error: "Failed to load player summary" };
-		}
-	});
-
-// ── getRatingTrend ────────────────────────────────────────────────────
-
-const trendRangeSchema = z.enum(["1m", "3m", "6m", "1y", "all"]);
-export type TrendRange = z.infer<typeof trendRangeSchema>;
-
-export const getRatingTrend = createServerFn({ method: "GET" })
-	.inputValidator(
-		z.object({
-			username: z.string().min(1),
-			range: trendRangeSchema.default("6m"),
-		}),
-	)
-	.handler(async ({ data }) => {
-		const { username, range } = data;
-
-		try {
-			const [player] = await db
-				.select()
-				.from(players)
-				.where(eq(players.username, username.toLowerCase().trim()));
-
-			if (!player) {
-				return { error: "Player not found" };
-			}
-
-			const rows = await db
-				.select({
-					playedAt: games.playedAt,
-					overallAccuracy: gamePerformance.overallAccuracy,
-				})
-				.from(gamePerformance)
-				.innerJoin(
-					gameAnalyses,
-					eq(gamePerformance.gameAnalysisId, gameAnalyses.id),
-				)
-				.innerJoin(games, eq(gameAnalyses.gameId, games.id))
-				.where(eq(gamePerformance.playerId, player.id))
-				.orderBy(asc(games.playedAt));
-
-			const allWeeks = computeRollingRatings(rows);
-			const since = rangeStartDate(range);
-			const weeks = since
-				? allWeeks.filter((w) => new Date(w.weekStart) >= since)
-				: allWeeks;
-
-			return { weeks };
-		} catch (err) {
-			console.error("[getRatingTrend] Error:", err);
-			return { error: "Failed to load rating trend" };
-		}
-	});
+// ── Rating trend helpers ──────────────────────────────────────────────
 
 const TREND_TRAILING_WINDOW = 20;
 
@@ -1138,7 +958,12 @@ function startOfWeek(date: Date): Date {
 	return d;
 }
 
+// ── Summary helpers ───────────────────────────────────────────────────
+
 type PerfRow = { overallAccuracy: number; playedAt: Date };
+
+// Size of each trailing window used for the 30d delta comparison.
+const TRAILING_WINDOW = 20;
 
 function avgAccuracy(rows: PerfRow[]): number | null {
 	if (rows.length === 0) return null;
@@ -1149,9 +974,6 @@ function computeEloEstimate(rows: PerfRow[]): number | null {
 	const avg = avgAccuracy(rows);
 	return avg !== null ? accuracyToElo(avg) : null;
 }
-
-// Size of each trailing window used for the 30d delta comparison.
-const TRAILING_WINDOW = 20;
 
 function computeEloDelta30d(rows: PerfRow[]): number | null {
 	// rows are ordered desc(playedAt) — most recent first

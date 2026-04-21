@@ -2,26 +2,11 @@
 
 ## File organization
 
-Non-generic code lives in `src/features/{domain}/`. Each feature owns its
-components, hooks, and types:
-
-```
-src/
-├── features/
-│   ├── games/
-│   │   ├── components/   GameTable.tsx, GameFilters.tsx, …
-│   │   ├── hooks/        use-games.ts, use-player-status.ts, …
-│   │   └── types.ts
-│   ├── analysis/         components/hooks for game analysis view
-│   ├── explanations/     LLM move explanation UI
-│   └── profile/          player profile & game performance
-├── components/           shared/generic only (Header, ThemeToggle, ui/)
-├── lib/                  shared utilities
-└── routes/               thin composition files
-```
-
-A file belongs in `features/` if it is specific to one domain. It belongs in
-`components/` or `lib/` if two or more features use it.
+Non-generic code lives in `src/features/{domain}/`. Feature-module layout,
+server-code boundaries, cross-feature imports, and hook placement rules
+live in `.claude/rules/feature-modules.md` — read that first. This file
+covers frontend-only concerns (component size, typography, state
+consolidation, types idioms).
 
 Component files use PascalCase matching the primary export (`GameTable.tsx`
 exports `GameTable`). All other files use kebab-case (`use-games.ts`,
@@ -81,12 +66,55 @@ schema. Manual types drift; derived types stay correct automatically.
 type Game = { id: string; playedAt: string; resultDetail: string; … }
 
 // Good — derived from the actual return type
-type GamesResult = Awaited<ReturnType<typeof listGames>>
-export type Game = GamesResult["games"][number]
+type ListGamesResult = Awaited<ReturnType<typeof listGames>>
+export type Game = ListGamesResult["items"][number]
 ```
 
-Feature-local derived types go in `features/{domain}/types.ts`. No global
-`types.ts`.
+For a server function with a discriminated return (success OR `{ error }`),
+pick the success branch with `Exclude`:
+
+```ts
+type Result = Awaited<ReturnType<typeof getFoo>>
+export type FooOk = Exclude<Result, { error: string }>
+```
+
+### What belongs in `features/{x}/types.ts`
+
+- **Derived server types** — aliases like `type Game = Awaited<…>["items"][number]`.
+  Put them here so consumers don't each re-derive.
+- **UI-only view models** — compact projection shapes (`GameSummary`,
+  `FocusArea`) that components build from server data. These are not wire
+  DTOs and cannot be derived.
+- **Feature-local string unions** — values not in `schema.ts` and not a
+  server return field (e.g. `"W" | "L" | "D"` display letters).
+
+### What does NOT belong
+
+- **Duplicates of schema enums** — import from `#/db/schema` (e.g.
+  `PlayerColor`, `TimeControlClass`). Schema is the single source of truth
+  for pgEnum values; drifting here breaks runtime Drizzle queries silently.
+- **Duplicates of another feature's type** — import from that feature. If
+  two features need the same type, it belongs to the one that owns the
+  producing data.
+- **Internal helper types** — if only one function uses a type, inline it
+  or keep it local to that file.
+
+### Server function annotations — prefer inference
+
+Do **not** annotate a `createServerFn().handler(...)` return if the shape
+is going to be derived by consumers via `Awaited<ReturnType<…>>`. Manual
+annotation + derivation is circular: if types.ts imports the fn to derive
+and the fn imports types.ts to annotate, the fn becomes its own type
+source. Let TS infer the handler return from the literal value; derive
+from there.
+
+### Explicit function types at feature boundaries
+
+Exported hooks and utility functions should have an explicit return type
+when the type is non-obvious or part of the feature's API. A query hook
+returning `useQuery(...)`'s native type is fine to leave inferred; a hook
+doing extra projection should annotate the return so the shape doesn't
+drift silently.
 
 ## State consolidation
 

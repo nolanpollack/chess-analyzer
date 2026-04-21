@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import {
-	getAnalysisStatus,
 	resetAndTriggerAnalysis,
 	triggerAnalysis,
-} from "#/server/analysis";
+} from "#/features/game/server/mutations";
+import { getAnalysisStatus } from "#/features/game/server/queries";
 
 type AnalysisStatusOverlayProps = {
 	gameId: string;

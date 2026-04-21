@@ -2,7 +2,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { MoveBadge } from "#/components/ui/move-badge";
 import { Tag } from "#/components/ui/tag";
 import { getConceptById } from "#/config/concepts";
-import { useMoveExplanation } from "#/features/game/hooks/use-move-explanation";
+import { useMoveExplanation } from "#/features/explanations/hooks/use-move-explanation";
 import type { FlatMove } from "#/features/game/types";
 
 type ExplanationCardProps = {

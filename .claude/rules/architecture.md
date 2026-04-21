@@ -80,11 +80,11 @@
 
 ## Move explanations
 - On-demand LLM-generated explanations for individual moves
-- Server functions: `src/server/explanations.ts` (getExplanation, generateExplanation)
+- Feature module: `src/features/explanations/` — server (queries + mutations),
+  hook (`use-move-explanation`), component (`ExplanationCard`)
 - Explanations are cached in `move_explanations` table — generate once, serve forever
 - Deterministic tags (game_phase, pieces_involved) come from `move_tags` (set during analysis)
 - LLM concept tags are stored on the explanation row itself
-- Feature module: `src/features/explanations/` (components, hooks, types)
 
 ## Provider interfaces
 All external integrations are hidden behind interfaces:

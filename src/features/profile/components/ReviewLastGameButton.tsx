@@ -8,7 +8,7 @@ export function ReviewLastGameButton({ username }: Props) {
 	const navigate = useNavigate();
 	const { data: recentGames } = useRecentGames(username);
 
-  const recentGameId = recentGames?.[0]?.id ?? null;
+	const recentGameId = recentGames?.[0]?.id ?? null;
 
 	return (
 		<button

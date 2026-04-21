@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
 	getRatingTrend,
 	type TrendRange,
-} from "#/features/profile/server/profile";
+} from "#/features/profile/server/queries";
 
 export function useRatingTrend(username: string, range: TrendRange) {
 	return useQuery({

@@ -1,3 +1,11 @@
+/**
+ * UI-only view models for the profile dashboard. These are not wire DTOs —
+ * they're shapes the profile screen constructs from server data. Types that
+ * describe server function output should be derived via
+ * `Awaited<ReturnType<typeof fn>>` at the consumption site, not duplicated
+ * here.
+ */
+
 export type PlayerSummary = {
 	currentRating: number | null;
 	gameCount: number;
@@ -33,5 +41,3 @@ export type FocusArea = {
 	confidence: FactorConfidence;
 	positions: number;
 };
-
-export type GameResultLetter = "W" | "L" | "D";

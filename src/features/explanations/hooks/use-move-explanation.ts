@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { generateExplanation, getExplanation } from "#/server/explanations";
+import { generateExplanation } from "#/features/explanations/server/mutations";
+import { getExplanation } from "#/features/explanations/server/queries";
 
 export function useMoveExplanation(
 	gameAnalysisId: string | undefined,

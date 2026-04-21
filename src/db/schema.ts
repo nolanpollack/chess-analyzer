@@ -89,6 +89,13 @@ export const conceptEnum = pgEnum("concept", [
 	"rook-endgame",
 ]);
 
+// ── Enum string unions (derived from pgEnum) ───────────────────────────
+
+export type Platform = (typeof platformEnum.enumValues)[number];
+export type TimeControlClass = (typeof timeControlClassEnum.enumValues)[number];
+export type PlayerColor = (typeof playerColorEnum.enumValues)[number];
+export type AnalysisStatus = (typeof analysisStatusEnum.enumValues)[number];
+
 // ── Tables ─────────────────────────────────────────────────────────────
 
 export const players = pgTable("players", {

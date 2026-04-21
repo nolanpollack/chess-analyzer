@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getGamePerformance } from "#/features/profile/server/profile";
+import { getGamePerformance } from "#/features/game/server/queries";
 
 export function useGamePerformance(gameAnalysisId: string | undefined) {
 	return useQuery({

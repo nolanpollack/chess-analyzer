@@ -1,5 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAnalysisStatus, getGameWithAnalysis } from "#/server/analysis";
+import {
+	getAnalysisStatus,
+	getGameWithAnalysis,
+} from "#/features/game/server/queries";
 
 export function useGameDetail(gameId: string) {
 	const queryClient = useQueryClient();

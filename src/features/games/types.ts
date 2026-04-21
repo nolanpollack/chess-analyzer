@@ -1,40 +1,35 @@
+import type { PlayerColor } from "#/db/schema";
+import type { listGames } from "#/features/games/server/queries";
+
+/**
+ * Three-value result bucket computed from `resultDetail`. Not stored in the
+ * DB — computed via `classifyResult()` in `lib/chess-utils.ts`.
+ */
 export type GameResult = "win" | "loss" | "draw";
 export type GameResultLetter = "W" | "L" | "D";
-export type PlayerColor = "white" | "black";
-export type TimeControlClass = "bullet" | "blitz" | "rapid" | "classical" | "daily";
 
-// Server DTO — wire format, what listGames/getGame return per row
-export type Game = {
-  id: string;
-  platformGameId: string;
-  playedAt: string;              // ISO string, not Date
-  timeControl: string;
-  timeControlClass: TimeControlClass;
-  resultDetail: string;
-  playerColor: PlayerColor;
-  playerRating: number;
-  opponentUsername: string;
-  opponentRating: number;
-  openingEco: string | null;
-  openingName: string | null;
-  accuracyWhite: number | null;
-  accuracyBlack: number | null;
-  // Joined/computed
-  analysisStatus: string | null;
-  overallAccuracy: number | null;
-  gameScore: number | null;
-};
+/**
+ * Game DTO — the row shape `listGames` returns over the wire. Derived from
+ * the server function's inferred return type so the shape cannot drift
+ * from its sole producer. `getGame` returns the same shape (or null).
+ */
+type ListGamesResult = Awaited<ReturnType<typeof listGames>>;
+export type Game = ListGamesResult["items"][number];
 
-// UI projection — condensed shape for compact displays
+/**
+ * UI projection — compact shape rendered by RecentGamesCard and similar
+ * condensed displays. This is a view model constructed at render time,
+ * not a wire DTO, so it is defined manually here.
+ */
 export type GameSummary = {
-  id: string;
-  opp: string;
-  oppElo: number | null;
-  result: GameResultLetter;
-  color: PlayerColor;
-  score: number | null;
-  acc: number | null;
-  time: string;
-  opening: string;
-  when: string;
+	id: string;
+	opp: string;
+	oppElo: number | null;
+	result: GameResultLetter;
+	color: PlayerColor;
+	score: number | null;
+	acc: number | null;
+	time: string;
+	opening: string;
+	when: string;
 };

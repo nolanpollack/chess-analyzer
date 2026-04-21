@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getPlayerSummary } from "#/features/profile/server/profile";
+import { getPlayerSummary } from "#/features/profile/server/queries";
 
 export function usePlayerSummary(username: string) {
 	return useQuery({
