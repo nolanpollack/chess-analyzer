@@ -20,7 +20,8 @@
     "db:studio": "drizzle-kit studio",
     "start": "node --import ./.output/server/instrument.server.mjs .output/server/index.mjs",
     "worker": "dotenv -e .env.local -- bun src/worker/index.ts",
-    "reanalyze": "bun scripts/reanalyze-all.ts"
+    "reanalyze": "bun scripts/reanalyze-all.ts",
+    "clear-all": "dotenv -e .env.local -- bun scripts/clear-all.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

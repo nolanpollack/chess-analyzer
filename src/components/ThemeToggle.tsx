@@ -67,9 +67,9 @@ export default function ThemeToggle() {
 			className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-fg-3 transition-all duration-[120ms] hover:bg-surface-2 hover:text-fg"
 		>
 			{isDark ? (
-				<Sun className="h-[14px] w-[14px]" />
+				<Sun className="h-3.5 w-3.5" />
 			) : (
-				<Moon className="h-[14px] w-[14px]" />
+				<Moon className="h-3.5 w-3.5" />
 			)}
 		</button>
 	);

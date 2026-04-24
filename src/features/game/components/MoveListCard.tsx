@@ -45,11 +45,11 @@ export function MoveListCard({ moves, cursor, onSelect }: MoveListCardProps) {
 
 	return (
 		<div className="flex min-h-0 flex-col rounded-[10px] border border-divider bg-surface">
-			<div className="flex flex-wrap items-center gap-2 border-b border-divider px-5 py-[14px]">
-				<div className="text-[11px] uppercase tracking-[0.08em] text-fg-3">
+			<div className="flex flex-wrap items-center gap-2 border-b border-divider px-5 py-3.5">
+				<div className="text-2xs uppercase tracking-[0.08em] text-fg-3">
 					Moves
 				</div>
-				<div className="ml-auto flex flex-wrap gap-[6px]">
+				<div className="ml-auto flex flex-wrap gap-1.5">
 					<ClassChip cls="blunder" count={blunders} />
 					<ClassChip cls="mistake" count={mistakes} />
 					<ClassChip cls="inaccuracy" count={inaccuracies} />
@@ -60,17 +60,17 @@ export function MoveListCard({ moves, cursor, onSelect }: MoveListCardProps) {
 					<tbody>
 						{pairs.map((p) => (
 							<tr key={p.moveNumber}>
-								<td className="w-[34px] py-[3px] pl-2 pr-2 mono-nums font-mono text-[11.5px] text-fg-4">
+								<td className="w-[34px] py-0.5 pl-2 pr-2 mono-nums font-mono text-[11.5px] text-fg-4">
 									{p.moveNumber}.
 								</td>
-								<td className="w-1/2 py-[3px] pr-1">
+								<td className="w-1/2 py-0.5 pr-1">
 									<MoveCell
 										move={p.white}
 										active={p.white?.index === cursor}
 										onClick={() => p.white && onSelect(p.white.index)}
 									/>
 								</td>
-								<td className="w-1/2 py-[3px]">
+								<td className="w-1/2 py-0.5">
 									<MoveCell
 										move={p.black}
 										active={p.black?.index === cursor}

@@ -35,12 +35,12 @@ export function ExplanationCard({
 			}`}
 		>
 			<div
-				className={`flex flex-wrap items-center gap-[10px] border-b border-divider px-5 py-[14px] ${
+				className={`flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 ${
 					badMove ? "bg-tint-blunder" : ""
 				}`}
 			>
 				<MoveBadge cls={move.classification} size="lg" />
-				<span className="mono-nums font-mono text-[13px] text-fg">
+				<span className="mono-nums font-mono text-ui text-fg">
 					{move.moveNumber}
 					{move.side === "white" ? "." : "..."} {move.san}
 				</span>
@@ -52,7 +52,7 @@ export function ExplanationCard({
 				</div>
 			</div>
 
-			<div className="px-5 py-[18px]">
+			<div className="px-5 py-4.5">
 				{hasExplanation ? (
 					<ExplanationBody
 						explanation={explanation.explanation}
@@ -94,10 +94,10 @@ function ExplanationBody({
 }) {
 	return (
 		<>
-			<div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-fg-3">
+			<div className="mb-2 text-2xs uppercase tracking-[0.08em] text-fg-3">
 				Analysis
 			</div>
-			<p className="mb-4 text-[14px] leading-[1.6] text-fg-1">{explanation}</p>
+			<p className="mb-4 text-sm leading-[1.6] text-fg-1">{explanation}</p>
 
 			{principle && (
 				<div className="mb-4 rounded-[6px] border border-divider bg-surface-2 px-3 py-2 text-[12.5px] text-fg-2">
@@ -107,10 +107,10 @@ function ExplanationBody({
 
 			{showBest && (
 				<div className="mb-4">
-					<div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-fg-3">
+					<div className="mb-2 text-2xs uppercase tracking-[0.08em] text-fg-3">
 						Best move
 					</div>
-					<div className="flex items-center gap-[10px] rounded-[6px] border border-data-6/30 bg-tint-data-6 px-3 py-[10px]">
+					<div className="flex items-center gap-2.5 rounded-[6px] border border-data-6/30 bg-tint-data-6 px-3 py-2.5">
 						<span className="text-[10px] font-medium uppercase tracking-[0.06em] text-data-6">
 							Top engine
 						</span>
@@ -129,10 +129,10 @@ function ExplanationBody({
 function ConceptTags({ concepts }: { concepts: string[] }) {
 	return (
 		<div>
-			<div className="mb-2 text-[11px] uppercase tracking-[0.08em] text-fg-3">
+			<div className="mb-2 text-2xs uppercase tracking-[0.08em] text-fg-3">
 				Concepts
 			</div>
-			<div className="flex flex-wrap gap-[6px]">
+			<div className="flex flex-wrap gap-1.5">
 				{concepts.map((id) => {
 					const concept = getConceptById(id);
 					return <Tag key={id}>{concept?.name ?? id}</Tag>;
@@ -161,12 +161,12 @@ function ExplainPrompt({
 				type="button"
 				onClick={onClick}
 				disabled={loading}
-				className="inline-flex cursor-pointer items-center gap-2 rounded-[6px] border border-divider bg-surface-2 px-3 py-[8px] text-[13px] font-medium text-fg-1 transition-colors duration-[100ms] hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
+				className="inline-flex cursor-pointer items-center gap-2 rounded-[6px] border border-divider bg-surface-2 px-3 py-2 text-ui font-medium text-fg-1 transition-colors duration-[100ms] hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
 			>
 				<Sparkles className="h-[13px] w-[13px]" />
 				{loading ? "Thinking…" : "Explain this move"}
 			</button>
-			{error && <p className="mt-2 text-[12px] text-blunder">{error}</p>}
+			{error && <p className="mt-2 text-xs text-blunder">{error}</p>}
 		</div>
 	);
 }
@@ -176,16 +176,16 @@ function EvalChangePill({ from, to }: { from: number; to: number }) {
 	const big = Math.abs(delta) > 0.3;
 	return (
 		<span
-			className={`inline-flex items-center gap-1 rounded-[4px] px-[6px] py-[2px] ${
+			className={`inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 ${
 				big ? "bg-tint-blunder text-blunder" : "bg-surface-2 text-fg-2"
 			}`}
 		>
-			<span className="mono-nums font-mono text-[11px]">
+			<span className="mono-nums font-mono text-2xs">
 				{from > 0 ? "+" : ""}
 				{from.toFixed(1)}
 			</span>
-			<ArrowRight className="h-[10px] w-[10px]" />
-			<span className="mono-nums font-mono text-[11px] font-medium">
+			<ArrowRight className="h-2.5 w-2.5" />
+			<span className="mono-nums font-mono text-2xs font-medium">
 				{to > 0 ? "+" : ""}
 				{to.toFixed(1)}
 			</span>

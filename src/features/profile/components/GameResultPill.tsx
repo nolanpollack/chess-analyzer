@@ -18,7 +18,7 @@ export function GameResultPill({ result }: GameResultPillProps) {
 
 	return (
 		<span
-			className={`inline-flex h-[22px] w-[22px] items-center justify-center rounded-[4px] font-mono text-[11px] font-semibold ${bgClass} ${colorClass}`}
+			className={`inline-flex h-5.5 w-5.5 items-center justify-center rounded-[4px] font-mono text-2xs font-semibold ${bgClass} ${colorClass}`}
 		>
 			{result}
 		</span>

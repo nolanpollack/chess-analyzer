@@ -12,9 +12,9 @@ export function MetricLabel({ children }: { children: ReactNode }) {
 type MetricValueSize = "lg" | "md" | "sm";
 
 const VALUE_SIZE_CLASSES: Record<MetricValueSize, string> = {
-	lg: "text-[48px] tracking-[-0.04em]",
+	lg: "text-5xl tracking-[-0.04em]",
 	md: "text-[32px] tracking-[-0.03em]",
-	sm: "text-[24px] tracking-[-0.02em]",
+	sm: "text-2xl tracking-[-0.02em]",
 };
 
 export function MetricValue({
@@ -54,7 +54,7 @@ export function MetricDelta({
 
 	return (
 		<span
-			className={`inline-flex items-center gap-1 rounded-[4px] px-[6px] py-[2px] font-mono text-xs font-medium ${DELTA_CLASSES[direction]}`}
+			className={`inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 font-mono text-xs font-medium ${DELTA_CLASSES[direction]}`}
 			style={{ fontFeatureSettings: "'zero', 'ss02'" }}
 		>
 			{direction === "up" && <ArrowUp className="h-[11px] w-[11px]" />}

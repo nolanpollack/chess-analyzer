@@ -28,7 +28,7 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 					</button>
 				</div>
 			</div>
-			<table className="w-full border-collapse text-[13px]">
+			<table className="w-full border-collapse text-ui">
 				<thead>
 					<tr>
 						{[
@@ -52,19 +52,13 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 				<tbody>
 					{isLoading ? (
 						<tr>
-							<td
-								colSpan={7}
-								className="py-8 text-center text-[13px] text-fg-3"
-							>
+							<td colSpan={7} className="py-8 text-center text-ui text-fg-3">
 								Loading…
 							</td>
 						</tr>
 					) : games.length === 0 ? (
 						<tr>
-							<td
-								colSpan={7}
-								className="py-8 text-center text-[13px] text-fg-3"
-							>
+							<td colSpan={7} className="py-8 text-center text-ui text-fg-3">
 								No games yet.
 							</td>
 						</tr>

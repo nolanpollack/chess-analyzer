@@ -18,7 +18,7 @@ export function EvalBar({ evalCp, flipped }: EvalBarProps) {
 				style={{ height: `${lightHeightPct * 100}%` }}
 			/>
 			<div className="absolute left-0 right-0 top-1/2 h-px bg-border-strong" />
-			<div className="absolute bottom-[6px] left-0 right-0 text-center mono-nums font-mono text-[10px] text-eval-bar-light">
+			<div className="absolute bottom-1.5 left-0 right-0 text-center mono-nums font-mono text-[10px] text-eval-bar-light">
 				{evalPawns > 0 ? "+" : ""}
 				{evalPawns.toFixed(1)}
 			</div>

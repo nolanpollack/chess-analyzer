@@ -28,20 +28,20 @@ export function RecentGameRow({ game, username }: RecentGameRowProps) {
 					<span
 						className={`h-2 w-2 shrink-0 rounded-[2px] border border-border-strong ${game.color === "white" ? "bg-surface-3" : "bg-fg-1"}`}
 					/>
-					<span className="text-[13px] font-medium text-fg-1">{game.opp}</span>
+					<span className="text-ui font-medium text-fg-1">{game.opp}</span>
 					<span className="mono-nums font-mono text-xs text-fg-3">
 						{game.oppElo}
 					</span>
 				</div>
 			</td>
-			<td className="px-3 py-3.5 text-[13px] text-fg-2">{game.opening}</td>
+			<td className="px-3 py-3.5 text-ui text-fg-2">{game.opening}</td>
 			<td className="px-3 py-3.5">
 				<span className="mono-nums font-mono text-xs text-fg-2">
 					{game.time}
 				</span>
 			</td>
 			<td className="px-3 py-3.5 text-right">
-				<span className="mono-nums font-mono text-[13px]">
+				<span className="mono-nums font-mono text-ui">
 					{game.acc !== null ? `${game.acc.toFixed(1)}%` : "—"}
 				</span>
 			</td>

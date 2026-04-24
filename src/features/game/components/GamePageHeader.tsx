@@ -42,23 +42,23 @@ export function GamePageHeader({
 	return (
 		<div className="mb-6 flex flex-wrap items-start justify-between gap-6">
 			<div className="min-w-0 flex-[1_1_420px]">
-				<div className="mb-2 flex flex-wrap items-center gap-[10px]">
+				<div className="mb-2 flex flex-wrap items-center gap-2.5">
 					<span
-						className={`rounded-[4px] px-2 py-[3px] font-mono text-[11px] font-semibold ${RESULT_STYLE[category]}`}
+						className={`rounded-[4px] px-2 py-0.5 font-mono text-2xs font-semibold ${RESULT_STYLE[category]}`}
 					>
 						{RESULT_LABEL[category]}
 					</span>
 					<Tag>{opening}</Tag>
 					<Tag>{game.timeControl}</Tag>
-					<span className="mono-nums font-mono text-[12px] text-fg-3">
+					<span className="mono-nums font-mono text-xs text-fg-3">
 						{moveCount} moves
 					</span>
 				</div>
-				<h1 className="text-[24px] font-semibold tracking-[-0.025em] text-fg">
+				<h1 className="text-2xl font-semibold tracking-[-0.025em] text-fg">
 					{game.playerUsername}{" "}
 					<span className="font-normal text-fg-3">vs</span>{" "}
 					{game.opponentUsername}{" "}
-					<span className="mono-nums font-mono text-[16px] font-normal text-fg-3">
+					<span className="mono-nums font-mono text-base font-normal text-fg-3">
 						· {game.opponentRating}
 					</span>
 				</h1>
@@ -79,7 +79,7 @@ export function GamePageHeader({
 						<MetricValue size="md">{gameScore ?? "—"}</MetricValue>
 					</div>
 					{overallElo !== null && (
-						<div className="mt-1 mono-nums font-mono text-[11px] text-fg-3">
+						<div className="mt-1 mono-nums font-mono text-2xs text-fg-3">
 							vs {overallElo} overall
 						</div>
 					)}
@@ -91,7 +91,7 @@ export function GamePageHeader({
 							{accuracy !== null ? (
 								<>
 									{accuracy.toFixed(1)}
-									<span className="text-[16px] text-fg-3">%</span>
+									<span className="text-base text-fg-3">%</span>
 								</>
 							) : (
 								"—"

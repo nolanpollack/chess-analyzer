@@ -40,8 +40,8 @@ export function EvalGraphCard({
 			: null;
 
 	return (
-		<div className="mt-4 rounded-[8px] border border-divider bg-surface px-[14px] py-3">
-			<div className="mb-[6px] flex items-center justify-between">
+		<div className="mt-4 rounded-[8px] border border-divider bg-surface px-3.5 py-3">
+			<div className="mb-1.5 flex items-center justify-between">
 				<span className="text-[11.5px] uppercase tracking-[0.06em] text-fg-3">
 					Evaluation over time
 				</span>

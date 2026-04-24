@@ -54,9 +54,9 @@ function GameDetailPage() {
 			/>
 			<PageContainer>
 				{isLoading ? (
-					<div className="py-8 text-center text-[13px] text-fg-3">Loading…</div>
+					<div className="py-8 text-center text-ui text-fg-3">Loading…</div>
 				) : !game ? (
-					<div className="py-8 text-center text-[13px] text-fg-3">
+					<div className="py-8 text-center text-ui text-fg-3">
 						Game not found.
 					</div>
 				) : !analysisComplete ? (

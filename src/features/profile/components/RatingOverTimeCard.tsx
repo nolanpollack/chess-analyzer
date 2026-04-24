@@ -54,9 +54,7 @@ export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
 		<div className="overflow-hidden rounded-[10px] border border-divider bg-surface">
 			<div className="flex items-center justify-between px-5 pt-5">
 				<div>
-					<div className="text-[13px] font-medium text-fg-2">
-						Rating over time
-					</div>
+					<div className="text-ui font-medium text-fg-2">Rating over time</div>
 					<div className="mt-0.5 text-[11.5px] text-fg-3">{subtitle}</div>
 				</div>
 				<Segmented options={RANGE_OPTIONS} value={range} onChange={setRange} />
@@ -65,7 +63,7 @@ export function RatingOverTimeCard({ username }: RatingOverTimeCardProps) {
 				{weeks.length >= 2 ? (
 					<LineChart data={chartData} className="h-64" />
 				) : (
-					<div className="flex h-50 items-center justify-center text-[12px] text-fg-3">
+					<div className="flex h-50 items-center justify-center text-xs text-fg-3">
 						{isLoading ? "Loading…" : "Not enough games to chart yet."}
 					</div>
 				)}

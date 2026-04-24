@@ -17,20 +17,20 @@ export function EloEstimateCard({ username }: EloEstimateCardProps) {
 		<div className="flex flex-col justify-between rounded-[10px] border border-divider bg-surface p-7">
 			<div>
 				<MetricLabel>Elo estimate</MetricLabel>
-				<div className="mt-[10px] flex flex-wrap items-baseline gap-x-3 gap-y-2">
+				<div className="mt-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
 					<MetricValue size="lg">
-						<span style={{ fontSize: 64 }}>
+						<span className="text-[64px]">
 							{elo !== null ? elo : isLoading ? "…" : "—"}
 						</span>
 					</MetricValue>
 					{delta !== null && (
-						<div className="inline-flex shrink-0 items-center gap-[6px]">
+						<div className="inline-flex shrink-0 items-center gap-1.5">
 							<MetricDelta value={delta} />
 							<span className="font-mono text-[11.5px] text-fg-3">30d</span>
 						</div>
 					)}
 				</div>
-				<p className="mt-[10px] max-w-[340px] text-[12.5px] leading-[1.5] text-fg-2">
+				<p className="mt-2.5 max-w-[340px] text-[12.5px] leading-[1.5] text-fg-2">
 					{analyzedCount > 0
 						? `Computed from ${analyzedCount} game${analyzedCount === 1 ? "" : "s"} analyzed across your connected accounts.`
 						: "No analyzed games yet."}
@@ -38,7 +38,7 @@ export function EloEstimateCard({ username }: EloEstimateCardProps) {
 			</div>
 
 			<div className="mt-8 border-t border-divider pt-5">
-				<div className="mb-3 text-[11px] uppercase tracking-[0.06em] text-fg-3">
+				<div className="mb-3 text-2xs uppercase tracking-[0.06em] text-fg-3">
 					Imported rating
 				</div>
 				<ImportedRating rating={chessComRating} games={chessComGames} />
@@ -56,14 +56,12 @@ function ImportedRating({
 }) {
 	return (
 		<div>
-			<div className="mb-1 text-[12px] text-fg-2">Chess.com</div>
+			<div className="mb-1 text-xs text-fg-2">Chess.com</div>
 			<div className="flex items-baseline gap-2">
-				<span className="mono-nums font-mono text-[18px] font-medium text-fg-1">
+				<span className="mono-nums font-mono text-lg font-medium text-fg-1">
 					{rating ?? "—"}
 				</span>
-				<span className="mono-nums font-mono text-[11px] text-fg-4">
-					{games}g
-				</span>
+				<span className="mono-nums font-mono text-2xs text-fg-4">{games}g</span>
 			</div>
 		</div>
 	);

@@ -35,15 +35,15 @@ const TEXT_CLASS: Record<MoveClassification, string> = {
 };
 
 const SIZE_CLASS: Record<Size, string> = {
-	sm: "px-[6px] py-[1px] text-[10px]",
-	md: "px-[7px] py-[2px] text-[11px]",
-	lg: "px-[9px] py-[3px] text-[12px]",
+	sm: "px-1.5 py-px text-[10px]",
+	md: "px-2 py-0.5 text-2xs",
+	lg: "px-2.5 py-0.5 text-xs",
 };
 
 export function MoveBadge({ cls, size = "md" }: MoveBadgeProps) {
 	return (
 		<span
-			className={`inline-flex items-center gap-[5px] rounded-[4px] border border-divider bg-surface-2 font-medium mono-nums font-mono ${SIZE_CLASS[size]} ${TEXT_CLASS[cls]}`}
+			className={`inline-flex items-center gap-1 rounded-[4px] border border-divider bg-surface-2 font-medium mono-nums font-mono ${SIZE_CLASS[size]} ${TEXT_CLASS[cls]}`}
 		>
 			<span className="font-semibold">{SYMBOL[cls]}</span>
 			<span>{LABEL[cls]}</span>

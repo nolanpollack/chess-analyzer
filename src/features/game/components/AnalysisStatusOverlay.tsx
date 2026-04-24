@@ -53,14 +53,14 @@ export function AnalysisStatusOverlay({
 	return (
 		<div className="rounded-[10px] border border-divider bg-surface px-6 py-8 text-center">
 			<Sparkles className="mx-auto h-5 w-5 text-fg-3" />
-			<h2 className="mt-3 text-[16px] font-medium text-fg-1">
+			<h2 className="mt-3 text-base font-medium text-fg-1">
 				{status === "pending"
 					? "Analyzing game…"
 					: status === "failed"
 						? "Analysis failed"
 						: "Not analyzed yet"}
 			</h2>
-			<p className="mx-auto mt-2 max-w-md text-[13px] text-fg-2">
+			<p className="mx-auto mt-2 max-w-md text-ui text-fg-2">
 				{status === "pending"
 					? "Stockfish is reviewing every move. This usually takes under a minute."
 					: status === "failed"
@@ -71,13 +71,13 @@ export function AnalysisStatusOverlay({
 
 			{status === "pending" && totalMoves !== null && (
 				<div className="mx-auto mt-4 max-w-md">
-					<div className="h-[6px] overflow-hidden rounded-full bg-surface-2">
+					<div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
 						<div
 							className="h-full bg-accent-brand transition-[width] duration-300"
 							style={{ width: `${pct ?? 0}%` }}
 						/>
 					</div>
-					<div className="mt-2 mono-nums font-mono text-[11px] text-fg-3">
+					<div className="mt-2 mono-nums font-mono text-2xs text-fg-3">
 						{movesAnalyzed} / {totalMoves} moves
 					</div>
 				</div>
@@ -88,7 +88,7 @@ export function AnalysisStatusOverlay({
 					type="button"
 					onClick={() => trigger.mutate()}
 					disabled={trigger.isPending}
-					className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-[6px] border border-divider bg-surface-2 px-4 py-[8px] text-[13px] font-medium text-fg-1 transition-colors duration-[100ms] hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
+					className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-[6px] border border-divider bg-surface-2 px-4 py-2 text-ui font-medium text-fg-1 transition-colors duration-[100ms] hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
 				>
 					{trigger.isPending
 						? "Queuing…"
@@ -98,7 +98,7 @@ export function AnalysisStatusOverlay({
 				</button>
 			)}
 			{trigger.error && (
-				<p className="mt-2 text-[12px] text-blunder">{trigger.error.message}</p>
+				<p className="mt-2 text-xs text-blunder">{trigger.error.message}</p>
 			)}
 		</div>
 	);

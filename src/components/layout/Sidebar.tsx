@@ -26,7 +26,7 @@ function NavLink({ item, username }: { item: NavItem; username: string }) {
 			to={item.href}
 			params={{ username }}
 			className={[
-				"flex items-center gap-[10px] rounded-[6px] px-[10px] py-[7px] text-[13.5px] font-[450] transition-all duration-[120ms]",
+				"flex items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-[13.5px] font-[450] transition-all duration-[120ms]",
 				isActive
 					? "bg-surface-2 font-medium text-fg"
 					: "text-fg-2 hover:bg-surface-2 hover:text-fg",
@@ -58,8 +58,8 @@ export function Sidebar() {
 	return (
 		<aside className="flex flex-col border-r border-divider bg-bg px-3 py-5">
 			{/* Logo */}
-			<div className="flex items-center gap-[10px] px-[10px] pb-5 text-base font-semibold tracking-[-0.02em]">
-				<div className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] bg-fg font-mono text-[13px] font-bold text-bg">
+			<div className="flex items-center gap-2.5 px-2.5 pb-5 text-base font-semibold tracking-[-0.02em]">
+				<div className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] bg-fg font-mono text-ui font-bold text-bg">
 					E
 				</div>
 				<span>Elo</span>
@@ -68,7 +68,7 @@ export function Sidebar() {
 
 			{/* Search placeholder */}
 			<div className="px-1 pb-2">
-				<div className="flex items-center gap-2 rounded-[6px] bg-surface-2 px-[10px] py-[6px] text-[12.5px] text-fg-3">
+				<div className="flex items-center gap-2 rounded-[6px] bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-fg-3">
 					<Search className="h-[13px] w-[13px]" />
 					<span>Search</span>
 					<span className="ml-auto font-mono text-[10.5px]">⌘K</span>
@@ -76,7 +76,7 @@ export function Sidebar() {
 			</div>
 
 			{/* Nav section */}
-			<div className="px-[10px] pb-[6px] pt-[14px] text-[11px] font-medium uppercase tracking-[0.08em] text-fg-3">
+			<div className="px-2.5 pb-1.5 pt-3.5 text-2xs font-medium uppercase tracking-[0.08em] text-fg-3">
 				Your chess
 			</div>
 			{username &&
@@ -85,11 +85,11 @@ export function Sidebar() {
 				))}
 
 			{/* Footer */}
-			<div className="mt-auto flex items-center gap-[10px] border-t border-divider px-[10px] pt-3">
+			<div className="mt-auto flex items-center gap-2.5 border-t border-divider px-2.5 pt-3">
 				{username && <SidebarAvatar username={username} />}
 				<div className="flex flex-col text-[12.5px]">
 					<span className="font-medium text-fg-1">{username ?? "—"}</span>
-					<span className="text-[11px] text-fg-3">@{username ?? "—"}</span>
+					<span className="text-2xs text-fg-3">@{username ?? "—"}</span>
 				</div>
 				<div className="ml-auto">
 					<ThemeToggle />

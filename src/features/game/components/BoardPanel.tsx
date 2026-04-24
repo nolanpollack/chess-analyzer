@@ -89,28 +89,28 @@ export function BoardPanel({
 
 			<div className="mt-3 flex items-center gap-2 rounded-[8px] border border-divider bg-surface p-2">
 				<ControlButton label="First move" onClick={onFirst}>
-					<ChevronsLeft className="h-[14px] w-[14px]" />
+					<ChevronsLeft className="h-3.5 w-3.5" />
 				</ControlButton>
 				<ControlButton label="Previous move" onClick={onPrev}>
-					<ChevronLeft className="h-[14px] w-[14px]" />
+					<ChevronLeft className="h-3.5 w-3.5" />
 				</ControlButton>
 				<div className="flex-1 text-center mono-nums font-mono text-[12.5px] text-fg-2">
 					{cur
 						? `${cur.moveNumber}${cur.side === "white" ? "." : "..."} ${cur.san}`
 						: "—"}
-					<span className="ml-[10px] text-[11px] text-fg-4">
+					<span className="ml-2.5 text-2xs text-fg-4">
 						{cursor + 1} / {moves.length}
 					</span>
 				</div>
 				<ControlButton label="Next move" onClick={onNext}>
-					<ChevronRight className="h-[14px] w-[14px]" />
+					<ChevronRight className="h-3.5 w-3.5" />
 				</ControlButton>
 				<ControlButton label="Last move" onClick={onLast}>
-					<ChevronsRight className="h-[14px] w-[14px]" />
+					<ChevronsRight className="h-3.5 w-3.5" />
 				</ControlButton>
-				<div className="h-[18px] w-px bg-divider" />
+				<div className="h-4.5 w-px bg-divider" />
 				<ControlButton label="Flip board" onClick={onFlip}>
-					<FlipVertical2 className="h-[14px] w-[14px]" />
+					<FlipVertical2 className="h-3.5 w-3.5" />
 				</ControlButton>
 			</div>
 		</div>
@@ -131,7 +131,7 @@ function ControlButton({
 			type="button"
 			aria-label={label}
 			onClick={onClick}
-			className="cursor-pointer rounded-[4px] border-none bg-transparent p-[6px] text-fg-2 transition-colors duration-[100ms] hover:bg-surface-2 hover:text-fg-1"
+			className="cursor-pointer rounded-[4px] border-none bg-transparent p-1.5 text-fg-2 transition-colors duration-[100ms] hover:bg-surface-2 hover:text-fg-1"
 		>
 			{children}
 		</button>

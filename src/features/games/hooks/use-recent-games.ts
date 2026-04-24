@@ -6,6 +6,7 @@ import type {
 	GameSummary,
 } from "#/features/games/types";
 import { classifyResult } from "#/lib/chess-utils";
+import { formatRelativeTime } from "#/lib/date";
 
 export function useRecentGames(username: string, pageSize = 8) {
 	return useQuery({
@@ -23,8 +24,9 @@ function toSummary(game: Game): GameSummary {
 	const category = classifyResult(game.resultDetail);
 	const result: GameResultLetter =
 		category === "win" ? "W" : category === "loss" ? "L" : "D";
-	const accuracy =
+	const chessComAccuracy =
 		game.playerColor === "white" ? game.accuracyWhite : game.accuracyBlack;
+	const accuracy = game.overallAccuracy ?? chessComAccuracy;
 
 	return {
 		id: game.id,
@@ -36,6 +38,6 @@ function toSummary(game: Game): GameSummary {
 		acc: accuracy,
 		time: game.timeControl,
 		opening: game.openingName ?? "—",
-		when: game.playedAt,
+		when: formatRelativeTime(game.playedAt),
 	};
 }

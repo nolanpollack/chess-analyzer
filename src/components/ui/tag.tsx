@@ -8,7 +8,7 @@ type TagProps = {
 export function Tag({ children, className = "" }: TagProps) {
 	return (
 		<span
-			className={`inline-flex items-center rounded-full border px-[7px] py-[2px] text-[11px] font-medium text-fg-2 ${className}`}
+			className={`inline-flex items-center rounded-full border px-2 py-0.5 text-2xs font-medium text-fg-2 ${className}`}
 			style={{
 				background: "var(--surface-2)",
 				borderColor: "var(--divider-token)",

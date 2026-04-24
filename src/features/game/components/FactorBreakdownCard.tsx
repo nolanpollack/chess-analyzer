@@ -19,11 +19,11 @@ export function FactorBreakdownCard({
 
 	return (
 		<div className="rounded-[10px] border border-divider bg-surface">
-			<div className="border-b border-divider px-5 py-[14px]">
-				<div className="text-[11px] uppercase tracking-[0.08em] text-fg-3">
+			<div className="border-b border-divider px-5 py-3.5">
+				<div className="text-2xs uppercase tracking-[0.08em] text-fg-3">
 					Factor breakdown
 				</div>
-				<div className="mt-1 text-[13px] text-fg-2">
+				<div className="mt-1 text-ui text-fg-2">
 					Elo estimate per factor · overall{" "}
 					<span className="mono-nums font-mono font-medium text-fg-1">
 						{overallElo}
@@ -56,7 +56,7 @@ function FactorGroup({
 			<div className="mb-2 text-[10.5px] uppercase tracking-[0.08em] text-fg-4">
 				{title}
 			</div>
-			<div className="flex flex-col gap-[10px]">
+			<div className="flex flex-col gap-2.5">
 				{factors.map((f) => (
 					<FactorRow key={`${f.group}-${f.label}`} factor={f} />
 				))}
@@ -73,13 +73,13 @@ function FactorRow({ factor }: { factor: GameFactor }) {
 	const positive = factor.delta >= 0;
 	return (
 		<div className="flex items-center gap-3">
-			<div className="w-[92px] shrink-0 text-[13px] text-fg-1">
+			<div className="w-[92px] shrink-0 text-ui text-fg-1">
 				{factor.label}
 				<span className="ml-1 mono-nums font-mono text-[10.5px] text-fg-4">
 					{factor.moveCount}
 				</span>
 			</div>
-			<div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-surface-2">
+			<div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
 				<div
 					className="absolute inset-y-0 left-0 bg-fg-2"
 					style={{ width: `${pct}%` }}
@@ -89,7 +89,7 @@ function FactorRow({ factor }: { factor: GameFactor }) {
 				{factor.value}
 			</div>
 			<div
-				className={`w-[46px] text-right mono-nums font-mono text-[11px] ${
+				className={`w-[46px] text-right mono-nums font-mono text-2xs ${
 					positive ? "text-data-6" : "text-blunder"
 				}`}
 			>

@@ -12,8 +12,8 @@ type TopbarProps = {
 
 export function Topbar({ crumbs, actions }: TopbarProps) {
 	return (
-		<div className="sticky top-0 z-10 flex items-center gap-4 border-b border-divider bg-topbar-bg px-10 py-[14px] backdrop-blur-[12px]">
-			<nav className="flex items-center gap-2 text-[13px] text-fg-2">
+		<div className="sticky top-0 z-10 flex items-center gap-4 border-b border-divider bg-topbar-bg px-10 py-3.5 backdrop-blur-[12px]">
+			<nav className="flex items-center gap-2 text-ui text-fg-2">
 				{crumbs.map((crumb, i) => (
 					<span key={crumb.label} className="flex items-center gap-2">
 						{i > 0 && <span className="text-fg-4">/</span>}
