@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { walkPgn } from "#/lib/chess-analysis";
+import { walkPgn } from "#/lib/analysis/pgn";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Game, Move } from "#/lib/tagging/types";
 

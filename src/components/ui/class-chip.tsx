@@ -20,9 +20,12 @@ const SYMBOL: Record<ClassChipProps["cls"], string> = {
 const ACTIVE: Record<MoveClassification, string> = {
 	blunder: "text-blunder border-blunder/30 bg-tint-blunder",
 	mistake: "text-mistake border-mistake/30 bg-mistake/10",
+	miss: "text-mistake border-mistake/30 bg-mistake/10",
 	inaccuracy: "text-inaccuracy border-inaccuracy/30 bg-inaccuracy/10",
 	brilliant: "",
+	great: "",
 	best: "",
+	excellent: "",
 	good: "",
 };
 

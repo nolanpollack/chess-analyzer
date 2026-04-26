@@ -9,29 +9,38 @@ type MoveBadgeProps = {
 
 const LABEL: Record<MoveClassification, string> = {
 	brilliant: "Brilliant",
+	great: "Great",
 	best: "Best",
+	excellent: "Excellent",
 	good: "Good",
 	inaccuracy: "Inaccuracy",
 	mistake: "Mistake",
 	blunder: "Blunder",
+	miss: "Miss",
 };
 
 const SYMBOL: Record<MoveClassification, string> = {
 	brilliant: "!!",
+	great: "!",
 	best: "✓",
+	excellent: "!",
 	good: "✓",
 	inaccuracy: "?!",
 	mistake: "?",
 	blunder: "??",
+	miss: "□",
 };
 
 const TEXT_CLASS: Record<MoveClassification, string> = {
 	brilliant: "text-brilliant",
+	great: "text-brilliant",
 	best: "text-best",
+	excellent: "text-best",
 	good: "text-good",
 	inaccuracy: "text-inaccuracy",
 	mistake: "text-mistake",
 	blunder: "text-blunder",
+	miss: "text-mistake",
 };
 
 const SIZE_CLASS: Record<Size, string> = {

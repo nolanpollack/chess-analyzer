@@ -7,7 +7,7 @@
  * Reference:
  * https://github.com/lichess-org/lila/blob/2e653ad1e2b9fad31b4a092394019ef8fafdedb8/modules/analyse/src/main/AccuracyPercent.scala#L81-L112
  */
-import { cpToWinPct, type MoveEvalData } from "#/lib/chess-analysis";
+import { cpToWinPct, type MoveEvalData } from "#/lib/analysis/accuracy";
 
 function standardDeviation(values: number[]): number {
 	if (values.length < 2) return 0;

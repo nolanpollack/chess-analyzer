@@ -8,6 +8,13 @@
       "when": 1777070673999,
       "tag": "0000_spooky_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777229211766,
+      "tag": "0001_equal_luminals",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { getGamePhase } from "#/lib/chess-analysis";
+import { getGamePhase } from "#/lib/analysis/position";
 import type { TagGenerator } from "#/lib/tagging/types";
 
 export const phaseGenerator: TagGenerator = {

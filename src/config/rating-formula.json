@@ -1,0 +1,7 @@
+{
+	"bullet": { "slope": 40, "offset": -1200, "r2": 0, "sampleSize": 0 },
+	"blitz": { "slope": 40, "offset": -1200, "r2": 0, "sampleSize": 0 },
+	"rapid": { "slope": 40, "offset": -1200, "r2": 0, "sampleSize": 0 },
+	"classical": { "slope": 40, "offset": -1200, "r2": 0, "sampleSize": 0 },
+	"daily": { "slope": 40, "offset": -1200, "r2": 0, "sampleSize": 0 }
+}

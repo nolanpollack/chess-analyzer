@@ -19,13 +19,13 @@ import { ANALYSIS_CONFIG } from "#/config/analysis";
 import { analysisJobs, games, moves, moveTags } from "#/db/schema";
 import { env } from "#/env";
 import {
-	classifyMove,
 	computeEvalDelta,
 	computeMoveAccuracy,
+	cpToWinPct,
 	type MoveEvalData,
-	type PgnMove,
-	walkPgn,
-} from "#/lib/chess-analysis";
+} from "#/lib/analysis/accuracy";
+import { type PgnMove, walkPgn } from "#/lib/analysis/pgn";
+import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
 import { invalidatePlayerCache } from "#/lib/scoring/cache";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
@@ -317,6 +317,7 @@ function buildMoveRows(args: {
 	const isPlayerWhite = args.playerColor === "white";
 	const moveRows: MoveRow[] = [];
 	const allEvals: MoveEvalData[] = [];
+	let prevWinPctLost: number | null = null;
 
 	for (const move of args.pgnMoves) {
 		const before = args.positionEvals.get(move.fenBefore);
@@ -332,8 +333,21 @@ function buildMoveRows(args: {
 			after.evalCp,
 			move.isWhite,
 		);
+
+		const winPctBefore = move.isWhite
+			? cpToWinPct(before.evalCp)
+			: 100 - cpToWinPct(before.evalCp);
+		const winPctAfter = move.isWhite
+			? cpToWinPct(after.evalCp)
+			: 100 - cpToWinPct(after.evalCp);
+		const winPctLost = Math.max(0, winPctBefore - winPctAfter);
+
+		const prevContext: PrevMoveContext | undefined =
+			prevWinPctLost !== null
+				? { opponentWinPctLost: prevWinPctLost }
+				: undefined;
+
 		const classification = classifyMove(
-			evalDelta,
 			move.uci,
 			before.bestMoveUci,
 			before.evalCp,
@@ -341,7 +355,10 @@ function buildMoveRows(args: {
 			move.fenBefore,
 			move.fenAfter,
 			move.isWhite,
+			prevContext,
 		);
+
+		prevWinPctLost = winPctLost;
 
 		const isPlayerMove = move.isWhite === isPlayerWhite;
 

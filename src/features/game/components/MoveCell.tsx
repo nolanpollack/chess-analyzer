@@ -8,19 +8,25 @@ type MoveCellProps = {
 };
 
 const SYMBOL: Partial<Record<MoveClassification, string>> = {
+	brilliant: "!!",
+	great: "!",
+	excellent: "!",
 	inaccuracy: "?!",
 	mistake: "?",
 	blunder: "??",
-	brilliant: "!!",
+	miss: "□",
 };
 
 const TEXT: Record<MoveClassification, string> = {
 	brilliant: "text-brilliant",
+	great: "text-brilliant",
 	best: "text-fg-1",
+	excellent: "text-best",
 	good: "text-fg-1",
 	inaccuracy: "text-inaccuracy",
 	mistake: "text-mistake",
 	blunder: "text-blunder",
+	miss: "text-mistake",
 };
 
 export function MoveCell({ move, active, onClick }: MoveCellProps) {

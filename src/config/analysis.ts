@@ -5,15 +5,29 @@ export const ANALYSIS_CONFIG = {
 	/** Number of principal variations (lines) to compute */
 	multiPv: 1,
 
-	/**
-	 * These are flat centipawn thresholds. A future improvement is to convert engine evals to win probability using a rating-adjusted model (similar to chess.com's Expected Points Model), which would make classification thresholds feel more appropriate across different rating levels. For now, flat thresholds work for MVP.
-	 * Move classification thresholds (centipawn loss from player's perspective).
-	 * A move is classified by the worst threshold it exceeds.
-	 */
+	/** Move classification thresholds (win% lost from the mover's perspective, 0–100 scale). */
 	classification: {
-		blunder: 200,
-		mistake: 100,
-		inaccuracy: 50,
+		// Standard waterfall: a move falls into the first bucket it fits.
+		excellent: 2,
+		good: 5,
+		inaccuracy: 10,
+		mistake: 20,
+		// blunder: anything above `mistake`
+
+		// Brilliant: near-best piece sacrifice, not already winning, doesn't land in a losing position.
+		brilliantMaxWinLoss: 2,
+		brilliantMaxWinPctBefore: 65,
+		brilliantMinWinPctAfter: 45,
+
+		// Great: critical turning point — position swings from not-winning to winning/equal.
+		greatMaxWinPctBefore: 50,
+		greatMinWinPctAfter: 55,
+		greatMinWinGain: 10,
+
+		// Miss: opponent just erred, player had a winning position and dropped it.
+		missOpponentErrorMin: 10,
+		missPlayerWinPctMin: 60,
+		missPlayerDropMin: 10,
 	},
 
 	/** Maximum centipawn value to clamp eval display (avoids huge values for forced mates) */

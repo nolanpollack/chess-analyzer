@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import type { MoveAnalysis } from "#/db/schema";
-import { detectConcepts } from "#/lib/chess-analysis";
+import { detectConcepts } from "#/lib/analysis/position";
 import type { Move, ProposedTag, TagGenerator } from "#/lib/tagging/types";
 
 export const conceptGenerator: TagGenerator = {

@@ -28,11 +28,14 @@ export const playerColorEnum = pgEnum("player_color", ["white", "black"]);
 
 export const moveClassificationEnum = pgEnum("move_classification", [
 	"brilliant",
+	"great",
 	"best",
+	"excellent",
 	"good",
 	"inaccuracy",
 	"mistake",
 	"blunder",
+	"miss",
 ]);
 
 export const analysisStatusEnum = pgEnum("analysis_status", [

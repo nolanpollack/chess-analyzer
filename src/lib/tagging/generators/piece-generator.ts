@@ -1,4 +1,4 @@
-import { getPiecesInvolved } from "#/lib/chess-analysis";
+import { getPiecesInvolved } from "#/lib/analysis/position";
 import type { ProposedTag, TagGenerator } from "#/lib/tagging/types";
 
 export const pieceGenerator: TagGenerator = {
