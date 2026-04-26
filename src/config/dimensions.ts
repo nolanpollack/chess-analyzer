@@ -12,7 +12,8 @@ export const DIMENSIONS = {
 	phase: ["opening", "middlegame", "endgame"],
 	piece: ["pawn", "knight", "bishop", "rook", "queen", "king"],
 	concept: CONCEPT_TAXONOMY.map((c) => c.id),
-	// Phase 4: agency = forcing | reactive | proactive | speculative
+	// "speculative" (sacrifice detection) deferred until post-MVP.
+	agency: ["forcing", "reactive", "proactive"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type DimensionType = keyof typeof DIMENSIONS;

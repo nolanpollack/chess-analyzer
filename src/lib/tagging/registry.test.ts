@@ -142,7 +142,7 @@ describe("runGeneratorsForMove", () => {
 		});
 		for (const row of rows) {
 			expect(row.source).toBe("heuristic");
-			expect(row.sourceVersion).toMatch(/^(phase|piece|concept)-v\d+$/);
+			expect(row.sourceVersion).toMatch(/^(phase|piece|agency|concept)-v\d+$/);
 			expect(row.moveId).toBe(moves[0].id);
 			expect(row.playerId).toBe(game.playerId);
 			expect(row.gameId).toBe(game.id);

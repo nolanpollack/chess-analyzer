@@ -1,4 +1,5 @@
 import type { moveTags } from "#/db/schema";
+import { agencyGenerator } from "#/lib/tagging/generators/agency-generator";
 import { conceptGenerator } from "#/lib/tagging/generators/concept-generator";
 import { phaseGenerator } from "#/lib/tagging/generators/phase-generator";
 import { pieceGenerator } from "#/lib/tagging/generators/piece-generator";
@@ -13,6 +14,7 @@ import { validateTagValue } from "#/lib/tagging/validate";
 export const GENERATORS: readonly TagGenerator[] = [
 	phaseGenerator,
 	pieceGenerator,
+	agencyGenerator,
 	conceptGenerator,
 ];
 
