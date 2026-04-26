@@ -23,6 +23,7 @@ or any other decision a future agent session would need to replicate.
 - code-style.md — TypeScript conventions, naming, imports, formatting
 - db.md — schema conventions, enum policy, migration approach
 - ai-prompts.md — LLM prompt design, concept taxonomy, versioning
+- ratings.md — dimensional ratings: scoring layer order, shrinkage isolation, cache, generators
 - frontend/components.md — UI component patterns, shadcn usage, theming
 - frontend/* — add new files here for additional frontend-specific rules
 

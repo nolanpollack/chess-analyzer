@@ -1,44 +1,47 @@
-import { Chess } from "chess.js";
-import { eq } from "drizzle-orm";
+/**
+ * analyze-game worker job.
+ *
+ * Pipeline:
+ *   1. Claim/create the analysis_jobs row, mark `running`.
+ *   2. Walk PGN, run Stockfish on each unique position.
+ *   3. Insert one `moves` row per ply (engine output stored as columns).
+ *   4. Run every registered tag generator over the moves; batch-insert
+ *      the resulting `move_tags` rows.
+ *   5. Mark the job `complete` with overall accuracies.
+ *
+ * Idempotent: re-running on the same job deletes prior moves + tags
+ * before reinsertion. Generators live in src/lib/tagging/.
+ */
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
-import {
-	type Concept,
-	gameAnalyses,
-	gamePerformance,
-	games,
-	type MoveAnalysis,
-	moveTags,
-} from "#/db/schema";
+import { analysisJobs, games, moves, moveTags } from "#/db/schema";
 import { env } from "#/env";
 import {
 	classifyMove,
 	computeAccuracy,
 	computeEvalDelta,
-	detectConcepts,
-	getGamePhase,
-	getPiecesInvolved,
 	type MoveEvalData,
 	type PgnMove,
 	walkPgn,
 } from "#/lib/chess-analysis";
-import { computeGamePerformance, type MoveTagData } from "#/lib/performance";
+import { invalidatePlayerCache } from "#/lib/scoring/cache";
+import { runGeneratorsForMove } from "#/lib/tagging/registry";
+import type { Move } from "#/lib/tagging/types";
 import type { AnalysisEngine } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
 
+export const ANALYZE_GAME_QUEUE = "analyze-game";
+export const PIPELINE_VERSION = "v1";
+
 const ENGINE_DEPTH =
 	Number(process.env.ANALYSIS_ENGINE_DEPTH) || ANALYSIS_CONFIG.engineDepth;
-
-// ── Job Types ──────────────────────────────────────────────────────────
-
-export const ANALYZE_GAME_QUEUE = "analyze-game";
+const ENGINE_NAME = "stockfish-wasm";
 
 export type AnalyzeGamePayload = {
 	gameId: string;
 };
-
-// ── Registration ──────────────────────────────────────────────────────
 
 export function registerAnalyzeGameJob(boss: PgBoss) {
 	boss.work<AnalyzeGamePayload>(
@@ -55,170 +58,211 @@ export function registerAnalyzeGameJob(boss: PgBoss) {
 	);
 }
 
-// ── Types ─────────────────────────────────────────────────────────────
-
 type PositionEval = {
 	evalCp: number;
 	bestMoveUci: string;
 	bestMoveSan: string;
 };
 
-type GameData = {
+type GameRow = {
 	pgn: string;
 	playerColor: "white" | "black";
 	playerId: string;
-	openingEco: string | null;
-	openingName: string | null;
 };
-
-// ── Top-level handler ─────────────────────────────────────────────────
 
 async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 	const { gameId } = data;
 	console.log(`[analyze-game] Starting analysis for game ${gameId}`);
 
 	const db = drizzle(env.DATABASE_URL);
+	const jobId = await claimOrCreateJob(db, gameId);
 
-	if (await isAlreadyComplete(db, gameId)) {
+	if (!jobId) {
 		console.log(`[analyze-game] Game ${gameId} already analyzed, skipping`);
 		return;
 	}
 
-	await ensureAnalysisRow(db, gameId);
 	const game = await loadGame(db, gameId);
 	const engine = createStockfishWasmEngine();
 
 	try {
 		await engine.init();
 		const pgnMoves = walkPgn(game.pgn);
-		await setTotalMoves(db, gameId, pgnMoves.length);
+		await db
+			.update(analysisJobs)
+			.set({
+				totalMoves: pgnMoves.length,
+				startedAt: new Date(),
+				status: "running",
+			})
+			.where(eq(analysisJobs.id, jobId));
 
 		const positionEvals = await evaluateAllPositions(
 			engine,
 			pgnMoves,
 			db,
-			gameId,
+			jobId,
 		);
-		const { moveAnalyses, accuracyWhite, accuracyBlack } = buildMoveAnalyses(
+
+		const { moveRows, accuracyWhite, accuracyBlack } = buildMoveRows({
 			pgnMoves,
 			positionEvals,
-			game.playerColor,
-		);
-
-		await storeAnalysisResults(
-			db,
+			playerColor: game.playerColor,
+			playerId: game.playerId,
 			gameId,
-			moveAnalyses,
-			accuracyWhite,
-			accuracyBlack,
-			pgnMoves.length,
-		);
+			analysisJobId: jobId,
+		});
 
-		const analysisId = await getAnalysisId(db, gameId);
-		if (analysisId) {
-			const tagRows = buildTagRows(
-				positionEvals,
-				moveAnalyses,
-				analysisId,
-				game,
-			);
-			await insertMoveTags(db, analysisId, tagRows);
-			await insertGamePerformance(
-				db,
-				analysisId,
-				game.playerId,
-				moveAnalyses,
-				tagRows,
-			);
+		// Replace any prior moves + tags for this job (re-run safety).
+		// move_tags FK to moves so the moves delete cascades via the explicit
+		// tag delete below.
+		await deleteJobTags(db, jobId);
+		await db.delete(moves).where(eq(moves.analysisJobId, jobId));
+
+		let insertedMoves: Move[] = [];
+		if (moveRows.length > 0) {
+			insertedMoves = await db.insert(moves).values(moveRows).returning();
 		}
 
+		await runAndInsertTags(db, insertedMoves, await loadGameRow(db, gameId));
+
+		await db
+			.update(analysisJobs)
+			.set({
+				accuracyWhite,
+				accuracyBlack,
+				movesAnalyzed: pgnMoves.length,
+				status: "complete",
+				completedAt: new Date(),
+			})
+			.where(eq(analysisJobs.id, jobId));
+
+		await invalidatePlayerCache(db, game.playerId);
+
 		console.log(
-			`[analyze-game] Completed analysis for game ${gameId}: ${pgnMoves.length} moves, white accuracy ${accuracyWhite}%, black accuracy ${accuracyBlack}%`,
+			`[analyze-game] Completed game ${gameId}: ${pgnMoves.length} moves, white ${accuracyWhite}%, black ${accuracyBlack}%`,
 		);
 	} catch (err) {
 		console.error(`[analyze-game] Failed for game ${gameId}:`, err);
-		await markFailed(db, gameId, err);
+		await markFailed(db, jobId, err);
 		throw err;
 	} finally {
 		await engine.destroy();
 	}
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────
-
-async function isAlreadyComplete(
+/**
+ * Reuse an existing queued job, or insert a new one. Returns null when the
+ * latest job is already complete (idempotent skip).
+ */
+async function claimOrCreateJob(
 	db: NodePgDatabase,
 	gameId: string,
-): Promise<boolean> {
-	const [existing] = await db
-		.select({ status: gameAnalyses.status })
-		.from(gameAnalyses)
-		.where(eq(gameAnalyses.gameId, gameId));
-	return existing?.status === "complete";
-}
+): Promise<string | null> {
+	const existing = await db
+		.select({ id: analysisJobs.id, status: analysisJobs.status })
+		.from(analysisJobs)
+		.where(eq(analysisJobs.gameId, gameId))
+		.orderBy(sql`${analysisJobs.enqueuedAt} DESC`)
+		.limit(1);
 
-async function ensureAnalysisRow(
-	db: NodePgDatabase,
-	gameId: string,
-): Promise<void> {
-	const [existing] = await db
-		.select({ status: gameAnalyses.status })
-		.from(gameAnalyses)
-		.where(eq(gameAnalyses.gameId, gameId));
+	const latest = existing[0];
 
-	if (!existing) {
-		await db.insert(gameAnalyses).values({
-			gameId,
-			engine: "stockfish-wasm",
-			depth: ENGINE_DEPTH,
-			moves: [],
-			status: "pending",
-		});
+	if (latest?.status === "complete") return null;
+
+	if (latest && (latest.status === "queued" || latest.status === "failed")) {
+		await db
+			.update(analysisJobs)
+			.set({
+				status: "running",
+				attempts: sql`${analysisJobs.attempts} + 1`,
+				errorMessage: null,
+				movesAnalyzed: 0,
+			})
+			.where(eq(analysisJobs.id, latest.id));
+		return latest.id;
 	}
+
+	if (latest?.status === "running") {
+		// Pick it up — likely a previously-killed worker. The DELETE on
+		// moves below makes restart safe.
+		return latest.id;
+	}
+
+	const [created] = await db
+		.insert(analysisJobs)
+		.values({
+			gameId,
+			engine: ENGINE_NAME,
+			depth: ENGINE_DEPTH,
+			pipelineVersion: PIPELINE_VERSION,
+			status: "running",
+			attempts: 1,
+			startedAt: new Date(),
+		})
+		.returning({ id: analysisJobs.id });
+
+	return created.id;
 }
 
-async function loadGame(db: NodePgDatabase, gameId: string): Promise<GameData> {
+async function loadGame(db: NodePgDatabase, gameId: string): Promise<GameRow> {
 	const [game] = await db
 		.select({
 			pgn: games.pgn,
 			playerColor: games.playerColor,
 			playerId: games.playerId,
-			openingEco: games.openingEco,
-			openingName: games.openingName,
 		})
 		.from(games)
 		.where(eq(games.id, gameId));
 
 	if (!game) {
-		await db
-			.update(gameAnalyses)
-			.set({
-				status: "failed",
-				errorMessage: `Game ${gameId} not found in database`,
-			})
-			.where(eq(gameAnalyses.gameId, gameId));
 		throw new Error(`Game ${gameId} not found`);
 	}
-
 	return game;
 }
 
-async function setTotalMoves(
+async function loadGameRow(db: NodePgDatabase, gameId: string) {
+	const [row] = await db.select().from(games).where(eq(games.id, gameId));
+	if (!row) throw new Error(`Game ${gameId} not found`);
+	return row;
+}
+
+async function deleteJobTags(db: NodePgDatabase, jobId: string): Promise<void> {
+	const moveIds = await db
+		.select({ id: moves.id })
+		.from(moves)
+		.where(eq(moves.analysisJobId, jobId));
+	if (moveIds.length === 0) return;
+	await db.delete(moveTags).where(
+		inArray(
+			moveTags.moveId,
+			moveIds.map((m) => m.id),
+		),
+	);
+}
+
+async function runAndInsertTags(
 	db: NodePgDatabase,
-	gameId: string,
-	totalMoves: number,
+	allMoves: Move[],
+	game: typeof games.$inferSelect,
 ): Promise<void> {
-	await db
-		.update(gameAnalyses)
-		.set({ totalMoves })
-		.where(eq(gameAnalyses.gameId, gameId));
+	if (allMoves.length === 0) return;
+
+	const tagRows = allMoves.flatMap((move) =>
+		runGeneratorsForMove({ move, game, allMoves }),
+	);
+	if (tagRows.length === 0) return;
+
+	// Single batch insert. ~5–10 tags per move × 40 moves = a few hundred rows
+	// per game; well within Postgres parameter limits.
+	await db.insert(moveTags).values(tagRows);
 }
 
 async function evaluateAllPositions(
 	engine: AnalysisEngine,
 	pgnMoves: PgnMove[],
 	db: NodePgDatabase,
-	gameId: string,
+	jobId: string,
 ): Promise<Map<string, PositionEval>> {
 	const evals = new Map<string, PositionEval>();
 
@@ -235,9 +279,9 @@ async function evaluateAllPositions(
 
 		if ((i + 1) % 5 === 0 || i === pgnMoves.length - 1) {
 			await db
-				.update(gameAnalyses)
+				.update(analysisJobs)
 				.set({ movesAnalyzed: i + 1 })
-				.where(eq(gameAnalyses.gameId, gameId));
+				.where(eq(analysisJobs.id, jobId));
 		}
 	}
 
@@ -259,219 +303,97 @@ async function evaluateAllPositions(
 	return evals;
 }
 
-function buildMoveAnalyses(
-	pgnMoves: PgnMove[],
-	positionEvals: Map<string, PositionEval>,
-	playerColor: "white" | "black",
-): {
-	moveAnalyses: MoveAnalysis[];
-	accuracyWhite: number;
-	accuracyBlack: number;
-} {
-	const isPlayerWhite = playerColor === "white";
-	const moveAnalyses: MoveAnalysis[] = [];
-	const whiteMoveEvals: MoveEvalData[] = [];
-	const blackMoveEvals: MoveEvalData[] = [];
+type MoveRow = typeof moves.$inferInsert;
 
-	for (const move of pgnMoves) {
-		const beforeEval = positionEvals.get(move.fenBefore);
-		const afterEval = positionEvals.get(move.fenAfter);
+function buildMoveRows(args: {
+	pgnMoves: PgnMove[];
+	positionEvals: Map<string, PositionEval>;
+	playerColor: "white" | "black";
+	playerId: string;
+	gameId: string;
+	analysisJobId: string;
+}): { moveRows: MoveRow[]; accuracyWhite: number; accuracyBlack: number } {
+	const isPlayerWhite = args.playerColor === "white";
+	const moveRows: MoveRow[] = [];
+	const whiteEvals: MoveEvalData[] = [];
+	const blackEvals: MoveEvalData[] = [];
 
-		if (!beforeEval || !afterEval) {
+	for (const move of args.pgnMoves) {
+		const before = args.positionEvals.get(move.fenBefore);
+		const after = args.positionEvals.get(move.fenAfter);
+
+		if (!before || !after) {
 			console.warn(`[analyze-game] Missing eval for ply ${move.ply}, skipping`);
 			continue;
 		}
 
 		const evalDelta = computeEvalDelta(
-			beforeEval.evalCp,
-			afterEval.evalCp,
+			before.evalCp,
+			after.evalCp,
 			move.isWhite,
 		);
 		const classification = classifyMove(
 			evalDelta,
 			move.uci,
-			beforeEval.bestMoveUci,
-			beforeEval.evalCp,
-			afterEval.evalCp,
+			before.bestMoveUci,
+			before.evalCp,
+			after.evalCp,
 			move.fenBefore,
 			move.fenAfter,
 			move.isWhite,
 		);
 
-		moveAnalyses.push({
+		const isPlayerMove = move.isWhite === isPlayerWhite;
+
+		moveRows.push({
+			analysisJobId: args.analysisJobId,
+			gameId: args.gameId,
+			playerId: args.playerId,
 			ply: move.ply,
+			color: move.isWhite ? "white" : "black",
+			isPlayerMove: isPlayerMove ? 1 : 0,
 			san: move.san,
 			uci: move.uci,
-			fen_before: move.fenBefore,
-			fen_after: move.fenAfter,
-			eval_before: beforeEval.evalCp,
-			eval_after: afterEval.evalCp,
-			eval_delta: evalDelta,
-			best_move_uci: beforeEval.bestMoveUci,
-			best_move_san: beforeEval.bestMoveSan,
+			fenBefore: move.fenBefore,
+			fenAfter: move.fenAfter,
+			engineBestUci: before.bestMoveUci,
+			engineBestSan: before.bestMoveSan,
+			evalBeforeCp: before.evalCp,
+			evalAfterCp: after.evalCp,
+			evalDeltaCp: evalDelta,
 			classification,
-			is_player_move: move.isWhite === isPlayerWhite,
+			// Per-move accuracy populated alongside aggregate computation; for
+			// MVP we leave it null (aggregate accuracy is what consumers read).
+			accuracyScore: null,
 		});
 
 		const evalData: MoveEvalData = {
-			evalBefore: beforeEval.evalCp,
-			evalAfter: afterEval.evalCp,
+			evalBefore: before.evalCp,
+			evalAfter: after.evalCp,
 			isWhite: move.isWhite,
 		};
-		if (move.isWhite) {
-			whiteMoveEvals.push(evalData);
-		} else {
-			blackMoveEvals.push(evalData);
-		}
+		if (move.isWhite) whiteEvals.push(evalData);
+		else blackEvals.push(evalData);
 	}
 
 	return {
-		moveAnalyses,
-		accuracyWhite: computeAccuracy(whiteMoveEvals),
-		accuracyBlack: computeAccuracy(blackMoveEvals),
+		moveRows,
+		accuracyWhite: computeAccuracy(whiteEvals),
+		accuracyBlack: computeAccuracy(blackEvals),
 	};
-}
-
-async function storeAnalysisResults(
-	db: NodePgDatabase,
-	gameId: string,
-	moveAnalyses: MoveAnalysis[],
-	accuracyWhite: number,
-	accuracyBlack: number,
-	totalMoves: number,
-): Promise<void> {
-	await db
-		.update(gameAnalyses)
-		.set({
-			moves: moveAnalyses,
-			accuracyWhite,
-			accuracyBlack,
-			movesAnalyzed: totalMoves,
-			status: "complete",
-			analyzedAt: new Date(),
-		})
-		.where(eq(gameAnalyses.gameId, gameId));
-}
-
-async function getAnalysisId(
-	db: NodePgDatabase,
-	gameId: string,
-): Promise<string | null> {
-	const [row] = await db
-		.select({ id: gameAnalyses.id })
-		.from(gameAnalyses)
-		.where(eq(gameAnalyses.gameId, gameId));
-	return row?.id ?? null;
-}
-
-type TagRow = {
-	gameAnalysisId: string;
-	playerId: string;
-	ply: number;
-	gamePhase: "opening" | "middlegame" | "endgame";
-	piecesInvolved: ("pawn" | "knight" | "bishop" | "rook" | "queen" | "king")[];
-	openingEco: string | null;
-	openingName: string | null;
-	concepts: Concept[];
-};
-
-function buildTagRows(
-	positionEvals: Map<string, PositionEval>,
-	moveAnalyses: MoveAnalysis[],
-	analysisId: string,
-	game: GameData,
-): TagRow[] {
-	return moveAnalyses.map((move) => {
-		const phase = getGamePhase(move.ply, move.fen_after);
-		const pieces = getPiecesInvolved(move.san, move.uci, move.fen_before);
-
-		const beforeEval = positionEvals.get(move.fen_before);
-		let bestMoveFenAfter = move.fen_after;
-		if (beforeEval?.bestMoveUci) {
-			try {
-				const chess = new Chess(move.fen_before);
-				const uci = beforeEval.bestMoveUci;
-				// from+to+promotion
-				chess.move({
-					from: uci.slice(0, 2),
-					to: uci.slice(2, 4),
-					promotion: uci.slice(4, 5) || undefined,
-				});
-				bestMoveFenAfter = chess.fen();
-			} catch (_e) {}
-		}
-		const concepts = detectConcepts(
-			move,
-			move.fen_before,
-			move.fen_after,
-			bestMoveFenAfter,
-		);
-
-		return {
-			gameAnalysisId: analysisId,
-			playerId: game.playerId,
-			ply: move.ply,
-			gamePhase: phase,
-			piecesInvolved: pieces,
-			openingEco: phase === "opening" ? game.openingEco : null,
-			openingName: phase === "opening" ? game.openingName : null,
-			concepts,
-		};
-	});
-}
-
-async function insertMoveTags(
-	db: NodePgDatabase,
-	analysisId: string,
-	tagRows: TagRow[],
-): Promise<void> {
-	await db.delete(moveTags).where(eq(moveTags.gameAnalysisId, analysisId));
-	if (tagRows.length > 0) {
-		await db.insert(moveTags).values(tagRows);
-	}
-}
-
-async function insertGamePerformance(
-	db: NodePgDatabase,
-	analysisId: string,
-	playerId: string,
-	moveAnalyses: MoveAnalysis[],
-	tagRows: TagRow[],
-): Promise<void> {
-	const tagData: MoveTagData[] = tagRows.map((t) => ({
-		ply: t.ply,
-		gamePhase: t.gamePhase,
-		piecesInvolved: t.piecesInvolved,
-		openingEco: t.openingEco,
-		openingName: t.openingName,
-		concepts: t.concepts,
-	}));
-
-	const perf = computeGamePerformance(moveAnalyses, tagData);
-
-	await db
-		.insert(gamePerformance)
-		.values({
-			gameAnalysisId: analysisId,
-			playerId,
-			...perf,
-		})
-		.onConflictDoUpdate({
-			target: gamePerformance.gameAnalysisId,
-			set: { ...perf, computedAt: new Date() },
-		});
 }
 
 async function markFailed(
 	db: NodePgDatabase,
-	gameId: string,
+	jobId: string,
 	err: unknown,
 ): Promise<void> {
 	await db
-		.update(gameAnalyses)
+		.update(analysisJobs)
 		.set({
 			status: "failed",
 			errorMessage: err instanceof Error ? err.message : "Unknown error",
+			completedAt: new Date(),
 		})
-		.where(eq(gameAnalyses.gameId, gameId));
+		.where(and(eq(analysisJobs.id, jobId)));
 }

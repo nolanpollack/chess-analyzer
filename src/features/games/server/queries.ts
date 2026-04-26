@@ -1,23 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import {
-	type AnalysisStatus,
-	gameAnalyses,
-	gamePerformance,
-	games,
-	players,
-} from "#/db/schema";
+import { type AnalysisStatus, analysisJobs, games, players } from "#/db/schema";
 import { getResultDetails, lookupOpeningName } from "#/lib/chess-utils";
-import { accuracyToElo } from "#/lib/elo-estimate";
+
+type UiAnalysisStatus = "pending" | "complete" | "failed";
+
+function toUiStatus(status: AnalysisStatus | null): UiAnalysisStatus | null {
+	if (status === null) return null;
+	if (status === "queued" || status === "running") return "pending";
+	return status;
+}
 
 export const getGame = createServerFn({ method: "GET" })
-	.inputValidator(
-		z.object({
-			gameId: z.string().uuid(),
-		}),
-	)
+	.inputValidator(z.object({ gameId: z.string().uuid() }))
 	.handler(async ({ data }) => {
 		const { gameId } = data;
 
@@ -44,7 +41,7 @@ export const getGame = createServerFn({ method: "GET" })
 				(game.openingEco ? lookupOpeningName(game.openingEco) : null),
 			accuracyWhite: game.accuracyWhite,
 			accuracyBlack: game.accuracyBlack,
-			analysisStatus: null as AnalysisStatus | null,
+			analysisStatus: null as UiAnalysisStatus | null,
 			overallAccuracy: null as number | null,
 			gameScore: null as number | null,
 		};
@@ -96,6 +93,15 @@ export const listGames = createServerFn({ method: "GET" })
 		const whereClause = and(...conditions);
 		const offset = (page - 1) * pageSize;
 
+		// Latest analysis_job per game via correlated subquery (small N).
+		const latestStatusSql = sql<AnalysisStatus | null>`(
+			SELECT ${analysisJobs.status}
+			FROM ${analysisJobs}
+			WHERE ${analysisJobs.gameId} = ${games.id}
+			ORDER BY ${analysisJobs.enqueuedAt} DESC
+			LIMIT 1
+		)`;
+
 		const [gameRows, countResult] = await Promise.all([
 			db
 				.select({
@@ -113,15 +119,9 @@ export const listGames = createServerFn({ method: "GET" })
 					openingName: games.openingName,
 					accuracyWhite: games.accuracyWhite,
 					accuracyBlack: games.accuracyBlack,
-					analysisStatus: gameAnalyses.status,
-					overallAccuracy: gamePerformance.overallAccuracy,
+					rawAnalysisStatus: latestStatusSql,
 				})
 				.from(games)
-				.leftJoin(gameAnalyses, eq(games.id, gameAnalyses.gameId))
-				.leftJoin(
-					gamePerformance,
-					eq(gameAnalyses.id, gamePerformance.gameAnalysisId),
-				)
 				.where(whereClause)
 				.orderBy(desc(games.playedAt))
 				.limit(pageSize)
@@ -130,13 +130,26 @@ export const listGames = createServerFn({ method: "GET" })
 		]);
 
 		const items = gameRows.map((g) => ({
-			...g,
+			id: g.id,
+			platformGameId: g.platformGameId,
 			playedAt: g.playedAt.toISOString(),
+			timeControl: g.timeControl,
+			timeControlClass: g.timeControlClass,
+			resultDetail: g.resultDetail,
+			playerColor: g.playerColor,
+			playerRating: g.playerRating,
+			opponentUsername: g.opponentUsername,
+			opponentRating: g.opponentRating,
+			openingEco: g.openingEco,
 			openingName:
 				g.openingName ??
 				(g.openingEco ? lookupOpeningName(g.openingEco) : null),
-			gameScore:
-				g.overallAccuracy !== null ? accuracyToElo(g.overallAccuracy) : null,
+			accuracyWhite: g.accuracyWhite,
+			accuracyBlack: g.accuracyBlack,
+			analysisStatus: toUiStatus(g.rawAnalysisStatus),
+			// TODO Phase 3 — pull overallAccuracy from scoring engine cache
+			overallAccuracy: null as number | null,
+			gameScore: null as number | null,
 		}));
 
 		return {

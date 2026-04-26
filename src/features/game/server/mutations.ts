@@ -1,14 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
 import { db } from "#/db/index";
-import { gameAnalyses } from "#/db/schema";
+import { analysisJobs } from "#/db/schema";
 import { ensureQueue, getBoss } from "#/lib/queue";
 import {
 	ANALYZE_GAME_QUEUE,
 	type AnalyzeGamePayload,
+	PIPELINE_VERSION,
 } from "#/worker/jobs/analyze-game";
+
+const ENGINE = "stockfish-wasm";
+
+async function enqueueAnalysis(gameId: string) {
+	await ensureQueue(ANALYZE_GAME_QUEUE);
+	const boss = await getBoss();
+	await boss.send(ANALYZE_GAME_QUEUE, {
+		gameId,
+	} satisfies AnalyzeGamePayload);
+}
 
 export const triggerAnalysis = createServerFn({ method: "POST" })
 	.inputValidator(z.object({ gameId: z.string().uuid() }))
@@ -16,38 +27,31 @@ export const triggerAnalysis = createServerFn({ method: "POST" })
 		const { gameId } = data;
 
 		try {
-			const [existing] = await db
-				.select({ status: gameAnalyses.status })
-				.from(gameAnalyses)
-				.where(eq(gameAnalyses.gameId, gameId));
+			const [latest] = await db
+				.select({ status: analysisJobs.status, id: analysisJobs.id })
+				.from(analysisJobs)
+				.where(eq(analysisJobs.gameId, gameId))
+				.orderBy(desc(analysisJobs.enqueuedAt))
+				.limit(1);
 
-			if (existing?.status === "complete" || existing?.status === "pending") {
+			if (
+				latest?.status === "complete" ||
+				latest?.status === "queued" ||
+				latest?.status === "running"
+			) {
 				return { enqueued: false };
 			}
 
-			if (existing?.status === "failed") {
-				await db
-					.update(gameAnalyses)
-					.set({ status: "pending", errorMessage: null, movesAnalyzed: 0 })
-					.where(eq(gameAnalyses.gameId, gameId));
-			} else {
-				// Create the row immediately so the UI can show "pending" without
-				// waiting for the worker.
-				await db.insert(gameAnalyses).values({
-					gameId,
-					engine: "stockfish-wasm",
-					depth: ANALYSIS_CONFIG.engineDepth,
-					moves: [],
-					status: "pending",
-				});
-			}
-
-			await ensureQueue(ANALYZE_GAME_QUEUE);
-			const boss = await getBoss();
-			await boss.send(ANALYZE_GAME_QUEUE, {
+			// No job, or last attempt failed → create a fresh queued job.
+			await db.insert(analysisJobs).values({
 				gameId,
-			} satisfies AnalyzeGamePayload);
+				engine: ENGINE,
+				depth: ANALYSIS_CONFIG.engineDepth,
+				pipelineVersion: PIPELINE_VERSION,
+				status: "queued",
+			});
 
+			await enqueueAnalysis(gameId);
 			return { enqueued: true };
 		} catch (err) {
 			console.error("[triggerAnalysis] Error:", err);
@@ -61,24 +65,17 @@ export const resetAndTriggerAnalysis = createServerFn({ method: "POST" })
 		const { gameId } = data;
 
 		try {
-			await db
-				.update(gameAnalyses)
-				.set({
-					status: "pending",
-					moves: [],
-					movesAnalyzed: 0,
-					totalMoves: null,
-					errorMessage: null,
-					analyzedAt: null,
-				})
-				.where(eq(gameAnalyses.gameId, gameId));
-
-			await ensureQueue(ANALYZE_GAME_QUEUE);
-			const boss = await getBoss();
-			await boss.send(ANALYZE_GAME_QUEUE, {
+			// Re-analysis: insert a new job rather than mutating prior state.
+			// The worker writes a fresh moves/move_tags batch keyed on this job.
+			await db.insert(analysisJobs).values({
 				gameId,
-			} satisfies AnalyzeGamePayload);
+				engine: ENGINE,
+				depth: ANALYSIS_CONFIG.engineDepth,
+				pipelineVersion: PIPELINE_VERSION,
+				status: "queued",
+			});
 
+			await enqueueAnalysis(gameId);
 			return { enqueued: true };
 		} catch (err) {
 			console.error("[resetAndTriggerAnalysis] Error:", err);

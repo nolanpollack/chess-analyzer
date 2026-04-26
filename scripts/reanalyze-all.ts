@@ -1,12 +1,19 @@
 /**
- * Resets all game analyses to pending and re-enqueues them for processing.
+ * Wipes all analysis state and re-enqueues every game for analysis.
  * Run with: bun run reanalyze
  */
 import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { PgBoss } from "pg-boss";
 import pg from "pg";
-import { gameAnalyses, games } from "#/db/schema";
+import {
+	analysisJobs,
+	dimensionScoreCache,
+	games,
+	moveExplanations,
+	moves,
+	moveTags,
+} from "#/db/schema";
 import { ANALYZE_GAME_QUEUE } from "#/worker/jobs/analyze-game";
 
 config({ path: ".env.local" });
@@ -20,17 +27,12 @@ if (!DATABASE_URL) {
 const pool = new pg.Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
-console.log("Resetting all game analyses to pending...");
-await db.update(gameAnalyses).set({
-	status: "pending",
-	moves: [],
-	accuracyWhite: null,
-	accuracyBlack: null,
-	movesAnalyzed: 0,
-	totalMoves: null,
-	errorMessage: null,
-	analyzedAt: null,
-});
+console.log("Wiping analysis tables...");
+await db.delete(moveExplanations);
+await db.delete(moveTags);
+await db.delete(dimensionScoreCache);
+await db.delete(moves);
+await db.delete(analysisJobs);
 
 const allGames = await db.select({ id: games.id }).from(games);
 console.log(`Enqueueing ${allGames.length} games for re-analysis...`);

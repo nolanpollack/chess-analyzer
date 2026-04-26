@@ -1,8 +1,38 @@
+/**
+ * Game queries — Phase 1 stub.
+ *
+ * `gameAnalyses` is replaced by `analysisJobs` (multiple jobs allowed per
+ * game). Per-game performance precomputation is gone — Phase 3 computes it
+ * on-read from the scoring engine.
+ */
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { gameAnalyses, gamePerformance, games } from "#/db/schema";
+import {
+	type AnalysisStatus,
+	analysisJobs,
+	games,
+	type MoveAnalysis,
+	moves,
+} from "#/db/schema";
+
+type UiAnalysisStatus = "pending" | "complete" | "failed";
+
+function toUiStatus(status: AnalysisStatus): UiAnalysisStatus {
+	if (status === "queued" || status === "running") return "pending";
+	return status;
+}
+
+async function getLatestJob(gameId: string) {
+	const [job] = await db
+		.select()
+		.from(analysisJobs)
+		.where(eq(analysisJobs.gameId, gameId))
+		.orderBy(desc(analysisJobs.enqueuedAt))
+		.limit(1);
+	return job ?? null;
+}
 
 export const getGameWithAnalysis = createServerFn({ method: "GET" })
 	.inputValidator(z.object({ gameId: z.string().uuid() }))
@@ -16,10 +46,17 @@ export const getGameWithAnalysis = createServerFn({ method: "GET" })
 				return { game: null, analysis: null };
 			}
 
-			const [analysis] = await db
-				.select()
-				.from(gameAnalyses)
-				.where(eq(gameAnalyses.gameId, gameId));
+			const job = await getLatestJob(gameId);
+
+			let moveRows: MoveAnalysis[] = [];
+			if (job) {
+				const rows = await db
+					.select()
+					.from(moves)
+					.where(eq(moves.analysisJobId, job.id))
+					.orderBy(moves.ply);
+				moveRows = rows.map(toMoveAnalysis);
+			}
 
 			return {
 				game: {
@@ -27,11 +64,21 @@ export const getGameWithAnalysis = createServerFn({ method: "GET" })
 					playedAt: game.playedAt.toISOString(),
 					fetchedAt: game.fetchedAt.toISOString(),
 				},
-				analysis: analysis
+				analysis: job
 					? {
-							...analysis,
-							analyzedAt: analysis.analyzedAt?.toISOString() ?? null,
-							createdAt: analysis.createdAt.toISOString(),
+							id: job.id,
+							status: toUiStatus(job.status),
+							rawStatus: job.status,
+							engine: job.engine,
+							depth: job.depth,
+							accuracyWhite: job.accuracyWhite,
+							accuracyBlack: job.accuracyBlack,
+							movesAnalyzed: job.movesAnalyzed,
+							totalMoves: job.totalMoves,
+							errorMessage: job.errorMessage,
+							moves: moveRows,
+							analyzedAt: job.completedAt?.toISOString() ?? null,
+							createdAt: job.enqueuedAt.toISOString(),
 						}
 					: null,
 			};
@@ -47,17 +94,9 @@ export const getAnalysisStatus = createServerFn({ method: "GET" })
 		const { gameId } = data;
 
 		try {
-			const [analysis] = await db
-				.select({
-					status: gameAnalyses.status,
-					movesAnalyzed: gameAnalyses.movesAnalyzed,
-					totalMoves: gameAnalyses.totalMoves,
-					errorMessage: gameAnalyses.errorMessage,
-				})
-				.from(gameAnalyses)
-				.where(eq(gameAnalyses.gameId, gameId));
+			const job = await getLatestJob(gameId);
 
-			if (!analysis) {
+			if (!job) {
 				return {
 					status: null as null,
 					movesAnalyzed: 0,
@@ -67,10 +106,10 @@ export const getAnalysisStatus = createServerFn({ method: "GET" })
 			}
 
 			return {
-				status: analysis.status,
-				movesAnalyzed: analysis.movesAnalyzed,
-				totalMoves: analysis.totalMoves,
-				error: analysis.errorMessage ?? undefined,
+				status: toUiStatus(job.status),
+				movesAnalyzed: job.movesAnalyzed,
+				totalMoves: job.totalMoves,
+				error: job.errorMessage ?? undefined,
 			};
 		} catch (err) {
 			console.error("[getAnalysisStatus] Error:", err);
@@ -78,29 +117,48 @@ export const getAnalysisStatus = createServerFn({ method: "GET" })
 		}
 	});
 
+// Shape consumers (FactorBreakdownCard, route gameId page) deconstruct.
+// Phase 3 fills this from the scoring engine; for now it's always null.
+export type GamePerformance = {
+	overallAccuracy: number;
+	openingAccuracy: number | null;
+	openingMoveCount: number;
+	middlegameAccuracy: number | null;
+	middlegameMoveCount: number;
+	endgameAccuracy: number | null;
+	endgameMoveCount: number;
+	pieceStats: Record<
+		"pawn" | "knight" | "bishop" | "rook" | "queen" | "king",
+		{ accuracy: number; avgCpLoss: number; moveCount: number }
+	>;
+};
+
 export const getGamePerformance = createServerFn({ method: "GET" })
 	.inputValidator(z.object({ gameAnalysisId: z.string().uuid() }))
-	.handler(async ({ data }) => {
-		const { gameAnalysisId } = data;
+	.handler(
+		async ({
+			data: _data,
+		}): Promise<{ performance: GamePerformance | null }> => {
+			// TODO Phase 3 — compute on-demand from scoring engine over moves rows
+			// for this analysis job, then map dimensional scores to the
+			// per-phase / per-piece breakdown the UI expects.
+			return { performance: null };
+		},
+	);
 
-		try {
-			const [row] = await db
-				.select()
-				.from(gamePerformance)
-				.where(eq(gamePerformance.gameAnalysisId, gameAnalysisId));
-
-			if (!row) {
-				return { performance: null };
-			}
-
-			return {
-				performance: {
-					...row,
-					computedAt: row.computedAt.toISOString(),
-				},
-			};
-		} catch (err) {
-			console.error("[getGamePerformance] Error:", err);
-			return { error: "Failed to load game performance" };
-		}
-	});
+function toMoveAnalysis(row: typeof moves.$inferSelect): MoveAnalysis {
+	return {
+		ply: row.ply,
+		san: row.san,
+		uci: row.uci,
+		fen_before: row.fenBefore,
+		fen_after: row.fenAfter,
+		eval_before: row.evalBeforeCp ?? 0,
+		eval_after: row.evalAfterCp ?? 0,
+		eval_delta: row.evalDeltaCp ?? 0,
+		best_move_uci: row.engineBestUci ?? "",
+		best_move_san: row.engineBestSan ?? "",
+		classification: row.classification ?? "good",
+		is_player_move: row.isPlayerMove === 1,
+	};
+}

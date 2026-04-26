@@ -13,9 +13,7 @@ export function useMoveExplanation(
 		queryKey: ["moveExplanation", gameAnalysisId, ply],
 		queryFn: async () => {
 			if (!gameAnalysisId || ply === null) return null;
-			const result = await getExplanation({ data: { gameAnalysisId, ply } });
-			if ("error" in result) throw new Error(result.error);
-			return result;
+			return await getExplanation({ data: { gameAnalysisId, ply } });
 		},
 		enabled,
 	});

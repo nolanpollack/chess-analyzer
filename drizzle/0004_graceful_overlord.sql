@@ -1,1 +1,0 @@
-ALTER TABLE "player_profile" ADD COLUMN "total_explained_moves" integer DEFAULT 0 NOT NULL;

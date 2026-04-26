@@ -9,19 +9,45 @@ import {
 	type SyncGamesPayload,
 } from "#/worker/jobs/sync-games";
 
+export const ensurePlayer = createServerFn({ method: "POST" })
+	.inputValidator(z.object({ username: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		const username = data.username.toLowerCase().trim();
+		try {
+			const [existing] = await db
+				.select()
+				.from(players)
+				.where(eq(players.username, username));
+			if (existing) return { playerId: existing.id, created: false };
+
+			const [created] = await db
+				.insert(players)
+				.values({ username, platform: "chess.com" })
+				.returning({ id: players.id });
+			return { playerId: created.id, created: true };
+		} catch (err) {
+			console.error("[ensurePlayer] Error:", err);
+			return { error: "Failed to create player" };
+		}
+	});
+
 export const syncPlayer = createServerFn({ method: "POST" })
 	.inputValidator(z.object({ username: z.string().min(1) }))
 	.handler(async ({ data }) => {
-		const { username } = data;
+		const username = data.username.toLowerCase().trim();
 
 		try {
-			const [player] = await db
+			let [player] = await db
 				.select()
 				.from(players)
-				.where(eq(players.username, username.toLowerCase().trim()));
+				.where(eq(players.username, username));
 
 			if (!player) {
-				return { error: "Player not found" };
+				const [created] = await db
+					.insert(players)
+					.values({ username, platform: "chess.com" })
+					.returning();
+				player = created;
 			}
 
 			await enqueueSyncJob(player.id, player.username, player.platform);

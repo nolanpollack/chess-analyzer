@@ -1,6 +1,13 @@
-import type { ChessPiece, PieceStats } from "#/db/schema";
+import type { ChessPiece } from "#/db/schema";
 import type { GameFactor } from "#/features/game/types";
 import { accuracyToElo } from "#/lib/elo-estimate";
+
+// Local view-model type. Phase 3 will replace this entirely with output
+// from the scoring engine (one rating per dimension value).
+type PieceStats = Record<
+	ChessPiece,
+	{ accuracy: number; avgCpLoss: number; moveCount: number }
+>;
 
 type Performance = {
 	overallAccuracy: number;
