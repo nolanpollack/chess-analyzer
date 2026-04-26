@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
 	classifyMove,
-	computeAccuracy,
 	computeEvalDelta,
 	cpToWinPct,
 	getGamePhase,
@@ -87,56 +86,6 @@ describe("cpToWinPct", () => {
 
 	it("is symmetric around 50", () => {
 		expect(cpToWinPct(200) + cpToWinPct(-200)).toBeCloseTo(100, 5);
-	});
-});
-
-describe("computeAccuracy", () => {
-	it("returns 0 for an empty array", () => {
-		expect(computeAccuracy([])).toBe(0);
-	});
-
-	it("returns ~100 when eval is unchanged (perfect move)", () => {
-		const moves = [{ evalBefore: 100, evalAfter: 100, isWhite: true }];
-		expect(computeAccuracy(moves)).toBeCloseTo(100, 0);
-	});
-
-	it("returns low accuracy for a catastrophic blunder", () => {
-		// White had +500cp advantage, drops to -500cp
-		const moves = [{ evalBefore: 500, evalAfter: -500, isWhite: true }];
-		expect(computeAccuracy(moves)).toBeLessThan(10);
-	});
-
-	it("returns ~100 for a position-improving move", () => {
-		// Player gained advantage — should not be penalized
-		const moves = [{ evalBefore: 0, evalAfter: 200, isWhite: true }];
-		expect(computeAccuracy(moves)).toBeCloseTo(100, 0);
-	});
-
-	it("correctly uses black's perspective for black moves", () => {
-		// Black's move: eval goes from +100 (white advantage) to -100 (black advantage) — black improved
-		const improved = [{ evalBefore: 100, evalAfter: -100, isWhite: false }];
-		// Black's move: eval goes from -100 (black advantage) to +100 (white advantage) — black blundered
-		const blundered = [{ evalBefore: -100, evalAfter: 100, isWhite: false }];
-		expect(computeAccuracy(improved)).toBeGreaterThan(
-			computeAccuracy(blundered),
-		);
-	});
-
-	it("averages accuracy across multiple moves", () => {
-		const perfect = { evalBefore: 0, evalAfter: 0, isWhite: true };
-		const blunder = { evalBefore: 300, evalAfter: -300, isWhite: true };
-		const mixed = computeAccuracy([perfect, blunder]);
-		expect(mixed).toBeGreaterThan(0);
-		expect(mixed).toBeLessThan(100);
-	});
-
-	it("rounds to one decimal place", () => {
-		const moves = [
-			{ evalBefore: 50, evalAfter: 20, isWhite: true },
-			{ evalBefore: 100, evalAfter: 50, isWhite: true },
-		];
-		const result = computeAccuracy(moves);
-		expect(result).toBe(Math.round(result * 10) / 10);
 	});
 });
 

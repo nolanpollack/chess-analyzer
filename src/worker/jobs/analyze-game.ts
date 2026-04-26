@@ -20,13 +20,14 @@ import { analysisJobs, games, moves, moveTags } from "#/db/schema";
 import { env } from "#/env";
 import {
 	classifyMove,
-	computeAccuracy,
 	computeEvalDelta,
+	computeMoveAccuracy,
 	type MoveEvalData,
 	type PgnMove,
 	walkPgn,
 } from "#/lib/chess-analysis";
 import { invalidatePlayerCache } from "#/lib/scoring/cache";
+import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
 import type { AnalysisEngine } from "#/providers/analysis-engine";
@@ -315,8 +316,7 @@ function buildMoveRows(args: {
 }): { moveRows: MoveRow[]; accuracyWhite: number; accuracyBlack: number } {
 	const isPlayerWhite = args.playerColor === "white";
 	const moveRows: MoveRow[] = [];
-	const whiteEvals: MoveEvalData[] = [];
-	const blackEvals: MoveEvalData[] = [];
+	const allEvals: MoveEvalData[] = [];
 
 	for (const move of args.pgnMoves) {
 		const before = args.positionEvals.get(move.fenBefore);
@@ -345,6 +345,13 @@ function buildMoveRows(args: {
 
 		const isPlayerMove = move.isWhite === isPlayerWhite;
 
+		const evalData: MoveEvalData = {
+			evalBefore: before.evalCp,
+			evalAfter: after.evalCp,
+			isWhite: move.isWhite,
+		};
+		const accuracyScore = isPlayerMove ? computeMoveAccuracy(evalData) : null;
+
 		moveRows.push({
 			analysisJobId: args.analysisJobId,
 			gameId: args.gameId,
@@ -362,24 +369,17 @@ function buildMoveRows(args: {
 			evalAfterCp: after.evalCp,
 			evalDeltaCp: evalDelta,
 			classification,
-			// Per-move accuracy populated alongside aggregate computation; for
-			// MVP we leave it null (aggregate accuracy is what consumers read).
-			accuracyScore: null,
+			accuracyScore,
 		});
 
-		const evalData: MoveEvalData = {
-			evalBefore: before.evalCp,
-			evalAfter: after.evalCp,
-			isWhite: move.isWhite,
-		};
-		if (move.isWhite) whiteEvals.push(evalData);
-		else blackEvals.push(evalData);
+		allEvals.push(evalData);
 	}
 
+	const gameAccuracy = computeGameAccuracy(allEvals);
 	return {
 		moveRows,
-		accuracyWhite: computeAccuracy(whiteEvals),
-		accuracyBlack: computeAccuracy(blackEvals),
+		accuracyWhite: gameAccuracy?.white ?? 0,
+		accuracyBlack: gameAccuracy?.black ?? 0,
 	};
 }
 

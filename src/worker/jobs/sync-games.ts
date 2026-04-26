@@ -73,13 +73,13 @@ async function handleSyncGames(data: SyncGamesPayload, boss: PgBoss) {
 
 		// 3. Upsert games and update lastSyncedAt atomically
 		let inserted = 0;
-		const newGameIds: string[] = [];
+		const newGames: { id: string; playedAt: Date }[] = [];
 		await db.transaction(async (tx) => {
 			for (const raw of rawGames) {
 				const result = await upsertGame(tx, raw, playerId, platform);
 				if (result) {
 					inserted++;
-					newGameIds.push(result);
+					newGames.push({ id: result, playedAt: raw.playedAt });
 				}
 			}
 			await tx
@@ -88,15 +88,17 @@ async function handleSyncGames(data: SyncGamesPayload, boss: PgBoss) {
 				.where(eq(players.id, playerId));
 		});
 
-		// 4. Enqueue analysis for each new game
-		if (newGameIds.length > 0) {
-			for (const gameId of newGameIds) {
+		// 4. Enqueue analysis newest-first so the user sees their most recent
+		// games light up on the dashboard before older ones backfill.
+		if (newGames.length > 0) {
+			newGames.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime());
+			for (const game of newGames) {
 				await boss.send(ANALYZE_GAME_QUEUE, {
-					gameId,
+					gameId: game.id,
 				} satisfies AnalyzeGamePayload);
 			}
 			console.log(
-				`[sync-games] Enqueued analysis for ${newGameIds.length} new games`,
+				`[sync-games] Enqueued analysis for ${newGames.length} new games (newest first)`,
 			);
 		}
 

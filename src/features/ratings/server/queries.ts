@@ -23,7 +23,7 @@ import {
 	moveTags,
 	players,
 } from "#/db/schema";
-import { invalidatePlayerCache as invalidatePlayerCacheImpl } from "#/lib/scoring/cache";
+import { getPlayerOverall } from "#/lib/scoring/overall";
 import { accuracyToRating } from "#/lib/scoring/rating-mapping";
 import { applyShrinkage } from "#/lib/scoring/shrinkage";
 
@@ -214,6 +214,9 @@ async function computeBucket(
 		getPlayerOverallAccuracy(playerId, gameIds),
 		aggregateDimension(playerId, gameIds, dimType),
 	]);
+	console.log(
+		`[computeBucket] dim=${dimType} player=${playerId.slice(0, 8)} windowGames=${gameIds.length} prior=${prior.toFixed(2)} rawDimRows=${raws.length}`,
+	);
 	const scores = raws.map((r) => scoreOne(dimType, r, prior));
 	await writeCachedBucket(playerId, windowKey, scores);
 	return scores;
@@ -227,15 +230,6 @@ async function getOrComputeBucket(
 	const cached = await readCachedBucket(playerId, dimType, windowKey);
 	if (cached) return cached;
 	return computeBucket(playerId, dimType, windowKey);
-}
-
-/**
- * Re-export of the cache invalidator for callers on the server-fn side.
- * The worker imports `invalidatePlayerCache` directly from `lib/scoring/cache`
- * since it owns its own Drizzle instance.
- */
-export function invalidatePlayerCache(playerId: string): Promise<void> {
-	return invalidatePlayerCacheImpl(db, playerId);
 }
 
 // ── Server functions ──────────────────────────────────────────────────
@@ -258,16 +252,96 @@ export const getDimensionScoresForPlayer = createServerFn({ method: "GET" })
 				.select({ id: players.id })
 				.from(players)
 				.where(eq(players.username, data.username.toLowerCase().trim()));
-			if (!player) return { error: "Player not found" };
+			if (!player) {
+				console.log(
+					`[getDimensionScoresForPlayer] Player not found for username=${data.username}`,
+				);
+				return { error: "Player not found" };
+			}
 			const scores = await getOrComputeBucket(
 				player.id,
 				data.dimensionType as DimensionType,
 				data.windowKey,
 			);
+			console.log(
+				`[getDimensionScoresForPlayer] dim=${data.dimensionType} window=${data.windowKey} player=${player.id.slice(0, 8)} scoreCount=${scores.length}${scores.length > 0 ? ` first=${JSON.stringify(scores[0])}` : ""}`,
+			);
 			return { scores };
 		} catch (err) {
 			console.error("[getDimensionScoresForPlayer] Error:", err);
 			return { error: "Failed to compute dimension scores" };
+		}
+	});
+
+export const getPlayerOverallRating = createServerFn({ method: "GET" })
+	.inputValidator(z.object({ username: z.string().min(1) }))
+	.handler(async ({ data }) => {
+		try {
+			const [player] = await db
+				.select({ id: players.id })
+				.from(players)
+				.where(eq(players.username, data.username.toLowerCase().trim()));
+			if (!player) return { error: "Player not found" };
+			const overall = await getPlayerOverall(db, player.id);
+			return { overall };
+		} catch (err) {
+			console.error("[getPlayerOverallRating] Error:", err);
+			return { error: "Failed to compute overall rating" };
+		}
+	});
+
+export const getGameDimensionScores = createServerFn({ method: "GET" })
+	.inputValidator(z.object({ gameId: z.string().uuid() }))
+	.handler(async ({ data }) => {
+		try {
+			const [game] = await db
+				.select({ playerId: games.playerId })
+				.from(games)
+				.where(eq(games.id, data.gameId));
+			if (!game) return { error: "Game not found" };
+
+			const overall = await getPlayerOverall(db, game.playerId);
+			const allDimTypes: DimensionType[] = [
+				"phase",
+				"piece",
+				"agency",
+				"concept",
+			];
+			const [perDim, gameAvgRow] = await Promise.all([
+				Promise.all(
+					allDimTypes.map((dt) =>
+						aggregateDimension(game.playerId, [data.gameId], dt).then((raws) =>
+							raws.map((r) => scoreOne(dt, r, overall.overallAccuracy)),
+						),
+					),
+				),
+				db
+					.select({
+						avg: sql<number | null>`avg(${moves.accuracyScore})::float`,
+						count: sql<number>`count(*)::int`,
+					})
+					.from(moves)
+					.where(
+						and(
+							eq(moves.gameId, data.gameId),
+							eq(moves.isPlayerMove, 1),
+							sql`${moves.accuracyScore} is not null`,
+						),
+					)
+					.then((rows) => rows[0]),
+			]);
+			const scores = perDim.flat();
+			const gameAccuracy = gameAvgRow?.avg ?? null;
+			const gameOverall = {
+				overallAccuracy: gameAccuracy,
+				ratingEstimate:
+					gameAccuracy != null ? accuracyToRating(gameAccuracy) : null,
+				sampleSize: gameAvgRow?.count ?? 0,
+			};
+			return { scores, gameOverall, playerOverall: overall };
+		} catch (err) {
+			console.error("[getGameDimensionScores] Error:", err);
+			return { error: "Failed to compute game dimension scores" };
 		}
 	});
 

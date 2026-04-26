@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
 import { type AnalysisStatus, analysisJobs, games, players } from "#/db/schema";
 import { getResultDetails, lookupOpeningName } from "#/lib/chess-utils";
+import { accuracyToRating } from "#/lib/scoring/rating-mapping";
 
 type UiAnalysisStatus = "pending" | "complete" | "failed";
 
@@ -93,15 +94,6 @@ export const listGames = createServerFn({ method: "GET" })
 		const whereClause = and(...conditions);
 		const offset = (page - 1) * pageSize;
 
-		// Latest analysis_job per game via correlated subquery (small N).
-		const latestStatusSql = sql<AnalysisStatus | null>`(
-			SELECT ${analysisJobs.status}
-			FROM ${analysisJobs}
-			WHERE ${analysisJobs.gameId} = ${games.id}
-			ORDER BY ${analysisJobs.enqueuedAt} DESC
-			LIMIT 1
-		)`;
-
 		const [gameRows, countResult] = await Promise.all([
 			db
 				.select({
@@ -119,7 +111,6 @@ export const listGames = createServerFn({ method: "GET" })
 					openingName: games.openingName,
 					accuracyWhite: games.accuracyWhite,
 					accuracyBlack: games.accuracyBlack,
-					rawAnalysisStatus: latestStatusSql,
 				})
 				.from(games)
 				.where(whereClause)
@@ -129,28 +120,71 @@ export const listGames = createServerFn({ method: "GET" })
 			db.select({ count: count() }).from(games).where(whereClause),
 		]);
 
-		const items = gameRows.map((g) => ({
-			id: g.id,
-			platformGameId: g.platformGameId,
-			playedAt: g.playedAt.toISOString(),
-			timeControl: g.timeControl,
-			timeControlClass: g.timeControlClass,
-			resultDetail: g.resultDetail,
-			playerColor: g.playerColor,
-			playerRating: g.playerRating,
-			opponentUsername: g.opponentUsername,
-			opponentRating: g.opponentRating,
-			openingEco: g.openingEco,
-			openingName:
-				g.openingName ??
-				(g.openingEco ? lookupOpeningName(g.openingEco) : null),
-			accuracyWhite: g.accuracyWhite,
-			accuracyBlack: g.accuracyBlack,
-			analysisStatus: toUiStatus(g.rawAnalysisStatus),
-			// TODO Phase 3 — pull overallAccuracy from scoring engine cache
-			overallAccuracy: null as number | null,
-			gameScore: null as number | null,
-		}));
+		// Pull the latest analysis job per game in one round-trip via DISTINCT ON.
+		const pageGameIds = gameRows.map((g) => g.id);
+		const latestJobs =
+			pageGameIds.length > 0
+				? await db
+						.selectDistinctOn([analysisJobs.gameId], {
+							gameId: analysisJobs.gameId,
+							status: analysisJobs.status,
+							accuracyWhite: analysisJobs.accuracyWhite,
+							accuracyBlack: analysisJobs.accuracyBlack,
+						})
+						.from(analysisJobs)
+						.where(inArray(analysisJobs.gameId, pageGameIds))
+						.orderBy(analysisJobs.gameId, desc(analysisJobs.enqueuedAt))
+				: [];
+		const jobByGameId = new Map(latestJobs.map((j) => [j.gameId, j]));
+
+		console.log(
+			`[listGames] username=${username} page=${page} pageSize=${pageSize} returnedRows=${gameRows.length} jobsFound=${latestJobs.length}`,
+		);
+		if (gameRows.length > 0) {
+			const sample = gameRows.slice(0, 3).map((g) => {
+				const job = jobByGameId.get(g.id);
+				return {
+					id: g.id.slice(0, 8),
+					color: g.playerColor,
+					status: job?.status ?? null,
+					jobAccW: job?.accuracyWhite ?? null,
+					jobAccB: job?.accuracyBlack ?? null,
+				};
+			});
+			console.log("[listGames] sample rows:", JSON.stringify(sample, null, 2));
+		}
+
+		const items = gameRows.map((g) => {
+			const job = jobByGameId.get(g.id);
+			const playerAccuracy =
+				job && job.status === "complete"
+					? g.playerColor === "white"
+						? job.accuracyWhite
+						: job.accuracyBlack
+					: null;
+			return {
+				id: g.id,
+				platformGameId: g.platformGameId,
+				playedAt: g.playedAt.toISOString(),
+				timeControl: g.timeControl,
+				timeControlClass: g.timeControlClass,
+				resultDetail: g.resultDetail,
+				playerColor: g.playerColor,
+				playerRating: g.playerRating,
+				opponentUsername: g.opponentUsername,
+				opponentRating: g.opponentRating,
+				openingEco: g.openingEco,
+				openingName:
+					g.openingName ??
+					(g.openingEco ? lookupOpeningName(g.openingEco) : null),
+				accuracyWhite: g.accuracyWhite,
+				accuracyBlack: g.accuracyBlack,
+				analysisStatus: toUiStatus(job?.status ?? null),
+				overallAccuracy: playerAccuracy,
+				gameScore:
+					playerAccuracy != null ? accuracyToRating(playerAccuracy) : null,
+			};
+		});
 
 		return {
 			items,

@@ -117,35 +117,6 @@ export const getAnalysisStatus = createServerFn({ method: "GET" })
 		}
 	});
 
-// Shape consumers (FactorBreakdownCard, route gameId page) deconstruct.
-// Phase 3 fills this from the scoring engine; for now it's always null.
-export type GamePerformance = {
-	overallAccuracy: number;
-	openingAccuracy: number | null;
-	openingMoveCount: number;
-	middlegameAccuracy: number | null;
-	middlegameMoveCount: number;
-	endgameAccuracy: number | null;
-	endgameMoveCount: number;
-	pieceStats: Record<
-		"pawn" | "knight" | "bishop" | "rook" | "queen" | "king",
-		{ accuracy: number; avgCpLoss: number; moveCount: number }
-	>;
-};
-
-export const getGamePerformance = createServerFn({ method: "GET" })
-	.inputValidator(z.object({ gameAnalysisId: z.string().uuid() }))
-	.handler(
-		async ({
-			data: _data,
-		}): Promise<{ performance: GamePerformance | null }> => {
-			// TODO Phase 3 — compute on-demand from scoring engine over moves rows
-			// for this analysis job, then map dimensional scores to the
-			// per-phase / per-piece breakdown the UI expects.
-			return { performance: null };
-		},
-	);
-
 function toMoveAnalysis(row: typeof moves.$inferSelect): MoveAnalysis {
 	return {
 		ply: row.ply,

@@ -1,17 +1,27 @@
 import { BarChart2 } from "lucide-react";
-import type { Factor } from "#/features/profile/types";
+import { useDimensionRatings } from "#/features/ratings/hooks/use-dimension-ratings";
 import { usePlayerSummary } from "../hooks/use-player-summary";
 import { FactorRow } from "./FactorRow";
 
-// TODO(missing-backend): Factor ratings — needs Elo-scale per-factor values + deltas.
-// See MISSING_FEATURES.md#factor-ratings
 type FactorBreakdownCardProps = {
 	username: string;
 };
 
 export function FactorBreakdownCard({ username }: FactorBreakdownCardProps) {
 	const { data: summary } = usePlayerSummary(username);
-	const factors: Factor[] | null = null as Factor[] | null;
+	const {
+		factors: allFactors,
+		isLoading,
+		isError,
+	} = useDimensionRatings(username);
+	console.log("[FactorBreakdownCard]", {
+		username,
+		isLoading,
+		isError,
+		factorCount: allFactors.length,
+		first: allFactors[0],
+	});
+	const factors = isLoading ? null : allFactors.length > 0 ? allFactors : null;
 	const playerElo = summary?.eloEstimate ?? null;
 	const baseline = playerElo ?? 1500;
 
@@ -41,10 +51,14 @@ export function FactorBreakdownCard({ username }: FactorBreakdownCardProps) {
 					<BarChart2 className="h-4 w-4 shrink-0 text-fg-4" />
 					<div>
 						<div className="text-ui text-fg-3">
-							Factor breakdown coming soon
+							{isLoading
+								? "Loading factor breakdown…"
+								: "No analyzed games yet"}
 						</div>
 						<div className="mt-0.5 text-xs text-fg-4">
-							Per-factor Elo ratings will appear once the scoring model is built
+							{isLoading
+								? "Computing per-factor Elo ratings"
+								: "Sync and analyze a few games to see your strengths and weaknesses"}
 						</div>
 					</div>
 				</div>

@@ -16,6 +16,7 @@ export function FactorBreakdownCard({
 
 	const phaseFactors = factors.filter((f) => f.group === "phase");
 	const pieceFactors = factors.filter((f) => f.group === "piece");
+	const agencyFactors = factors.filter((f) => f.group === "agency");
 
 	return (
 		<div className="rounded-[10px] border border-divider bg-surface">
@@ -37,6 +38,15 @@ export function FactorBreakdownCard({
 				{pieceFactors.length > 0 && (
 					<div className={phaseFactors.length > 0 ? "mt-5" : ""}>
 						<FactorGroup title="Pieces" factors={pieceFactors} />
+					</div>
+				)}
+				{agencyFactors.length > 0 && (
+					<div
+						className={
+							phaseFactors.length > 0 || pieceFactors.length > 0 ? "mt-5" : ""
+						}
+					>
+						<FactorGroup title="Agency" factors={agencyFactors} />
 					</div>
 				)}
 			</div>

@@ -11,12 +11,11 @@ import { FactorBreakdownCard } from "#/features/game/components/FactorBreakdownC
 import { GamePageHeader } from "#/features/game/components/GamePageHeader";
 import { MoveListCard } from "#/features/game/components/MoveListCard";
 import { useGameDetail } from "#/features/game/hooks/use-game-detail";
-import { useGamePerformance } from "#/features/game/hooks/use-game-performance";
 import { useMoveNavigation } from "#/features/game/hooks/use-move-navigation";
 import { findCriticalMoveIndex } from "#/features/game/utils/critical-move";
-import { buildFactorBreakdown } from "#/features/game/utils/factor-breakdown";
 import { flattenMoves } from "#/features/game/utils/flat-moves";
-import { accuracyToElo } from "#/lib/elo-estimate";
+import { useGameDimensionRatings } from "#/features/ratings/hooks/use-game-dimension-ratings";
+import { toGameFactors } from "#/features/ratings/utils/to-game-factor";
 
 export const Route = createFileRoute("/$username/games/$gameId")({
 	component: GameDetailPage,
@@ -95,7 +94,7 @@ type GameDetailBodyProps = {
 
 function GameDetailBody({
 	username,
-	gameId: _gameId,
+	gameId,
 	game,
 	analysisId,
 	moves,
@@ -106,16 +105,16 @@ function GameDetailBody({
 		useMoveNavigation(moves.length, initialCursor);
 
 	const cur = moves[cursor];
-	const { data: performance } = useGamePerformance(analysisId);
+	const { data: ratings } = useGameDimensionRatings(gameId);
 
-	const overallElo =
-		performance?.overallAccuracy != null
-			? accuracyToElo(performance.overallAccuracy)
-			: null;
-	const accuracy = performance?.overallAccuracy ?? null;
+	const accuracy = ratings?.gameOverall.overallAccuracy ?? null;
+	const overallElo = ratings?.gameOverall.ratingEstimate ?? null;
 	const gameScore = overallElo;
 
-	const factors = performance ? buildFactorBreakdown(performance) : [];
+	const factors =
+		ratings && overallElo !== null
+			? toGameFactors(ratings.scores, overallElo)
+			: [];
 
 	return (
 		<>

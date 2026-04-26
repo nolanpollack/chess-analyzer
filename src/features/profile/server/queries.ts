@@ -13,6 +13,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
 import { analysisJobs, games, players } from "#/db/schema";
+import { getPlayerOverall } from "#/lib/scoring/overall";
 
 export const getPlayerSummary = createServerFn({ method: "GET" })
 	.inputValidator(z.object({ username: z.string().min(1) }))
@@ -44,13 +45,17 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 
 			const currentRating = gameRows[0]?.playerRating ?? null;
 
+			const overall = await getPlayerOverall(db, player.id);
+			const eloEstimate =
+				overall.sampleSize > 0 ? overall.ratingEstimate : null;
+
 			return {
 				summary: {
 					currentRating,
 					gameCount: gameRows.length,
 					analyzedGameCount: completedJobs.length,
-					// TODO Phase 3 — derive from scoring engine (overall accuracy → Elo)
-					eloEstimate: null as number | null,
+					eloEstimate,
+					// TODO — needs historical rating snapshots
 					eloDelta30d: null as number | null,
 				},
 			};

@@ -3,6 +3,7 @@
  * Run with: bun run reanalyze
  */
 import { config } from "dotenv";
+import { desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { PgBoss } from "pg-boss";
 import pg from "pg";
@@ -34,12 +35,19 @@ await db.delete(dimensionScoreCache);
 await db.delete(moves);
 await db.delete(analysisJobs);
 
-const allGames = await db.select({ id: games.id }).from(games);
-console.log(`Enqueueing ${allGames.length} games for re-analysis...`);
+const allGames = await db
+	.select({ id: games.id })
+	.from(games)
+	.orderBy(desc(games.playedAt));
+console.log(
+	`Enqueueing ${allGames.length} games for re-analysis (newest first)...`,
+);
 
 const boss = new PgBoss(DATABASE_URL);
 await boss.start();
 await boss.createQueue(ANALYZE_GAME_QUEUE);
+await boss.deleteAllJobs(ANALYZE_GAME_QUEUE);
+console.log("Cleared stale jobs from queue.");
 
 for (const game of allGames) {
 	await boss.send(ANALYZE_GAME_QUEUE, { gameId: game.id });

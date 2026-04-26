@@ -20,7 +20,7 @@ export type RatingPoint = {
 };
 
 export type FactorConfidence = "high" | "medium" | "low";
-export type FactorGroup = "phase" | "skill" | "piece";
+export type FactorGroup = "phase" | "skill" | "piece" | "agency" | "concept";
 
 export type Factor = {
 	id: string;

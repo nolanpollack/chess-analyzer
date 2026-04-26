@@ -112,26 +112,18 @@ export type MoveEvalData = {
 };
 
 /**
- * Compute accuracy using Chess.com's win-probability formula.
- * Each move's accuracy is derived from how much win% was lost, then averaged.
- * Returns a value 0–100 rounded to one decimal place.
+ * Per-move accuracy (0–100) using Chess.com's win-probability formula.
+ * Computed from how much win% was lost on this single move, from the
+ * mover's perspective.
  */
-export function computeAccuracy(moves: MoveEvalData[]): number {
-	if (moves.length === 0) return 0;
-	let sum = 0;
-	for (const { evalBefore, evalAfter, isWhite } of moves) {
-		const playerEvalBefore = isWhite ? evalBefore : -evalBefore;
-		const playerEvalAfter = isWhite ? evalAfter : -evalAfter;
-		const winPctBefore = cpToWinPct(playerEvalBefore);
-		const winPctAfter = cpToWinPct(playerEvalAfter);
-		const delta = Math.max(0, winPctBefore - winPctAfter);
-		const moveAccuracy = Math.max(
-			0,
-			103.1668 * Math.exp(-0.04354 * delta) - 3.1669,
-		);
-		sum += moveAccuracy;
-	}
-	return Math.round((sum / moves.length) * 10) / 10;
+export function computeMoveAccuracy(data: MoveEvalData): number {
+	const playerEvalBefore = data.isWhite ? data.evalBefore : -data.evalBefore;
+	const playerEvalAfter = data.isWhite ? data.evalAfter : -data.evalAfter;
+	const delta = Math.max(
+		0,
+		cpToWinPct(playerEvalBefore) - cpToWinPct(playerEvalAfter),
+	);
+	return Math.max(0, 103.1668 * Math.exp(-0.04354 * delta) - 3.1669);
 }
 
 // ── PGN Walking ────────────────────────────────────────────────────────

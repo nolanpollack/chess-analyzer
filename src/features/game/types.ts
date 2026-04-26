@@ -1,8 +1,5 @@
 import type { MoveAnalysis, PlayerColor } from "#/db/schema";
-import type {
-	getGamePerformance,
-	getGameWithAnalysis,
-} from "#/features/game/server/queries";
+import type { getGameWithAnalysis } from "#/features/game/server/queries";
 
 /**
  * Server function return types are derived so consumer types cannot drift
@@ -11,14 +8,6 @@ import type {
  */
 export type GameDetailResult = Awaited<ReturnType<typeof getGameWithAnalysis>>;
 export type GameDetailOk = Exclude<GameDetailResult, { error: string }>;
-
-export type GamePerformanceResult = Awaited<
-	ReturnType<typeof getGamePerformance>
->;
-export type GamePerformanceOk = Exclude<
-	GamePerformanceResult,
-	{ error: string }
->;
 
 /**
  * A single move projected onto a flat list for UI display. Extends the raw
@@ -32,12 +21,12 @@ export type FlatMove = MoveAnalysis & {
 };
 
 /**
- * A single row in the per-game factor breakdown (phase or piece strength).
- * Built by `utils/factor-breakdown.ts` from a GamePerformance row.
+ * A single row in the per-game factor breakdown. Built by
+ * `features/ratings/utils/to-game-factor.ts` from a per-game DimensionScore[].
  */
 export type GameFactor = {
 	label: string;
-	group: "phase" | "piece";
+	group: "phase" | "piece" | "agency";
 	value: number;
 	delta: number;
 	moveCount: number;
