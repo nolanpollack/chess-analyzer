@@ -14,7 +14,13 @@
  * Download PGN databases from https://database.lichess.org/
  */
 
-import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
+import {
+	appendFileSync,
+	createReadStream,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+} from "node:fs";
 import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 import { basename } from "node:path";
@@ -75,7 +81,7 @@ function openInputStream(arg: string | undefined): InputStream {
 	if (arg.startsWith("http://") || arg.startsWith("https://")) {
 		const proc = Bun.spawn(["sh", "-c", `curl -sL "${arg}" | zstd -d`], {
 			stdout: "pipe",
-			stderr: "ignore",
+			stderr: "inherit",
 		});
 		return {
 			input: Readable.fromWeb(proc.stdout as ReadableStream<Uint8Array>),
@@ -87,7 +93,7 @@ function openInputStream(arg: string | undefined): InputStream {
 	if (arg.endsWith(".zst")) {
 		const proc = Bun.spawn(["zstd", "-d", "-c", arg], {
 			stdout: "pipe",
-			stderr: "ignore",
+			stderr: "inherit",
 		});
 		return {
 			input: Readable.fromWeb(proc.stdout as ReadableStream<Uint8Array>),
@@ -392,8 +398,8 @@ if (existingCount > 0) {
 	);
 }
 
-const outFile = Bun.file(OUT_PATH);
-const writer = outFile.writer({ flags: "a" } as never);
+// Note: appending synchronously after each game so a kill mid-stream doesn't
+// drop buffered work. Stockfish per-game cost dwarfs the syscall overhead.
 
 console.log(
 	`Build eval cache — target=${TARGET_GAMES} games, depth=${ENGINE_DEPTH}, stratify=${FLAG_STRATIFY}`,
@@ -429,7 +435,7 @@ for await (const pgn of streamGames(input)) {
 
 	if (!shouldInclude(cached, cellCounts, TARGET_PER_CELL)) continue;
 
-	writer.write(`${JSON.stringify(cached)}\n`);
+	appendFileSync(OUT_PATH, `${JSON.stringify(cached)}\n`);
 	seen.add(gid);
 	recordCellCounts(cached, cellCounts);
 	gamesWritten++;
@@ -441,7 +447,6 @@ for await (const pgn of streamGames(input)) {
 	}
 }
 
-await writer.flush();
 proc?.kill();
 await engine.destroy();
 
