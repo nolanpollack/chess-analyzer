@@ -28,11 +28,16 @@ import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
-const SAMPLES_PER_BUCKET = 20;
+const SAMPLES_PER_BUCKET = 500;
 const MIN_POINTS_FOR_REGRESSION = 50;
 const PROGRESS_INTERVAL_MS = 1000;
-/** Stop once this many consecutive games yield no new data points. */
-const SATURATION_THRESHOLD = 10_000;
+/** Stop once this many consecutive games yield no new data points from the top TCs. */
+const SATURATION_THRESHOLD = 100_000;
+/** Only sample from the N most-played time controls in the database. */
+const TOP_TC_COUNT = 8;
+/** Only sample games within this Elo range — extreme ratings are too sparse to fill buckets. */
+const MIN_ELO = 600;
+const MAX_ELO = 2400;
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -102,13 +107,31 @@ function openInputStream(arg: string | undefined): InputStream {
 
 // ── Bucket sampling ─────────────────────────────────────────────────────────────
 
+const tcGameCounts = new Map<string, number>();
 const bucketCounts = new Map<string, number>();
+
+let topTCCache: Set<string> = new Set();
+let topTCCacheAt = 0;
+
+function getTopTCs(): Set<string> {
+	if (gamesScanned - topTCCacheAt > 10_000 || topTCCache.size === 0) {
+		topTCCache = new Set(
+			[...tcGameCounts.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, TOP_TC_COUNT)
+				.map(([tc]) => tc),
+		);
+		topTCCacheAt = gamesScanned;
+	}
+	return topTCCache;
+}
 
 function bucketKey(timeControl: string, rating: number): string {
 	return `${timeControl}:${Math.floor(rating / 100) * 100}`;
 }
 
 function bucketNeeded(timeControl: string, rating: number): boolean {
+	if (rating < MIN_ELO || rating > MAX_ELO) return false;
 	return (bucketCounts.get(bucketKey(timeControl, rating)) ?? 0) < SAMPLES_PER_BUCKET;
 }
 
@@ -117,6 +140,7 @@ function tryAdd(
 	timeControl: string,
 	point: DataPoint,
 ): boolean {
+	if (point.rating < MIN_ELO || point.rating > MAX_ELO) return false;
 	const key = bucketKey(timeControl, point.rating);
 	if ((bucketCounts.get(key) ?? 0) >= SAMPLES_PER_BUCKET) return false;
 	bucketCounts.set(key, (bucketCounts.get(key) ?? 0) + 1);
@@ -333,27 +357,73 @@ console.log(`Streaming PGN from ${label}${totalBytes > 0 ? ` (${fmtBytes(totalBy
 console.log(`Stratified sampling: up to ${SAMPLES_PER_BUCKET} points per (time control × 100-Elo bucket).`);
 console.log(`Early exit after ${SATURATION_THRESHOLD.toLocaleString()} consecutive games with no new data.\n`);
 
+let progressLines = 0;
+
+type TCFill = { tc: string; have: number; capacity: number; sparse: string };
+
+function tcFills(): TCFill[] {
+	return [...getTopTCs()]
+		.map((tc) => {
+			const have = dataByTC.get(tc)?.length ?? 0;
+			const tcBuckets = [...bucketCounts.entries()].filter(([k]) => k.startsWith(`${tc}:`));
+			const capacity = tcBuckets.length * SAMPLES_PER_BUCKET;
+			const sparse = tcBuckets
+				.filter(([, n]) => n < SAMPLES_PER_BUCKET)
+				.sort(([, a], [, b]) => a - b)
+				.slice(0, 6)
+				.map(([k, n]) => `${k.split(":")[1]}(${n}/${SAMPLES_PER_BUCKET})`)
+				.join(" ");
+			return { tc, have, capacity, sparse };
+		})
+		.sort((a, b) => a.have / Math.max(a.capacity, 1) - b.have / Math.max(b.capacity, 1));
+}
+
 function printProgress(final = false) {
 	const now = Date.now();
 	if (!final && now - lastProgressMs < PROGRESS_INTERVAL_MS) return;
 	lastProgressMs = now;
 
 	const elapsed = now - startMs;
-	const parts: string[] = [];
 
-	if (totalBytes > 0) {
-		const pct = Math.min(100, (bytesRead / totalBytes) * 100);
-		const eta = pct > 0.5 ? fmtDuration((elapsed / pct) * (100 - pct)) : "…";
-		parts.push(`${pct.toFixed(1)}%  ETA ${eta}`);
-	} else {
-		parts.push(`${fmtDuration(elapsed)} elapsed`);
+	const timeStr = totalBytes > 0
+		? (() => {
+			const pct = Math.min(100, (bytesRead / totalBytes) * 100);
+			const eta = pct > 0.5 ? fmtDuration((elapsed / pct) * (100 - pct)) : "…";
+			return `${pct.toFixed(1)}%  ETA ${eta}`;
+		})()
+		: `${fmtDuration(elapsed)} elapsed`;
+
+	const totalCapacity = bucketCounts.size * SAMPLES_PER_BUCKET;
+	const fillPct = totalCapacity > 0 ? (totalPoints / totalCapacity) * 100 : 0;
+
+	const fills = tcFills();
+
+	const COL = { tc: 8, have: 7, cap: 7, pct: 6 };
+	const header =
+		`${"TC".padEnd(COL.tc)}  ${"have".padStart(COL.have)}  ${"cap".padStart(COL.cap)}  ${"fill".padStart(COL.pct)}  sparse Elo buckets (count/max)`;
+	const divider = "─".repeat(header.length);
+	const rows = fills.map(({ tc, have, capacity, sparse }) => {
+		const pct = capacity > 0 ? ((have / capacity) * 100).toFixed(1) : "—";
+		return `${tc.padEnd(COL.tc)}  ${String(have).padStart(COL.have)}  ${String(capacity).padStart(COL.cap)}  ${(pct + "%").padStart(COL.pct)}  ${sparse}`;
+	});
+
+	const lines = [
+		`${timeStr}  |  ${gamesScanned.toLocaleString()} games scanned  |  ${totalPoints.toLocaleString()} / ${totalCapacity.toLocaleString()} points (${fillPct.toFixed(1)}% full)`,
+		"",
+		header,
+		divider,
+		...rows,
+	];
+
+	// Erase previously printed lines then reprint
+	let out = "";
+	if (progressLines > 0) {
+		out += "\r\x1b[K";
+		for (let i = 1; i < progressLines; i++) out += "\x1b[A\r\x1b[K";
 	}
-
-	parts.push(`${gamesScanned.toLocaleString()} games scanned`);
-	parts.push(`${totalPoints.toLocaleString()} points collected`);
-	parts.push(`${dataByTC.size} time controls`);
-
-	process.stdout.write(`\r  ${parts.join("  |  ")}    `);
+	out += lines.map((l) => `  ${l}`).join("\n");
+	process.stdout.write(out);
+	progressLines = lines.length;
 }
 
 function processBuffer() {
@@ -366,7 +436,8 @@ function processBuffer() {
 	if (headers) {
 		const { whiteElo, blackElo, timeControl } = headers;
 
-		if (bucketNeeded(timeControl, whiteElo) || bucketNeeded(timeControl, blackElo)) {
+		tcGameCounts.set(timeControl, (tcGameCounts.get(timeControl) ?? 0) + 1);
+		if (getTopTCs().has(timeControl) && (bucketNeeded(timeControl, whiteElo) || bucketNeeded(timeControl, blackElo))) {
 			const evals = extractEvals(gameLines);
 			if (evals.length >= 10) {
 				const points = computeDataPoints(evals, whiteElo, blackElo);
@@ -439,3 +510,4 @@ for (const tc of sortedTCs) {
 
 writeConfig(results);
 writeChart(dataByTC, results);
+process.exit(0);
