@@ -78,6 +78,16 @@ MVP supports a single window: `"trailing_20"` (most recent 20 games by
   - `moveCount` / `opponentRating` / `timeControlClass` (one-hot) — game-shape context
 - Phase 2 is **offline-only** (eval script); not yet wired into the production worker. Wire in after further validation on a larger cache.
 
+## Phase 3: LightGBM regression
+- Training is a Python step: `uv run --with lightgbm --with numpy scripts/train-phase3.py --cache bench/cache/<file>.jsonl --out bench/phase3-model.json`
+- The script reproduces the exact same seeded-LCG train/test split as the TS eval scripts (seed=42, 0.7 fraction).
+- Features are identical to Phase 2 (from `game-features.ts`), reproduced in Python; `opponentRating` is excluded (label leak).
+- Hyperparameters: `n_estimators` picked via 5-fold CV with early stopping (max 500 rounds, patience 30); defaults `max_depth=6, learning_rate=0.05, min_data_in_leaf=10, num_leaves=31, lambda_l2=0.1`.
+- Model artifact: `bench/phase3-model.json` (gitignored, portable LightGBM JSON dump from `booster.dump_model()`).
+- Inference: pure-TS tree walker in `src/lib/scoring/lgbm-inference.ts` — `loadLgbmModel(json)` + `predictLgbm(model, features)`.
+  This is the production inference path once the model is wired in; it needs no Python at runtime.
+- Phase 3 is **offline-eval-only** — not yet wired into the worker job.
+
 ## Offline evaluation scripts
 - `scripts/build-eval-cache.ts` — builds `bench/cache/<name>.jsonl` by running
   Stockfish multipv=2 once per unique position. Resumable; pass `--stratify` for
@@ -85,3 +95,4 @@ MVP supports a single window: `"trailing_20"` (most recent 20 games by
 - `scripts/eval-phase1.ts` — reads the JSONL cache, fits per-TC regressions, and
   prints baseline vs Phase 1 MAE/R² comparison table + dumps `bench/phase1-results.json`.
 - `scripts/eval-phase2.ts` — multivariate OLS comparison (baseline vs MV-no-complexity vs full MV); dumps `bench/phase2-results.json`.
+- `scripts/eval-phase3.ts` — 4-column comparison (baseline, OLS, LightGBM); loads pre-trained `bench/phase3-model.json`; dumps `bench/phase3-results.json`.
