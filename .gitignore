@@ -13,3 +13,5 @@ __unconfig*
 todos.json
 logfile
 build/
+bench/cache/
+bench/*.json

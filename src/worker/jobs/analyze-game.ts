@@ -27,10 +27,15 @@ import {
 import { type PgnMove, walkPgn } from "#/lib/analysis/pgn";
 import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
 import { invalidatePlayerCache } from "#/lib/scoring/cache";
+import { moveComplexity } from "#/lib/scoring/complexity";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
+import {
+	computeWeightedAccuracy,
+	type WeightedMove,
+} from "#/lib/scoring/weighted-accuracy";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
-import type { AnalysisEngine } from "#/providers/analysis-engine";
+import type { AnalysisEngine, PositionEval } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
 
 export const ANALYZE_GAME_QUEUE = "analyze-game";
@@ -59,10 +64,12 @@ export function registerAnalyzeGameJob(boss: PgBoss) {
 	);
 }
 
-type PositionEval = {
+type CachedPositionEval = {
 	evalCp: number;
 	bestMoveUci: string;
 	bestMoveSan: string;
+	/** Eval of the second-best PV (side-to-move perspective), null if only one PV. */
+	pv2EvalCp: number | null;
 };
 
 type GameRow = {
@@ -105,7 +112,13 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			jobId,
 		);
 
-		const { moveRows, accuracyWhite, accuracyBlack } = buildMoveRows({
+		const {
+			moveRows,
+			accuracyWhite,
+			accuracyBlack,
+			weightedAccuracyWhite,
+			weightedAccuracyBlack,
+		} = buildMoveRows({
 			pgnMoves,
 			positionEvals,
 			playerColor: game.playerColor,
@@ -132,6 +145,8 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			.set({
 				accuracyWhite,
 				accuracyBlack,
+				weightedAccuracyWhite,
+				weightedAccuracyBlack,
 				movesAnalyzed: pgnMoves.length,
 				status: "complete",
 				completedAt: new Date(),
@@ -259,22 +274,35 @@ async function runAndInsertTags(
 	await db.insert(moveTags).values(tagRows);
 }
 
+/** Extract pv2 eval from side-to-move perspective given the engine result. */
+function extractPv2SideToMove(
+	result: PositionEval,
+	isBlackToMove: boolean,
+): number | null {
+	if (result.pvs.length < 2) return null;
+	const pv2WhitePerspective = result.pvs[1].eval_cp;
+	// Convert back to side-to-move perspective for complexity computation
+	return isBlackToMove ? -pv2WhitePerspective : pv2WhitePerspective;
+}
+
 async function evaluateAllPositions(
 	engine: AnalysisEngine,
 	pgnMoves: PgnMove[],
 	db: NodePgDatabase,
 	jobId: string,
-): Promise<Map<string, PositionEval>> {
-	const evals = new Map<string, PositionEval>();
+): Promise<Map<string, CachedPositionEval>> {
+	const evals = new Map<string, CachedPositionEval>();
 
 	for (let i = 0; i < pgnMoves.length; i++) {
 		const move = pgnMoves[i];
 		if (!evals.has(move.fenBefore)) {
 			const result = await engine.analyzePosition(move.fenBefore, ENGINE_DEPTH);
+			const isBlackToMove = move.fenBefore.split(" ")[1] === "b";
 			evals.set(move.fenBefore, {
 				evalCp: result.eval_cp,
 				bestMoveUci: result.best_move_uci,
 				bestMoveSan: result.best_move_san,
+				pv2EvalCp: extractPv2SideToMove(result, isBlackToMove),
 			});
 		}
 
@@ -293,10 +321,12 @@ async function evaluateAllPositions(
 				lastMove.fenAfter,
 				ENGINE_DEPTH,
 			);
+			const isBlackToMove = lastMove.fenAfter.split(" ")[1] === "b";
 			evals.set(lastMove.fenAfter, {
 				evalCp: result.eval_cp,
 				bestMoveUci: result.best_move_uci,
 				bestMoveSan: result.best_move_san,
+				pv2EvalCp: extractPv2SideToMove(result, isBlackToMove),
 			});
 		}
 	}
@@ -306,17 +336,26 @@ async function evaluateAllPositions(
 
 type MoveRow = typeof moves.$inferInsert;
 
+type BuildMoveRowsResult = {
+	moveRows: MoveRow[];
+	accuracyWhite: number;
+	accuracyBlack: number;
+	weightedAccuracyWhite: number;
+	weightedAccuracyBlack: number;
+};
+
 function buildMoveRows(args: {
 	pgnMoves: PgnMove[];
-	positionEvals: Map<string, PositionEval>;
+	positionEvals: Map<string, CachedPositionEval>;
 	playerColor: "white" | "black";
 	playerId: string;
 	gameId: string;
 	analysisJobId: string;
-}): { moveRows: MoveRow[]; accuracyWhite: number; accuracyBlack: number } {
+}): BuildMoveRowsResult {
 	const isPlayerWhite = args.playerColor === "white";
 	const moveRows: MoveRow[] = [];
 	const allEvals: MoveEvalData[] = [];
+	const allWeightedMoves: WeightedMove[] = [];
 	let prevWinPctLost: number | null = null;
 
 	for (const move of args.pgnMoves) {
@@ -367,7 +406,11 @@ function buildMoveRows(args: {
 			evalAfter: after.evalCp,
 			isWhite: move.isWhite,
 		};
-		const accuracyScore = isPlayerMove ? computeMoveAccuracy(evalData) : null;
+		const accuracyScore = computeMoveAccuracy(evalData);
+
+		// Complexity: pv1 is white-perspective; convert to side-to-move for comparison.
+		const pv1SideToMove = move.isWhite ? before.evalCp : -before.evalCp;
+		const complexity = moveComplexity(pv1SideToMove, before.pv2EvalCp);
 
 		moveRows.push({
 			analysisJobId: args.analysisJobId,
@@ -386,17 +429,27 @@ function buildMoveRows(args: {
 			evalAfterCp: after.evalCp,
 			evalDeltaCp: evalDelta,
 			classification,
-			accuracyScore,
+			accuracyScore: isPlayerMove ? accuracyScore : null,
+			complexity,
 		});
 
 		allEvals.push(evalData);
+		allWeightedMoves.push({
+			accuracy: accuracyScore,
+			complexity,
+			isWhite: move.isWhite,
+		});
 	}
 
 	const gameAccuracy = computeGameAccuracy(allEvals);
+	const weightedAccuracy = computeWeightedAccuracy(allWeightedMoves);
+
 	return {
 		moveRows,
 		accuracyWhite: gameAccuracy?.white ?? 0,
 		accuracyBlack: gameAccuracy?.black ?? 0,
+		weightedAccuracyWhite: weightedAccuracy?.white ?? 0,
+		weightedAccuracyBlack: weightedAccuracy?.black ?? 0,
 	};
 }
 

@@ -9,7 +9,11 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { Chess } from "chess.js";
-import type { AnalysisEngine, PositionEval } from "#/providers/analysis-engine";
+import type {
+	AnalysisEngine,
+	PositionEval,
+	PrincipalVariation,
+} from "#/providers/analysis-engine";
 
 /** Convert a mate-in-N score to a large centipawn value for sorting/comparison */
 function mateScoreToCp(mateIn: number): number {
@@ -32,8 +36,15 @@ function uciToSan(fen: string, uci: string): string {
 	return move.san;
 }
 
+/**
+ * Number of principal variations to request from Stockfish.
+ * Phase 1 only needs 2 (PV1 vs PV2 for complexity). Cap at 2 for timing predictability.
+ */
+const MULTIPV = 2;
+
 type ParsedInfo = {
 	depth: number;
+	multipv: number;
 	scoreCp: number | null;
 	scoreMate: number | null;
 	pv: string[];
@@ -46,6 +57,9 @@ function parseInfoLine(line: string): ParsedInfo | null {
 	if (!depthMatch) return null;
 
 	const depth = Number.parseInt(depthMatch[1], 10);
+
+	const multipvMatch = line.match(/\bmultipv\s+(\d+)/);
+	const multipv = multipvMatch ? Number.parseInt(multipvMatch[1], 10) : 1;
 
 	let scoreCp: number | null = null;
 	let scoreMate: number | null = null;
@@ -65,7 +79,7 @@ function parseInfoLine(line: string): ParsedInfo | null {
 	const pvMatch = line.match(/\bpv\s+(.+)/);
 	const pv = pvMatch ? pvMatch[1].trim().split(/\s+/) : [];
 
-	return { depth, scoreCp, scoreMate, pv };
+	return { depth, multipv, scoreCp, scoreMate, pv };
 }
 
 export function createStockfishWasmEngine(): AnalysisEngine {
@@ -156,6 +170,7 @@ export function createStockfishWasmEngine(): AnalysisEngine {
 			// Configure engine
 			sendCommand("setoption name Threads value 1");
 			sendCommand("setoption name Hash value 64");
+			sendCommand(`setoption name MultiPV value ${MULTIPV}`);
 			sendCommand("isready");
 			await waitForLine((line) => line === "readyok");
 		},
@@ -168,7 +183,10 @@ export function createStockfishWasmEngine(): AnalysisEngine {
 			sendCommand(`position fen ${fen}`);
 			sendCommand(`go depth ${depth}`);
 
-			let bestInfo: ParsedInfo | null = null;
+			const isBlackToMove = fen.split(" ")[1] === "b";
+
+			// Track best info per multipv slot (1-indexed). Key = multipv number.
+			const pvInfos = new Map<number, ParsedInfo>();
 
 			return new Promise<PositionEval>((resolve, reject) => {
 				const timeout = setTimeout(() => {
@@ -180,21 +198,23 @@ export function createStockfishWasmEngine(): AnalysisEngine {
 					if (line.startsWith("info ")) {
 						const parsed = parseInfoLine(line);
 						if (parsed && parsed.pv.length > 0) {
-							if (!bestInfo || parsed.depth >= bestInfo.depth) {
-								bestInfo = parsed;
+							const existing = pvInfos.get(parsed.multipv);
+							if (!existing || parsed.depth >= existing.depth) {
+								pvInfos.set(parsed.multipv, parsed);
 							}
 						}
 					} else if (line.startsWith("bestmove ")) {
 						clearTimeout(timeout);
 						removeLineListener(handler);
 
-						if (!bestInfo || bestInfo.pv.length === 0) {
+						const pv1 = pvInfos.get(1);
+
+						if (!pv1 || pv1.pv.length === 0) {
 							// Terminal position (checkmate or stalemate) — resolve with game-over eval
 							const chess = new Chess(fen);
 							let terminalEvalCp: number;
 							if (chess.isCheckmate()) {
 								// Side to move is checkmated; normalize to white's perspective
-								const isBlackToMove = fen.split(" ")[1] === "b";
 								terminalEvalCp = isBlackToMove ? 99999 : -99999;
 							} else {
 								// Stalemate or other terminal draw
@@ -207,28 +227,48 @@ export function createStockfishWasmEngine(): AnalysisEngine {
 								depth: 0,
 								is_mate: chess.isCheckmate(),
 								mate_in: chess.isCheckmate() ? 0 : null,
+								pvs: [],
 							});
 							return;
 						}
 
-						const isMate = bestInfo.scoreMate !== null;
-						const rawEvalCp = isMate
-							? mateScoreToCp(bestInfo.scoreMate as number)
-							: (bestInfo.scoreCp as number);
-						// Stockfish returns eval from side-to-move perspective; normalize to white's perspective
-						const isBlackToMove = fen.split(" ")[1] === "b";
-						const evalCp = isBlackToMove ? -rawEvalCp : rawEvalCp;
+						/** Convert a ParsedInfo to white-perspective eval_cp */
+						function parsedToCp(info: ParsedInfo): number {
+							const isMate = info.scoreMate !== null;
+							const raw = isMate
+								? mateScoreToCp(info.scoreMate as number)
+								: (info.scoreCp as number);
+							// Stockfish returns eval from side-to-move; normalize to white's perspective
+							return isBlackToMove ? -raw : raw;
+						}
 
-						const bestMoveUci = bestInfo.pv[0];
+						const pv1EvalCp = parsedToCp(pv1);
+						const bestMoveUci = pv1.pv[0];
 						const bestMoveSan = uciToSan(fen, bestMoveUci);
 
+						// Build pvs array from all collected PV slots (sorted by slot index)
+						const pvs: PrincipalVariation[] = [];
+						const sortedSlots = [...pvInfos.keys()].sort((a, b) => a - b);
+						for (const slot of sortedSlots) {
+							const info = pvInfos.get(slot);
+							if (!info || info.pv.length === 0) continue;
+							const evalCp = parsedToCp(info);
+							const moveUci = info.pv[0];
+							pvs.push({
+								eval_cp: evalCp,
+								move_uci: moveUci,
+								move_san: uciToSan(fen, moveUci),
+							});
+						}
+
 						resolve({
-							eval_cp: evalCp,
+							eval_cp: pv1EvalCp,
 							best_move_uci: bestMoveUci,
 							best_move_san: bestMoveSan,
-							depth: bestInfo.depth,
-							is_mate: isMate,
-							mate_in: bestInfo.scoreMate,
+							depth: pv1.depth,
+							is_mate: pv1.scoreMate !== null,
+							mate_in: pv1.scoreMate,
+							pvs,
 						});
 					}
 				}

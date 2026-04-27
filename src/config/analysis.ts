@@ -3,7 +3,7 @@ export const ANALYSIS_CONFIG = {
 	engineDepth: 12,
 
 	/** Number of principal variations (lines) to compute */
-	multiPv: 1,
+	multiPv: 5,
 
 	/** Move classification thresholds (win% lost from the mover's perspective, 0–100 scale). */
 	classification: {

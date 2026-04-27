@@ -40,3 +40,28 @@ instance) cannot import server functions.
 MVP supports a single window: `"trailing_20"` (most recent 20 games by
 `played_at`). Window keys are opaque strings; add new ones to the
 `windowKeySchema` enum in `queries.ts`.
+
+## Per-move complexity (Phase 1)
+- Complexity = win%(PV1) − win%(PV2), from the side-to-move's perspective, clamped to [0, 50].
+- Both PV evals are from the side-to-move's perspective (Stockfish UCI convention).
+- Implementation: `moveComplexity(pv1EvalCp, pv2EvalCp)` in `src/lib/scoring/complexity.ts`.
+- Requires multipv≥2 from the engine. Production engine is configured with `MULTIPV=2`.
+- Stored on the `moves` table as `complexity` (double precision, nullable on old analyses).
+
+## Complexity-weighted accuracy (Phase 1)
+- `src/lib/scoring/weighted-accuracy.ts` is the **single source of truth** for both
+  game-level and dimension-slice accuracy aggregation.
+- Formula: weighted harmonic mean with w_i = max(complexity_i, EPSILON=1.0).
+- Two exports: `computeWeightedAccuracy(moves)` (per-color, game-level, drop-in for
+  `computeGameAccuracy`) and `computeWeightedAccuracySlice(moves)` (any slice, for
+  dimension ratings).
+- `analysis_jobs` stores both `accuracy_white/black` (Lichess baseline) and
+  `weighted_accuracy_white/black` (Phase 1) for A/B comparison. Do not remove
+  the baseline columns until Phase 1 is fully validated.
+
+## Offline evaluation scripts
+- `scripts/build-eval-cache.ts` — builds `bench/cache/<name>.jsonl` by running
+  Stockfish multipv=2 once per unique position. Resumable; pass `--stratify` for
+  balanced rating-band × time-control sampling.
+- `scripts/eval-phase1.ts` — reads the JSONL cache, fits per-TC regressions, and
+  prints baseline vs Phase 1 MAE/R² comparison table + dumps `bench/phase1-results.json`.

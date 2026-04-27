@@ -119,6 +119,9 @@ export const analysisJobs = pgTable(
 		// Computed once on completion for fast listing without re-aggregating moves
 		accuracyWhite: doublePrecision("accuracy_white"),
 		accuracyBlack: doublePrecision("accuracy_black"),
+		// Complexity-weighted accuracy (Phase 1 A/B comparison). Null on old analyses.
+		weightedAccuracyWhite: doublePrecision("weighted_accuracy_white"),
+		weightedAccuracyBlack: doublePrecision("weighted_accuracy_black"),
 		errorMessage: text("error_message"),
 		enqueuedAt: timestamp("enqueued_at").defaultNow().notNull(),
 		startedAt: timestamp("started_at"),
@@ -161,6 +164,11 @@ export const moves = pgTable(
 		evalDeltaCp: integer("eval_delta_cp"),
 		// Per-move accuracy 0–100 (only meaningful for player moves; null otherwise)
 		accuracyScore: doublePrecision("accuracy_score"),
+		/**
+		 * Position complexity: win%(PV1) − win%(PV2) from side-to-move perspective,
+		 * clamped to [0, 50]. Requires multipv=2 engine output. Null on old analyses.
+		 */
+		complexity: doublePrecision("complexity"),
 		classification: moveClassificationEnum(),
 
 		// Future: depth at which engine's best move stabilized. Null until generator added.
