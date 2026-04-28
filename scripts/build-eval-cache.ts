@@ -10,6 +10,7 @@
  *   bun scripts/build-eval-cache.ts <url-or-path> [--games 300] [--depth 12]
  *   bun scripts/build-eval-cache.ts <url> --stratify --games 300
  *   bun scripts/build-eval-cache.ts <url> --out bench/cache/my-sample.jsonl
+ *   bun scripts/build-eval-cache.ts <url> --workers 4
  *
  * Download PGN databases from https://database.lichess.org/
  */
@@ -46,6 +47,7 @@ const ENGINE_DEPTH =
 	Number(argValue("--depth") ?? process.env.ANALYSIS_ENGINE_DEPTH ?? "0") ||
 	ANALYSIS_CONFIG.engineDepth;
 const FLAG_STRATIFY = argv.includes("--stratify");
+const WORKERS = Number(argValue("--workers") ?? "4");
 
 const defaultOut = inputArg
 	? `bench/cache/${basename(inputArg).replace(/\.zst$/, "").replace(/\.pgn$/, "")}.jsonl`
@@ -252,15 +254,67 @@ function loadExistingCache(path: string): {
 	return { seen, cellCounts };
 }
 
+// ── Engine pool ───────────────────────────────────────────────────────────────
+
+type Engine = ReturnType<typeof createStockfishWasmEngine>;
+
+class EnginePool {
+	private idle: Engine[] = [];
+	private waiters: Array<(engine: Engine) => void> = [];
+	private all: Engine[] = [];
+
+	constructor(engines: Engine[]) {
+		this.all = engines;
+		this.idle = [...engines];
+	}
+
+	acquire(): Promise<Engine> {
+		if (this.idle.length > 0) {
+			return Promise.resolve(this.idle.pop()!);
+		}
+		return new Promise((resolve) => {
+			this.waiters.push(resolve);
+		});
+	}
+
+	release(engine: Engine): void {
+		if (this.waiters.length > 0) {
+			const waiter = this.waiters.shift()!;
+			waiter(engine);
+		} else {
+			this.idle.push(engine);
+		}
+	}
+
+	async close(): Promise<void> {
+		await Promise.all(this.all.map((e) => e.destroy()));
+	}
+}
+
+async function initEnginePool(size: number): Promise<EnginePool> {
+	console.log(`Initializing ${size} Stockfish engine(s) in parallel…`);
+	const engines = await Promise.all(
+		Array.from({ length: size }, async () => {
+			const engine = createStockfishWasmEngine();
+			await engine.init();
+			return engine;
+		}),
+	);
+	console.log(`Engine pool ready (${size} workers).`);
+	return new EnginePool(engines);
+}
+
 // ── Engine analysis with in-process FEN cache ─────────────────────────────────
+
+type FenCache = Map<
+	string,
+	{ evalCp: number; pv2Cp: number | null; bestUci: string; bestSan: string }
+>;
 
 async function buildGameCache(
 	pgn: string,
-	engine: ReturnType<typeof createStockfishWasmEngine>,
-	fenCache: Map<
-		string,
-		{ evalCp: number; pv2Cp: number | null; bestUci: string; bestSan: string }
-	>,
+	engine: Engine,
+	fenCache: FenCache,
 ): Promise<CachedGame | null> {
 	const lines = pgn.split("\n");
 	const headers = parseHeaders(lines);
@@ -399,10 +453,48 @@ function recordCellCounts(
 	}
 }
 
+// ── Per-game task (runs concurrently across pool) ─────────────────────────────
+
+async function processGame(
+	pgn: string,
+	pool: EnginePool,
+	fenCache: FenCache,
+	seen: Set<string>,
+	cellCounts: Map<string, number>,
+	state: { gamesWritten: number; gamesScanned: number; gamesRejectedByHeaders: number },
+): Promise<void> {
+	const engine = await pool.acquire();
+	try {
+		const cached = await buildGameCache(pgn, engine, fenCache);
+		if (!cached) return;
+
+		// shouldInclude + record + append must be a single synchronous block —
+		// no await between the read of cellCounts and the write, so two tasks
+		// that interleave on an await boundary cannot both see "cell has room"
+		// and then both record. At most WORKERS-1 overshoot is acceptable.
+		if (!shouldInclude(cached, cellCounts, TARGET_PER_CELL)) return;
+		appendFileSync(OUT_PATH, `${JSON.stringify(cached)}\n`);
+		seen.add(cached.gameId);
+		recordCellCounts(cached, cellCounts);
+		state.gamesWritten++;
+
+		if (state.gamesWritten % 10 === 0 || state.gamesWritten === TARGET_GAMES) {
+			console.log(
+				`Progress: ${state.gamesWritten}/${TARGET_GAMES} games written` +
+					` (scanned ${state.gamesScanned},` +
+					` ${state.gamesRejectedByHeaders} rejected pre-engine,` +
+					` workers=${WORKERS})`,
+			);
+		}
+	} finally {
+		pool.release(engine);
+	}
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 if (!inputArg) {
-	console.error("Usage: bun scripts/build-eval-cache.ts <url-or-path> [--games N]");
+	console.error("Usage: bun scripts/build-eval-cache.ts <url-or-path> [--games N] [--workers N]");
 	process.exit(1);
 }
 
@@ -420,7 +512,7 @@ if (existingCount > 0) {
 // drop buffered work. Stockfish per-game cost dwarfs the syscall overhead.
 
 console.log(
-	`Build eval cache — target=${TARGET_GAMES} games, depth=${ENGINE_DEPTH}, stratify=${FLAG_STRATIFY}`,
+	`Build eval cache — target=${TARGET_GAMES} games, depth=${ENGINE_DEPTH}, stratify=${FLAG_STRATIFY}, workers=${WORKERS}`,
 );
 console.log(`Output: ${OUT_PATH}`);
 console.log();
@@ -428,23 +520,26 @@ console.log();
 // Target per stratification cell: rough even split across 4 bands × 4 TC classes
 const TARGET_PER_CELL = Math.ceil(TARGET_GAMES / 16);
 
-const engine = createStockfishWasmEngine();
-await engine.init();
+// Shared FEN cache across all games to avoid re-analyzing the same position.
+// Two tasks may race to populate the same FEN entry, but Map.set is atomic in
+// JS and engine.analyzePosition is idempotent — worst case is duplicate work,
+// not corruption.
+const fenCache: FenCache = new Map();
 
-// Shared FEN cache across all games to avoid re-analyzing the same position
-const fenCache = new Map<
-	string,
-	{ evalCp: number; pv2Cp: number | null; bestUci: string; bestSan: string }
->();
-
+const pool = await initEnginePool(WORKERS);
 const { input, proc } = openInputStream(inputArg);
-let gamesWritten = seen.size;
-let gamesScanned = 0;
 
-let gamesRejectedByHeaders = 0;
+const state = {
+	gamesWritten: seen.size,
+	gamesScanned: 0,
+	gamesRejectedByHeaders: 0,
+};
+
+const inflight = new Set<Promise<void>>();
+
 for await (const pgn of streamGames(input)) {
-	gamesScanned++;
-	if (gamesWritten >= TARGET_GAMES) break;
+	state.gamesScanned++;
+	if (state.gamesWritten >= TARGET_GAMES) break;
 
 	const gid = gameId(pgn);
 	if (seen.has(gid)) continue;
@@ -454,34 +549,35 @@ for await (const pgn of streamGames(input)) {
 	const headers = parseHeaders(pgn.split("\n"));
 	if (!headers) continue;
 	if (!shouldIncludeFromHeaders(headers, cellCounts, TARGET_PER_CELL)) {
-		gamesRejectedByHeaders++;
+		state.gamesRejectedByHeaders++;
 		continue;
 	}
 
-	const cached = await buildGameCache(pgn, engine, fenCache);
-	if (!cached) continue;
+	// Wait until a worker slot is free before dispatching another game.
+	while (inflight.size >= WORKERS) await Promise.race(inflight);
 
-	// Re-check after Stockfish: cellCounts may have changed via concurrent writes
-	// in future, and the header-based tcClass might differ from the cache's. Cheap.
-	if (!shouldInclude(cached, cellCounts, TARGET_PER_CELL)) continue;
+	// Re-check target after awaiting — another task may have finished and
+	// pushed us over the limit while we were waiting for a slot.
+	if (state.gamesWritten >= TARGET_GAMES) break;
 
-	appendFileSync(OUT_PATH, `${JSON.stringify(cached)}\n`);
-	seen.add(gid);
-	recordCellCounts(cached, cellCounts);
-	gamesWritten++;
-
-	if (gamesWritten % 10 === 0 || gamesWritten === TARGET_GAMES) {
-		console.log(
-			`Progress: ${gamesWritten}/${TARGET_GAMES} games written (scanned ${gamesScanned}, ${gamesRejectedByHeaders} rejected pre-engine)`,
-		);
-	}
+	const task: Promise<void> = processGame(
+		pgn,
+		pool,
+		fenCache,
+		seen,
+		cellCounts,
+		state,
+	).finally(() => inflight.delete(task));
+	inflight.add(task);
 }
 
+await Promise.all(inflight);
+
 proc?.kill();
-await engine.destroy();
+await pool.close();
 
 console.log();
-console.log(`Done. ${gamesWritten} total game(s) in ${OUT_PATH}.`);
+console.log(`Done. ${state.gamesWritten} total game(s) in ${OUT_PATH}.`);
 
 if (FLAG_STRATIFY) {
 	console.log("\nCell counts:");
