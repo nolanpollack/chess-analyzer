@@ -371,6 +371,24 @@ function shouldInclude(
 	return false;
 }
 
+/**
+ * Header-only stratification check, runs before Stockfish work.
+ * Avoids burning engine time on games we'd reject anyway.
+ */
+function shouldIncludeFromHeaders(
+	headers: GameHeaders,
+	cellCounts: Map<string, number>,
+	targetPerCell: number,
+): boolean {
+	if (!FLAG_STRATIFY) return true;
+	const tcClass = classifyTimeControl(headers.timeControl);
+	for (const elo of [headers.whiteElo, headers.blackElo]) {
+		const cell = stratCell(elo, tcClass);
+		if ((cellCounts.get(cell) ?? 0) < targetPerCell) return true;
+	}
+	return false;
+}
+
 function recordCellCounts(
 	game: CachedGame,
 	cellCounts: Map<string, number>,
@@ -423,6 +441,7 @@ const { input, proc } = openInputStream(inputArg);
 let gamesWritten = seen.size;
 let gamesScanned = 0;
 
+let gamesRejectedByHeaders = 0;
 for await (const pgn of streamGames(input)) {
 	gamesScanned++;
 	if (gamesWritten >= TARGET_GAMES) break;
@@ -430,9 +449,20 @@ for await (const pgn of streamGames(input)) {
 	const gid = gameId(pgn);
 	if (seen.has(gid)) continue;
 
+	// Cheap pre-check: reject from header data BEFORE running Stockfish.
+	// Saves ~10x engine time once popular cells fill up.
+	const headers = parseHeaders(pgn.split("\n"));
+	if (!headers) continue;
+	if (!shouldIncludeFromHeaders(headers, cellCounts, TARGET_PER_CELL)) {
+		gamesRejectedByHeaders++;
+		continue;
+	}
+
 	const cached = await buildGameCache(pgn, engine, fenCache);
 	if (!cached) continue;
 
+	// Re-check after Stockfish: cellCounts may have changed via concurrent writes
+	// in future, and the header-based tcClass might differ from the cache's. Cheap.
 	if (!shouldInclude(cached, cellCounts, TARGET_PER_CELL)) continue;
 
 	appendFileSync(OUT_PATH, `${JSON.stringify(cached)}\n`);
@@ -442,7 +472,7 @@ for await (const pgn of streamGames(input)) {
 
 	if (gamesWritten % 10 === 0 || gamesWritten === TARGET_GAMES) {
 		console.log(
-			`Progress: ${gamesWritten}/${TARGET_GAMES} games written (scanned ${gamesScanned})`,
+			`Progress: ${gamesWritten}/${TARGET_GAMES} games written (scanned ${gamesScanned}, ${gamesRejectedByHeaders} rejected pre-engine)`,
 		);
 	}
 }
