@@ -63,7 +63,7 @@ export function FactorRow({ factor, baseline }: FactorRowProps) {
 			{/* Delta */}
 			<div className="text-right">
 				<span
-					className={`mono-nums inline-flex items-center rounded-[4px] px-1.5 py-0.5 font-mono text-2xs font-medium ${deltaColorClass} ${deltaBgClass}`}
+					className={`mono-nums inline-flex items-center rounded-lg px-1.5 py-0.5 font-mono text-2xs font-medium ${deltaColorClass} ${deltaBgClass}`}
 				>
 					{factor.delta > 0 ? `+${factor.delta}` : factor.delta}
 				</span>
