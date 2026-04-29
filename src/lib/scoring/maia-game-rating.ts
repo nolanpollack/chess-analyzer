@@ -40,7 +40,7 @@ function gaussianPdf(x: number, mean: number, std: number): number {
 	return Math.exp(-0.5 * z * z) / (std * Math.sqrt(2 * Math.PI));
 }
 
-function buildGaussianPrior(
+export function buildGaussianPrior(
 	ratingGrid: number[],
 	mean: number,
 	std: number,

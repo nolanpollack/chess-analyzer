@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageContainer } from "#/components/layout/PageContainer";
 import { Topbar } from "#/components/layout/Topbar";
+import { useSyncProgress } from "#/features/players/hooks/use-sync-progress";
 import { EloEstimateCard } from "#/features/profile/components/EloEstimateCard";
 import { FactorBreakdownCard } from "#/features/profile/components/FactorBreakdownCard";
 import { FocusAreasCard } from "#/features/profile/components/FocusAreasCard";
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/$username/")({
 
 function ProfilePage() {
 	const { username } = Route.useParams();
+	const syncProgress = useSyncProgress(username);
 
 	return (
 		<>
@@ -23,7 +25,7 @@ function ProfilePage() {
 				crumbs={[{ label: "Profile" }]}
 				actions={
 					<>
-						<SyncStatusButton username={username} />
+						<SyncStatusButton username={username} progress={syncProgress} />
 						<ReviewLastGameButton username={username} />
 					</>
 				}

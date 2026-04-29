@@ -1,4 +1,5 @@
 import { ChevronRight, Filter } from "lucide-react";
+import { useGameAnalysisStatuses } from "#/features/games/hooks/use-game-analysis-statuses";
 import { useRecentGames } from "#/features/games/hooks/use-recent-games";
 import { RecentGameRow } from "./RecentGameRow";
 
@@ -8,6 +9,8 @@ type RecentGamesCardProps = {
 
 export function RecentGamesCard({ username }: RecentGamesCardProps) {
 	const { data: games = [], isLoading } = useRecentGames(username);
+	const gameIds = games.map((g) => g.id);
+	const { statusById } = useGameAnalysisStatuses(gameIds);
 
 	return (
 		<div className="overflow-hidden rounded-lg border border-divider bg-surface">
@@ -63,9 +66,24 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 							</td>
 						</tr>
 					) : (
-						games.map((game) => (
-							<RecentGameRow key={game.id} game={game} username={username} />
-						))
+						games.map((game) => {
+							const status = statusById.get(game.id);
+							const analysis = status
+								? {
+										status: status.status,
+										movesAnalyzed: status.movesAnalyzed,
+										totalMoves: status.totalMoves ?? 0,
+									}
+								: undefined;
+							return (
+								<RecentGameRow
+									key={game.id}
+									game={game}
+									username={username}
+									analysis={analysis}
+								/>
+							);
+						})
 					)}
 				</tbody>
 			</table>
