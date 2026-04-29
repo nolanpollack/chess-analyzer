@@ -9,9 +9,17 @@ import { FactorRow } from "./FactorRow";
 
 type FactorBreakdownCardProps = {
 	username: string;
+	/** When true, append a pulsing "updating" hint to the subtitle. */
+	isAnalyzing?: boolean;
+	/** Total positions analyzed across the player's games. Drives subtitle copy. */
+	positionsAnalyzed?: number;
 };
 
-export function FactorBreakdownCard({ username }: FactorBreakdownCardProps) {
+export function FactorBreakdownCard({
+	username,
+	isAnalyzing = false,
+	positionsAnalyzed = 0,
+}: FactorBreakdownCardProps) {
 	const { data: summary } = usePlayerSummary(username);
 	const playerId = summary?.playerId ?? null;
 	const playerElo = summary?.eloEstimate ?? null;
@@ -51,12 +59,22 @@ export function FactorBreakdownCard({ username }: FactorBreakdownCardProps) {
 					<div className="text-ui font-medium text-fg-2">
 						Performance by factor
 					</div>
-					<div className="mt-0.5 text-[11.5px] text-fg-3">
-						{factors !== null
-							? playerElo !== null
-								? `Each score shown relative to your overall rating of ${playerElo}. Weakest first.`
-								: "Weakest first."
-							: "Elo-scale ratings across key skill areas"}
+					<div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-fg-3">
+						<span>
+							{factors !== null
+								? positionsAnalyzed > 0
+									? `Based on ${positionsAnalyzed.toLocaleString()} position${positionsAnalyzed === 1 ? "" : "s"}.`
+									: playerElo !== null
+										? `Each score shown relative to your overall rating of ${playerElo}.`
+										: "Weakest first."
+								: "Elo-scale ratings across key skill areas"}
+						</span>
+						{isAnalyzing && (
+							<span className="inline-flex items-center gap-1.5 text-2xs text-accent-brand">
+								<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-brand" />
+								Updating
+							</span>
+						)}
 					</div>
 				</div>
 				{factors !== null && playerElo !== null && (

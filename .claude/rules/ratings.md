@@ -102,11 +102,41 @@ MVP supports a single window: `"trailing_20"` (most recent 20 games by
   `maia_n_positions_*`. Populated by the `computeAndPersistMaiaRating` worker step.
 - Hook: `useMaiaGameRating(analysisJobId)`.
 
+## Player headline (overall) rating
+- Aggregated by `aggregateRating` in `src/lib/rating-aggregator/recency.ts` over the
+  player's per-game (player-side) ratings. Pure function; caller (profile server fn)
+  fetches per-game scalars and passes them in.
+- Weight per game = `exp(-ageDays / TAU_DAYS)` × inverse-variance of the per-game CI.
+  TAU_DAYS = 60. Game-count cap = 500. Max age = 1095 days. CI weight cap ratio = 4
+  (caps the inverse-variance component, NOT combined weight — capping combined
+  weight would erase the recency intent).
+- Aggregate CI is the wider of `1.96 × √(weightedVar / effectiveN)` and
+  `avgPerGameHalfWidth / √(effectiveN)`. The floor avoids a zero-CI degenerate
+  result when only one game exists (variance=0, effectiveN=1).
+- Server fn: `getPlayerSummary` returns `eloEstimate` (rounded posterior mean) and
+  `eloDelta30d` (current minus an aggregate computed at `now - 30d`).
+
 ## Rating-over-time trend
-- `getMaiaRatingTrend({ playerId, side, limit })` in `features/profile/server/queries.ts`
-  joins `analysis_jobs ⨝ games` filtered by `player_id` + `player_color` + non-null
-  `maia_predicted_*`. Returns ascending by `played_at` for charting.
-- Hook: inline `useQuery` in `RatingOverTimeCard` (not a separate hook file).
+- `aggregateRatingTrend` reuses `aggregateRating` once per snapshot date with
+  `now = snapshot` and games filtered to `playedAt ≤ snapshot`. Pure function.
+- Server fn: `getRatingTrend({ playerId, range })` where `range ∈ "1m"|"3m"|"6m"|"1y"|"all"`.
+  Snapshot dates are the actual game dates inside the window, decimated to at most
+  `MAX_TREND_POINTS = 60` so the chart only moves where data changes.
+- Returned points have integer ratings (`Math.round`). UI hover shows the date
+  (formatted from the original ISO string) and the rounded rating.
+- Hook: inline `useQuery` in `RatingOverTimeCard`. The card has no white/black toggle;
+  the player's side is selected at the per-game level upstream in `fetchPerGameRatings`.
+
+## Position-level recency in the MLE aggregator
+- `estimateRating` (`src/lib/rating-aggregator/index.ts`) accepts optional `now` and
+  `tauDays`. When both are set AND a position has `playedAt`, that position's weight
+  is multiplied by `exp(-ageDays / tauDays)`.
+- Used by `computeMaiaTagRatings` (dimensional ratings) so a tag-slice's positions
+  drawn from old games decay the same way the per-game aggregator decays old games.
+- Per-game scoring (`estimateGameSideRating`) does NOT pass `now`/`tauDays` —
+  positions in a single game share the same date, so recency would factor out anyway.
+- Tau is shared (60 days) so the headline elo and dimensional ratings move on the
+  same timescale.
 
 ## Legacy pipeline (deleted)
 Phases 1-3 (accuracy-based scoring, complexity weighting, multivariate OLS,
@@ -120,7 +150,6 @@ files no longer exist:
 - `scripts/{eval-phase1,eval-phase2,eval-phase3,train-phase3,calibrate-rating-formula,build-eval-cache,benchmark-analysis}.ts/py`
 
 Retained from legacy pipeline:
-- `src/lib/scoring/overall.ts` — used by `profile/server/queries.ts` for `eloEstimate`
 - `src/lib/scoring/game-accuracy.ts` — used by `analyze-game` worker to populate `accuracy_white/black` on `analysis_jobs` (displayed in game list)
 - `src/lib/scoring/rating-mapping.ts` — used by `features/games/server/queries.ts` to map per-game accuracy to an Elo-scale `gameScore` in the game list
 - `accuracy_white/black` columns on `analysis_jobs` — still populated by worker and displayed in game list

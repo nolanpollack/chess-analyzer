@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Search, User } from "lucide-react";
+import { List, Search, User } from "lucide-react";
 import ThemeToggle from "#/components/ThemeToggle";
 import { useCurrentPlayer } from "#/lib/use-current-player";
 
@@ -12,14 +12,19 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
 	{ id: "profile", label: "Profile", icon: User, href: "/$username" },
+	{ id: "games", label: "Games", icon: List, href: "/$username/games" },
 ];
 
 function NavLink({ item, username }: { item: NavItem; username: string }) {
 	const routerState = useRouterState();
 	const resolvedHref = item.href.replace("$username", username);
+	const path = routerState.location.pathname;
+	// Profile is active only on its own page; nested items (e.g. Games) stay
+	// active when the user drills into a child route like /games/$gameId.
 	const isActive =
-		routerState.location.pathname === resolvedHref ||
-		routerState.location.pathname === `${resolvedHref}/`;
+		item.id === "profile"
+			? path === resolvedHref || path === `${resolvedHref}/`
+			: path === resolvedHref || path.startsWith(`${resolvedHref}/`);
 
 	return (
 		<Link

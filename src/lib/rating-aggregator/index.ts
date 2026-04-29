@@ -43,6 +43,26 @@ function resolveWeights(positions: Position[], weights?: number[]): number[] {
 	return weights;
 }
 
+const MS_PER_DAY = 86_400_000;
+
+function applyRecency(
+	weights: number[],
+	positions: Position[],
+	now: Date | undefined,
+	tauDays: number | undefined,
+): number[] {
+	if (now === undefined || tauDays === undefined) return weights;
+	return weights.map((w, i) => {
+		const playedAt = positions[i]?.playedAt;
+		if (!playedAt) return w;
+		const ageDays = Math.max(
+			0,
+			(now.getTime() - playedAt.getTime()) / MS_PER_DAY,
+		);
+		return w * Math.exp(-ageDays / tauDays);
+	});
+}
+
 function resolveLogPrior(
 	prior: number[] | undefined,
 	nRatings: number,
@@ -77,7 +97,13 @@ export function estimateRating(
 
 	const epsilon = opts?.epsilon ?? DEFAULT_EPSILON;
 	const ratingGrid = resolveRatingGrid(positions, opts?.ratingGrid);
-	const weights = resolveWeights(positions, opts?.weights);
+	const baseWeights = resolveWeights(positions, opts?.weights);
+	const weights = applyRecency(
+		baseWeights,
+		positions,
+		opts?.now,
+		opts?.tauDays,
+	);
 	const logPrior = resolveLogPrior(opts?.prior, ratingGrid.length);
 
 	const logLikelihoodPerPosition = positions.map((pos) =>

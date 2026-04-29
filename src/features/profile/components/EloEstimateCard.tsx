@@ -3,13 +3,18 @@ import { usePlayerSummary } from "../hooks/use-player-summary";
 
 type EloEstimateCardProps = {
 	username: string;
+	/** When true, append a pulsing "updating" hint to the subtitle. */
+	isAnalyzing?: boolean;
 };
 
-export function EloEstimateCard({ username }: EloEstimateCardProps) {
+export function EloEstimateCard({
+	username,
+	isAnalyzing = false,
+}: EloEstimateCardProps) {
 	const { data: summary, isLoading } = usePlayerSummary(username);
 	const elo = summary?.eloEstimate ?? null;
 	const delta = summary?.eloDelta30d ?? null;
-	const analyzedCount = summary?.analyzedGameCount ?? 0;
+	const sampleSize = summary?.eloSampleSize ?? 0;
 	const chessComRating = summary?.currentRating ?? null;
 	const chessComGames = summary?.gameCount ?? 0;
 
@@ -30,11 +35,14 @@ export function EloEstimateCard({ username }: EloEstimateCardProps) {
 						</div>
 					)}
 				</div>
-				<p className="mt-2.5 max-w-[340px] text-[12.5px] leading-[1.5] text-fg-2">
-					{analyzedCount > 0
-						? `Computed from ${analyzedCount} game${analyzedCount === 1 ? "" : "s"} analyzed across your connected accounts.`
-						: "No analyzed games yet."}
-				</p>
+				<div className="mt-2.5 flex max-w-[340px] flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] leading-[1.5] text-fg-2">
+					<span>
+						{sampleSize > 0
+							? `Based on ${sampleSize} game${sampleSize === 1 ? "" : "s"}.`
+							: "No analyzed games yet."}
+					</span>
+					{isAnalyzing && <UpdatingHint />}
+				</div>
 			</div>
 
 			<div className="mt-8 border-t border-divider pt-5">
@@ -44,6 +52,15 @@ export function EloEstimateCard({ username }: EloEstimateCardProps) {
 				<ImportedRating rating={chessComRating} games={chessComGames} />
 			</div>
 		</div>
+	);
+}
+
+function UpdatingHint() {
+	return (
+		<span className="inline-flex items-center gap-1.5 text-2xs text-accent-brand">
+			<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-brand" />
+			Updating
+		</span>
 	);
 }
 

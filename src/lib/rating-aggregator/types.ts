@@ -5,6 +5,12 @@ export type Position = {
 	/** UCI string of the move actually played in this position. */
 	playedMove: string;
 	maia: MaiaOutput;
+	/**
+	 * Source-game date for this position. Optional. When provided AND the
+	 * estimator is given `now` + `tauDays`, an exp(-age/tau) recency factor
+	 * is multiplied into this position's weight.
+	 */
+	playedAt?: Date;
 };
 
 export type EstimatorOptions = {
@@ -22,6 +28,13 @@ export type EstimatorOptions = {
 	 * If any position's grid differs, throws a clear error.
 	 */
 	ratingGrid?: number[];
+	/**
+	 * Reference time for per-position recency decay. Required to enable recency
+	 * weighting; combined with `tauDays` and each Position's `playedAt`.
+	 */
+	now?: Date;
+	/** Recency time constant in days. Required to enable recency weighting. */
+	tauDays?: number;
 };
 
 export type RatingEstimate = {

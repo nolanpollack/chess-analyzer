@@ -15,12 +15,24 @@ type LineChartProps = {
 	data: DataPoint[];
 	color?: string;
 	className?: string;
+	/** Recharts XAxis interval. Use a number to skip ticks, or a preset. */
+	xTickInterval?: number | "preserveStartEnd" | "preserveStart" | "preserveEnd";
+	/** Format the tooltip value (e.g. round to integer). */
+	tooltipValueFormatter?: (value: number) => string;
+	/** Format the tooltip label (the X axis value at the hovered point). */
+	tooltipLabelFormatter?: (label: string) => string;
+	/** Series name shown in the tooltip; defaults to "Value". */
+	tooltipName?: string;
 };
 
 export function LineChart({
 	data,
 	color = "var(--accent-color)",
 	className,
+	xTickInterval = "preserveStartEnd",
+	tooltipValueFormatter,
+	tooltipLabelFormatter,
+	tooltipName = "Value",
 }: LineChartProps) {
 	return (
 		<div className={className}>
@@ -39,6 +51,8 @@ export function LineChart({
 						}}
 						axisLine={false}
 						tickLine={false}
+						interval={xTickInterval}
+						minTickGap={24}
 					/>
 					<YAxis
 						tick={{
@@ -61,10 +75,24 @@ export function LineChart({
 							color: "var(--fg-1)",
 						}}
 						cursor={{ stroke: "var(--divider-token)", strokeWidth: 1 }}
+						formatter={(value) => {
+							const num = typeof value === "number" ? value : Number(value);
+							const formatted = tooltipValueFormatter
+								? tooltipValueFormatter(num)
+								: String(num);
+							return [formatted, tooltipName];
+						}}
+						labelFormatter={(label) => {
+							const str = typeof label === "string" ? label : String(label);
+							return tooltipLabelFormatter
+								? tooltipLabelFormatter(str)
+								: str;
+						}}
 					/>
 					<Line
 						type="monotone"
 						dataKey="value"
+						name={tooltipName}
 						stroke={color}
 						strokeWidth={1.75}
 						dot={false}

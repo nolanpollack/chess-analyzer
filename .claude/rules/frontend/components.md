@@ -1,5 +1,16 @@
 # Frontend Components
 
+## Analysis vocabulary (user-facing)
+Never expose engine implementation names ("Stockfish", "Maia", "Maia-2", "pg-boss")
+in user-facing strings, labels, or tooltips. The pipeline surfaces to users as three
+concepts:
+- **Accuracy** — how precisely the player played (Stockfish per-move).
+- **Game score** — how well the player played overall (Maia-2 rating; drives Elo estimate).
+- **Patterns** — recurring strengths and weaknesses (move tags; drives Performance by factor).
+
+Counts shown in the topbar pill and progress popover always use these labels. Internal
+identifiers in code (column names, server-fn fields) may still reference the engines.
+
 ## UI library
 shadcn/ui components are the default for all UI elements.
 Install components with: bunx shadcn@latest add {component}

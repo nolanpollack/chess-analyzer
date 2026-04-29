@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageContainer } from "#/components/layout/PageContainer";
 import { Topbar } from "#/components/layout/Topbar";
-import { useSyncProgress } from "#/features/players/hooks/use-sync-progress";
+import { useProfileProgress } from "#/features/players/hooks/use-profile-progress";
 import { EloEstimateCard } from "#/features/profile/components/EloEstimateCard";
 import { FactorBreakdownCard } from "#/features/profile/components/FactorBreakdownCard";
 import { FocusAreasCard } from "#/features/profile/components/FocusAreasCard";
@@ -17,7 +17,8 @@ export const Route = createFileRoute("/$username/")({
 
 function ProfilePage() {
 	const { username } = Route.useParams();
-	const syncProgress = useSyncProgress(username);
+	const progress = useProfileProgress(username);
+	const isAnalyzing = progress?.state === "analyzing";
 
 	return (
 		<>
@@ -25,7 +26,7 @@ function ProfilePage() {
 				crumbs={[{ label: "Profile" }]}
 				actions={
 					<>
-						<SyncStatusButton username={username} progress={syncProgress} />
+						<SyncStatusButton username={username} progress={progress} />
 						<ReviewLastGameButton username={username} />
 					</>
 				}
@@ -33,11 +34,15 @@ function ProfilePage() {
 			<PageContainer className="space-y-4">
 				<ProfilePageHeader username={username} />
 				<div className="grid grid-cols-[1fr_1.3fr] gap-4">
-					<EloEstimateCard username={username} />
+					<EloEstimateCard username={username} isAnalyzing={isAnalyzing} />
 					<RatingOverTimeCard username={username} />
 				</div>
 				<FocusAreasCard username={username} />
-				<FactorBreakdownCard username={username} />
+				<FactorBreakdownCard
+					username={username}
+					isAnalyzing={isAnalyzing}
+					positionsAnalyzed={progress?.positionsAnalyzed ?? 0}
+				/>
 				<RecentGamesCard username={username} />
 			</PageContainer>
 		</>

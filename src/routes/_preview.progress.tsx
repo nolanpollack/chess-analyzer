@@ -2,15 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageContainer } from "#/components/layout/PageContainer";
 import { Topbar } from "#/components/layout/Topbar";
-import type { GameSummary } from "#/features/games/types";
 import {
 	type AnalysisProgress,
-	RecentGameRow,
-} from "#/features/profile/components/RecentGameRow";
-import {
-	type SyncProgress,
-	SyncStatusButton,
-} from "#/features/profile/components/SyncStatusButton";
+	GameTableRow,
+} from "#/features/games/components/GameTableRow";
+import type { GameSummary } from "#/features/games/types";
+import type { ProfileProgress } from "#/features/players/hooks/use-profile-progress";
+import { SyncStatusButton } from "#/features/profile/components/SyncStatusButton";
 
 export const Route = createFileRoute("/_preview/progress")({
 	component: ProgressPreviewPage,
@@ -55,7 +53,13 @@ const ROW_FIXTURES: RowFixture[] = [
 			acc: null,
 			when: "12m ago",
 		}),
-		analysis: { status: "pending", movesAnalyzed: 0, totalMoves: 64 },
+		analysis: {
+			status: "pending",
+			movesAnalyzed: 0,
+			totalMoves: 64,
+			accuracyReady: false,
+			gameScoreReady: false,
+		},
 	},
 	{
 		game: makeGame({
@@ -68,20 +72,32 @@ const ROW_FIXTURES: RowFixture[] = [
 			acc: null,
 			when: "8m ago",
 		}),
-		analysis: { status: "in-progress", movesAnalyzed: 12, totalMoves: 80 },
+		analysis: {
+			status: "in-progress",
+			movesAnalyzed: 12,
+			totalMoves: 80,
+			accuracyReady: false,
+			gameScoreReady: false,
+		},
 	},
 	{
 		game: makeGame({
-			id: "g-late",
+			id: "g-acc-only",
 			opp: "knightowl",
 			oppElo: 1720,
 			result: "D",
 			color: "black",
 			score: null,
-			acc: null,
+			acc: 78.1,
 			when: "4m ago",
 		}),
-		analysis: { status: "in-progress", movesAnalyzed: 58, totalMoves: 64 },
+		analysis: {
+			status: "in-progress",
+			movesAnalyzed: 64,
+			totalMoves: 64,
+			accuracyReady: true,
+			gameScoreReady: false,
+		},
 	},
 	{
 		game: makeGame({
@@ -94,32 +110,28 @@ const ROW_FIXTURES: RowFixture[] = [
 			acc: null,
 			when: "yesterday",
 		}),
-		analysis: { status: "failed", movesAnalyzed: 12, totalMoves: 64 },
+		analysis: {
+			status: "failed",
+			movesAnalyzed: 12,
+			totalMoves: 64,
+			accuracyReady: false,
+			gameScoreReady: false,
+		},
 	},
 ];
 
-type SyncState =
-	| "idle"
-	| "syncing-unknown-total"
-	| "syncing-imported-only"
-	| "syncing-and-analyzing"
-	| "complete"
-	| "failed";
+type SyncState = "idle" | "syncing" | "analyzing-light" | "analyzing-deep";
 
 const SYNC_STATES: SyncState[] = [
 	"idle",
-	"syncing-unknown-total",
-	"syncing-imported-only",
-	"syncing-and-analyzing",
-	"complete",
-	"failed",
+	"syncing",
+	"analyzing-light",
+	"analyzing-deep",
 ];
 
 function ProgressPreviewPage() {
-	const [syncState, setSyncState] = useState<SyncState>(
-		"syncing-and-analyzing",
-	);
-	const syncProgress = syncFixture(syncState);
+	const [syncState, setSyncState] = useState<SyncState>("analyzing-light");
+	const progress = progressFixture(syncState);
 
 	return (
 		<>
@@ -129,8 +141,9 @@ function ProgressPreviewPage() {
 					<header className="space-y-1">
 						<h2 className="text-lg font-medium">Game analysis progress</h2>
 						<p className="text-sm text-fg-3">
-							Inline within the recent-games table. The accuracy cell switches
-							to a progress indicator while the game is being analyzed.
+							Per-cell loading on the Accuracy and Game score columns — em-dash
+							for queued, indeterminate shimmer for game-score, a determinate
+							bar for accuracy as moves complete.
 						</p>
 					</header>
 					<MockGamesTable rows={ROW_FIXTURES} />
@@ -138,10 +151,10 @@ function ProgressPreviewPage() {
 
 				<section className="space-y-3">
 					<header className="space-y-1">
-						<h2 className="text-lg font-medium">Profile sync progress</h2>
+						<h2 className="text-lg font-medium">Topbar status pill</h2>
 						<p className="text-sm text-fg-3">
-							The topbar sync button surfaces progress inline — a thin strip
-							under the label and an inline count.
+							Single pill, three states. Hover the pill to reveal the per-stage
+							breakdown popover.
 						</p>
 					</header>
 					<StateSwitcher
@@ -150,7 +163,7 @@ function ProgressPreviewPage() {
 						onChange={setSyncState}
 					/>
 					<TopbarFragment>
-						<SyncStatusButton username="preview" progress={syncProgress} />
+						<SyncStatusButton username="preview" progress={progress} />
 					</TopbarFragment>
 				</section>
 			</PageContainer>
@@ -184,7 +197,7 @@ function MockGamesTable({ rows }: { rows: RowFixture[] }) {
 				</thead>
 				<tbody>
 					{rows.map((row) => (
-						<RecentGameRow
+						<GameTableRow
 							key={row.game.id}
 							game={row.game}
 							username="preview"
@@ -257,44 +270,55 @@ function makeGame(
 	};
 }
 
-function syncFixture(state: SyncState): SyncProgress | undefined {
+function progressFixture(state: SyncState): ProfileProgress {
 	switch (state) {
 		case "idle":
-			return undefined;
-		case "syncing-unknown-total":
 			return {
-				status: "syncing",
-				gamesImported: 8,
+				state: "idle",
+				isSyncing: false,
+				lastSyncedAt: new Date(Date.now() - 3 * 60_000).toISOString(),
+				imported: 50,
+				totalGamesToImport: 50,
+				accuracy: 50,
+				gameScore: 50,
+				patterns: 50,
+				positionsAnalyzed: 2400,
+			};
+		case "syncing":
+			return {
+				state: "syncing",
+				isSyncing: true,
+				lastSyncedAt: null,
+				imported: 12,
+				totalGamesToImport: 84,
+				accuracy: 0,
+				gameScore: 0,
+				patterns: 0,
+				positionsAnalyzed: 0,
+			};
+		case "analyzing-light":
+			return {
+				state: "analyzing",
+				isSyncing: false,
+				lastSyncedAt: new Date(Date.now() - 60_000).toISOString(),
+				imported: 42,
 				totalGamesToImport: 0,
-				gamesAnalyzed: 0,
+				accuracy: 38,
+				gameScore: 21,
+				patterns: 12,
+				positionsAnalyzed: 1900,
 			};
-		case "syncing-imported-only":
+		case "analyzing-deep":
 			return {
-				status: "syncing",
-				gamesImported: 8,
-				totalGamesToImport: 50,
-				gamesAnalyzed: 0,
-			};
-		case "syncing-and-analyzing":
-			return {
-				status: "syncing",
-				gamesImported: 32,
-				totalGamesToImport: 50,
-				gamesAnalyzed: 14,
-			};
-		case "complete":
-			return {
-				status: "complete",
-				gamesImported: 50,
-				totalGamesToImport: 50,
-				gamesAnalyzed: 50,
-			};
-		case "failed":
-			return {
-				status: "failed",
-				gamesImported: 8,
-				totalGamesToImport: 50,
-				gamesAnalyzed: 3,
+				state: "analyzing",
+				isSyncing: false,
+				lastSyncedAt: new Date(Date.now() - 30_000).toISOString(),
+				imported: 200,
+				totalGamesToImport: 0,
+				accuracy: 80,
+				gameScore: 30,
+				patterns: 28,
+				positionsAnalyzed: 4200,
 			};
 	}
 }

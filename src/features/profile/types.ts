@@ -6,19 +6,6 @@
  * here.
  */
 
-export type PlayerSummary = {
-	currentRating: number | null;
-	gameCount: number;
-	analyzedGameCount: number;
-	eloEstimate: number | null;
-	eloDelta30d: number | null;
-};
-
-export type RatingPoint = {
-	weekStart: string;
-	rating: number;
-};
-
 export type FactorConfidence = "high" | "medium" | "low";
 export type FactorGroup = "phase" | "skill" | "piece" | "agency" | "concept";
 

@@ -1,8 +1,8 @@
+import { Link } from "@tanstack/react-router";
 import { ChevronRight, Filter } from "lucide-react";
+import { GameTableRow } from "#/features/games/components/GameTableRow";
 import { useGameAnalysisStatuses } from "#/features/games/hooks/use-game-analysis-statuses";
 import { useRecentGames } from "#/features/games/hooks/use-recent-games";
-import { useAnalysisProgress } from "#/features/players/hooks/use-analysis-progress";
-import { RecentGameRow } from "./RecentGameRow";
 
 type RecentGamesCardProps = {
 	username: string;
@@ -12,29 +12,11 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 	const { data: games = [], isLoading } = useRecentGames(username);
 	const gameIds = games.map((g) => g.id);
 	const { statusById } = useGameAnalysisStatuses(gameIds);
-	const globalProgress = useAnalysisProgress(username);
-
-	// Counter prefers the global counts (across all imported games) so the
-	// number reflects the full backlog during re-analyze, not just the rows
-	// shown in the table. Falls back to the local row counts if the global
-	// query hasn't returned yet.
-	const totalGames = globalProgress?.imported ?? games.length;
-	const analyzedCount =
-		globalProgress?.analyzed ??
-		games.filter((g) => statusById.get(g.id)?.status === "complete").length;
-	const pendingCount = totalGames - analyzedCount;
 
 	return (
 		<div className="overflow-hidden rounded-lg border border-divider bg-surface">
 			<div className="flex items-center justify-between border-b border-divider px-5 py-4">
-				<div className="flex items-baseline gap-3">
-					<div className="text-sm font-medium text-fg">Recent games</div>
-					{totalGames > 0 && pendingCount > 0 && (
-						<div className="text-xs text-fg-3" aria-live="polite">
-							Analyzing — {analyzedCount} of {totalGames} complete
-						</div>
-					)}
-				</div>
+				<div className="text-sm font-medium text-fg">Recent games</div>
 				<div className="flex gap-1.5">
 					<button
 						type="button"
@@ -42,12 +24,13 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 					>
 						<Filter className="size-3.5" /> Filter
 					</button>
-					<button
-						type="button"
-						className="inline-flex items-center gap-1.5 rounded-sm border-none bg-transparent px-3 py-1.5 text-xs font-medium text-fg-1 transition-all duration-100 hover:bg-surface-2"
+					<Link
+						to="/$username/games"
+						params={{ username }}
+						className="inline-flex items-center gap-1.5 rounded-sm bg-transparent px-3 py-1.5 text-xs font-medium text-fg-1 transition-all duration-100 hover:bg-surface-2"
 					>
 						View all <ChevronRight className="size-3.5" />
-					</button>
+					</Link>
 				</div>
 			</div>
 			<table className="w-full border-collapse text-ui">
@@ -98,16 +81,20 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 										status: status.status,
 										movesAnalyzed: status.movesAnalyzed,
 										totalMoves: status.totalMoves ?? 0,
+										accuracyReady: status.accuracyReady,
+										gameScoreReady: status.gameScoreReady,
 									}
 								: game.acc === null
 									? {
 											status: "pending" as const,
 											movesAnalyzed: 0,
 											totalMoves: 0,
+											accuracyReady: false,
+											gameScoreReady: false,
 										}
 									: undefined;
 							return (
-								<RecentGameRow
+								<GameTableRow
 									key={game.id}
 									game={game}
 									username={username}

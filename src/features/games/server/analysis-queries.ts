@@ -3,10 +3,10 @@
  * page row-level progress indicators.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { desc, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { type AnalysisStatus, analysisJobs } from "#/db/schema";
+import { type AnalysisStatus, analysisJobs, games } from "#/db/schema";
 
 type UiStatus = "pending" | "in-progress" | "complete" | "failed";
 
@@ -22,6 +22,10 @@ export type GameAnalysisStatus = {
 	status: UiStatus;
 	movesAnalyzed: number;
 	totalMoves: number | null;
+	/** True once the player-side accuracy column is populated. */
+	accuracyReady: boolean;
+	/** True once the player-side Maia rating column is populated. */
+	gameScoreReady: boolean;
 };
 
 export const getRecentGameAnalysisStatuses = createServerFn({ method: "GET" })
@@ -35,8 +39,14 @@ export const getRecentGameAnalysisStatuses = createServerFn({ method: "GET" })
 					status: analysisJobs.status,
 					movesAnalyzed: analysisJobs.movesAnalyzed,
 					totalMoves: analysisJobs.totalMoves,
+					playerColor: games.playerColor,
+					accuracyWhite: analysisJobs.accuracyWhite,
+					accuracyBlack: analysisJobs.accuracyBlack,
+					maiaPredictedWhite: analysisJobs.maiaPredictedWhite,
+					maiaPredictedBlack: analysisJobs.maiaPredictedBlack,
 				})
 				.from(analysisJobs)
+				.innerJoin(games, eq(games.id, analysisJobs.gameId))
 				.where(inArray(analysisJobs.gameId, data.gameIds))
 				.orderBy(analysisJobs.gameId, desc(analysisJobs.enqueuedAt));
 
@@ -46,6 +56,14 @@ export const getRecentGameAnalysisStatuses = createServerFn({ method: "GET" })
 				status: toUiStatus(j.status),
 				movesAnalyzed: j.movesAnalyzed,
 				totalMoves: j.totalMoves ?? null,
+				accuracyReady:
+					j.playerColor === "white"
+						? j.accuracyWhite != null
+						: j.accuracyBlack != null,
+				gameScoreReady:
+					j.playerColor === "white"
+						? j.maiaPredictedWhite != null
+						: j.maiaPredictedBlack != null,
 			}));
 
 			return { statuses };

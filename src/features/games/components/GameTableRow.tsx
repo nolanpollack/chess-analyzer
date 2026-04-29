@@ -8,20 +8,20 @@ export type AnalysisProgress = {
 	status: "pending" | "in-progress" | "complete" | "failed";
 	movesAnalyzed: number;
 	totalMoves: number;
+	/** True once the player-side accuracy column is populated. */
+	accuracyReady: boolean;
+	/** True once the player-side Maia rating column is populated. */
+	gameScoreReady: boolean;
 };
 
-type RecentGameRowProps = {
+type GameTableRowProps = {
 	game: GameSummary;
 	username: string;
 	/** Optional analysis progress; when omitted, renders as today (assumes complete). */
 	analysis?: AnalysisProgress;
 };
 
-export function RecentGameRow({
-	game,
-	username,
-	analysis,
-}: RecentGameRowProps) {
+export function GameTableRow({ game, username, analysis }: GameTableRowProps) {
 	const navigate = useNavigate();
 	return (
 		<tr
@@ -57,7 +57,7 @@ export function RecentGameRow({
 				<AccuracyCell game={game} analysis={analysis} />
 			</td>
 			<td className="px-3 py-3.5 text-right">
-				<GameScoreCell score={game.score} />
+				<GameScoreOrLoading game={game} analysis={analysis} />
 			</td>
 			<td className="py-3.5 pl-3 pr-5 text-right text-xs text-fg-3">
 				{game.when}
@@ -73,7 +73,7 @@ function AccuracyCell({
 	game: GameSummary;
 	analysis?: AnalysisProgress;
 }) {
-	if (!analysis || analysis.status === "complete") {
+	if (!analysis || (analysis.accuracyReady && analysis.status !== "failed")) {
 		return (
 			<span className="mono-nums font-mono text-ui">
 				{game.acc !== null ? `${game.acc.toFixed(1)}%` : "—"}
@@ -91,19 +91,62 @@ function AccuracyCell({
 			</span>
 		);
 	}
-	return <AnalysisProgressInline progress={analysis} />;
+	return <AccuracyProgress progress={analysis} />;
 }
 
-function AnalysisProgressInline({ progress }: { progress: AnalysisProgress }) {
+function GameScoreOrLoading({
+	game,
+	analysis,
+}: {
+	game: GameSummary;
+	analysis?: AnalysisProgress;
+}) {
+	if (!analysis || (analysis.gameScoreReady && analysis.status !== "failed")) {
+		return <GameScoreCell score={game.score} />;
+	}
+	if (analysis.status === "failed") {
+		return (
+			<span
+				className="inline-flex items-center justify-end gap-1 text-ui text-blunder"
+				title="Analysis failed"
+			>
+				<AlertTriangle className="size-3" aria-hidden="true" />
+				<span className="mono-nums font-mono">—</span>
+			</span>
+		);
+	}
+	// Game score is one batched call per game — there's no fine-grained
+	// progress to show, so we render an indeterminate shimmer or a quiet em-dash
+	// depending on whether analysis has started for this game at all.
+	const queued = analysis.status === "pending";
+	return (
+		<div className="inline-flex items-center justify-end">
+			{queued ? (
+				<span className="mono-nums font-mono text-xs text-fg-4">—</span>
+			) : (
+				<IndeterminateBar />
+			)}
+		</div>
+	);
+}
+
+function AccuracyProgress({ progress }: { progress: AnalysisProgress }) {
 	const { status, movesAnalyzed, totalMoves } = progress;
-	const isPending = status === "pending" || movesAnalyzed === 0;
+	const queued =
+		status === "pending" || (movesAnalyzed === 0 && totalMoves === 0);
+
+	if (queued) {
+		return (
+			<div className="inline-flex items-center justify-end">
+				<span className="mono-nums font-mono text-xs text-fg-4">—</span>
+			</div>
+		);
+	}
+
 	const pct =
-		!isPending && totalMoves > 0
+		totalMoves > 0
 			? Math.min(100, Math.round((movesAnalyzed / totalMoves) * 100))
 			: 0;
-
-	const countLabel =
-		totalMoves > 0 ? `${movesAnalyzed} / ${totalMoves}` : "Pending";
 
 	return (
 		<div
@@ -111,25 +154,32 @@ function AnalysisProgressInline({ progress }: { progress: AnalysisProgress }) {
 			aria-busy="true"
 			className="inline-flex items-center justify-end gap-2"
 		>
-			<span className="mono-nums font-mono text-xs text-fg-3">
-				{countLabel}
-			</span>
 			<span
 				role="progressbar"
 				aria-valuemin={0}
 				aria-valuemax={100}
-				aria-valuenow={isPending ? undefined : pct}
-				className="relative block h-1 w-12 overflow-hidden rounded-full bg-surface-3"
+				aria-valuenow={pct}
+				className="relative block h-1 w-14 overflow-hidden rounded-full bg-surface-3"
 			>
-				{isPending ? (
-					<span className="absolute inset-y-0 left-0 w-1/3 animate-pulse rounded-full bg-fg-4/50" />
-				) : (
-					<span
-						className="absolute inset-y-0 left-0 rounded-full bg-fg-3 transition-all"
-						style={{ width: `${pct}%` }}
-					/>
-				)}
+				<span
+					className="absolute inset-y-0 left-0 rounded-full bg-accent-brand transition-all"
+					style={{ width: `${pct}%` }}
+				/>
 			</span>
 		</div>
+	);
+}
+
+function IndeterminateBar() {
+	return (
+		<span
+			role="progressbar"
+			aria-busy="true"
+			aria-valuemin={0}
+			aria-valuemax={100}
+			className="relative block h-1 w-14 overflow-hidden rounded-full bg-surface-3"
+		>
+			<span className="absolute inset-y-0 left-0 w-1/3 animate-pulse rounded-full bg-accent-brand/70" />
+		</span>
 	);
 }

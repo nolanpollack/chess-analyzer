@@ -1,33 +1,31 @@
-/**
- * Profile queries — Phase 1 stub.
- *
- * The previous implementation depended on `gamePerformance` and
- * `playerProfile` tables which were dropped in the dimensional-ratings
- * refactor (see docs/dimensional-ratings-plan.md). This file exposes the
- * server fns that consumer hooks still import (`getPlayerSummary`,
- * `getRatingTrend`) but with empty / minimal returns until the scoring
- * engine lands in Phase 3.
- */
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
 import { analysisJobs, games, players } from "#/db/schema";
+import {
+	aggregateRating,
+	aggregateRatingTrend,
+	type PerGameRating,
+} from "#/lib/rating-aggregator/recency";
 
-const ELO_ESTIMATE_WINDOW_GAMES = 20;
+const PER_GAME_FETCH_LIMIT = 500;
 
 /**
- * Mean Maia-predicted Elo for the player's side over the most recent N
- * analyzed games. Used by EloEstimateCard and the profile factor cards.
+ * Per-game player-side rating rows, ordered descending by playedAt.
+ * Selects the maia prediction matching the player's color in each game.
  */
-async function getPlayerMaiaOverall(
-	playerId: string,
-): Promise<{ ratingEstimate: number | null; sampleSize: number }> {
+async function fetchPerGameRatings(playerId: string): Promise<PerGameRating[]> {
 	const rows = await db
 		.select({
 			playerColor: games.playerColor,
-			maiaPredictedWhite: analysisJobs.maiaPredictedWhite,
-			maiaPredictedBlack: analysisJobs.maiaPredictedBlack,
+			playedAt: games.playedAt,
+			predictedWhite: analysisJobs.maiaPredictedWhite,
+			predictedBlack: analysisJobs.maiaPredictedBlack,
+			ciLowWhite: analysisJobs.maiaCiLowWhite,
+			ciHighWhite: analysisJobs.maiaCiHighWhite,
+			ciLowBlack: analysisJobs.maiaCiLowBlack,
+			ciHighBlack: analysisJobs.maiaCiHighBlack,
 		})
 		.from(games)
 		.innerJoin(analysisJobs, eq(games.id, analysisJobs.gameId))
@@ -38,18 +36,38 @@ async function getPlayerMaiaOverall(
 			),
 		)
 		.orderBy(desc(games.playedAt))
-		.limit(ELO_ESTIMATE_WINDOW_GAMES);
+		.limit(PER_GAME_FETCH_LIMIT);
 
-	const ratings = rows
-		.map((r) =>
-			r.playerColor === "white" ? r.maiaPredictedWhite : r.maiaPredictedBlack,
-		)
-		.filter((v): v is number => v != null);
+	const out: PerGameRating[] = [];
+	for (const r of rows) {
+		const isWhite = r.playerColor === "white";
+		const rating = isWhite ? r.predictedWhite : r.predictedBlack;
+		const ciLow = isWhite ? r.ciLowWhite : r.ciLowBlack;
+		const ciHigh = isWhite ? r.ciHighWhite : r.ciHighBlack;
+		if (rating == null) continue;
+		out.push({
+			rating,
+			ciLow: ciLow ?? rating,
+			ciHigh: ciHigh ?? rating,
+			playedAt: r.playedAt,
+		});
+	}
+	return out;
+}
 
-	if (ratings.length === 0) return { ratingEstimate: null, sampleSize: 0 };
+const DELTA_LOOKBACK_DAYS = 30;
 
-	const mean = ratings.reduce((a, b) => a + b, 0) / ratings.length;
-	return { ratingEstimate: Math.round(mean), sampleSize: ratings.length };
+function computeEloDelta30d(
+	games: PerGameRating[],
+	now: Date,
+	current: number,
+): number | null {
+	const past = new Date(now.getTime() - DELTA_LOOKBACK_DAYS * 86_400_000);
+	const eligible = games.filter((g) => g.playedAt.getTime() <= past.getTime());
+	if (eligible.length === 0) return null;
+	const prior = aggregateRating(eligible, { now: past });
+	if (prior === null) return null;
+	return Math.round(current - prior.rating);
 }
 
 export const getPlayerSummary = createServerFn({ method: "GET" })
@@ -67,7 +85,7 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 				return { error: "Player not found" };
 			}
 
-			const [gameRows, completedJobs] = await Promise.all([
+			const [gameRows, completedJobs, perGameRatings] = await Promise.all([
 				db
 					.select({ playerRating: games.playerRating })
 					.from(games)
@@ -78,22 +96,27 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 					.from(analysisJobs)
 					.innerJoin(games, eq(games.id, analysisJobs.gameId))
 					.where(eq(games.playerId, player.id)),
+				fetchPerGameRatings(player.id),
 			]);
 
-			const currentRating = gameRows[0]?.playerRating ?? null;
-
-			const overall = await getPlayerMaiaOverall(player.id);
-			const eloEstimate = overall.ratingEstimate;
+			const now = new Date();
+			const aggregate = aggregateRating(perGameRatings, { now });
+			const eloEstimate = aggregate ? Math.round(aggregate.rating) : null;
+			const eloDelta30d =
+				aggregate !== null
+					? computeEloDelta30d(perGameRatings, now, aggregate.rating)
+					: null;
 
 			return {
 				summary: {
 					playerId: player.id,
-					currentRating,
+					currentRating: gameRows[0]?.playerRating ?? null,
 					gameCount: gameRows.length,
 					analyzedGameCount: completedJobs.length,
+					/** Number of games actually feeding the Elo estimate. */
+					eloSampleSize: aggregate?.totalGames ?? 0,
 					eloEstimate,
-					// TODO — needs historical rating snapshots
-					eloDelta30d: null as number | null,
+					eloDelta30d,
 				},
 			};
 		} catch (err) {
@@ -102,99 +125,72 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 		}
 	});
 
+// ── Rating-over-time trend ───────────────────────────────────────────────
+
 const trendRangeSchema = z.enum(["1m", "3m", "6m", "1y", "all"]);
 export type TrendRange = z.infer<typeof trendRangeSchema>;
 
-export type RatingTrendWeek = {
-	weekStart: string;
+const RANGE_DAYS: Record<TrendRange, number | null> = {
+	"1m": 30,
+	"3m": 90,
+	"6m": 180,
+	"1y": 365,
+	all: null,
+};
+
+const MAX_TREND_POINTS = 60;
+
+/**
+ * Snapshot dates: every game date inside the window, decimated to at most
+ * MAX_TREND_POINTS. We snapshot at game dates (not regular calendar ticks)
+ * so the curve only moves where data actually changes.
+ */
+function pickSnapshotDates(games: PerGameRating[], windowStart: Date): Date[] {
+	const eligible = games
+		.filter((g) => g.playedAt.getTime() >= windowStart.getTime())
+		.map((g) => g.playedAt)
+		.sort((a, b) => a.getTime() - b.getTime());
+	if (eligible.length <= MAX_TREND_POINTS) return eligible;
+	const stride = (eligible.length - 1) / (MAX_TREND_POINTS - 1);
+	const out: Date[] = [];
+	for (let i = 0; i < MAX_TREND_POINTS; i++) {
+		out.push(eligible[Math.round(i * stride)]);
+	}
+	return out;
+}
+
+export type RatingTrendPoint = {
+	date: string;
 	rating: number;
-	gameCount: number;
 };
 
 export const getRatingTrend = createServerFn({ method: "GET" })
 	.inputValidator(
 		z.object({
-			username: z.string().min(1),
+			playerId: z.string().uuid(),
 			range: trendRangeSchema.default("6m"),
 		}),
 	)
-	.handler(async ({ data: _data }) => {
-		// TODO Phase 3 — compute weekly rating trend from scoring engine output
-		return { weeks: [] as RatingTrendWeek[] };
-	});
-
-// ── Maia rating trend ────────────────────────────────────────────────────
-
-export type MaiaRatingTrendPoint = {
-	playedAt: string;
-	predicted: number;
-	ciLow: number;
-	ciHigh: number;
-};
-
-export type MaiaRatingSide = "white" | "black";
-
-const maiaRatingTrendSchema = z.object({
-	playerId: z.string().uuid(),
-	side: z.enum(["white", "black"]),
-	limit: z.number().int().min(1).max(200).default(50),
-});
-
-/**
- * Returns per-game Maia predicted rating for a player on a given side,
- * ordered ascending by played_at so charts render left-to-right.
- * Only games with a completed Maia estimate for the requested side are included.
- */
-export const getMaiaRatingTrend = createServerFn({ method: "GET" })
-	.inputValidator(maiaRatingTrendSchema)
 	.handler(async ({ data }) => {
 		try {
-			const predicted =
-				data.side === "white"
-					? analysisJobs.maiaPredictedWhite
-					: analysisJobs.maiaPredictedBlack;
-			const ciLow =
-				data.side === "white"
-					? analysisJobs.maiaCiLowWhite
-					: analysisJobs.maiaCiLowBlack;
-			const ciHigh =
-				data.side === "white"
-					? analysisJobs.maiaCiHighWhite
-					: analysisJobs.maiaCiHighBlack;
+			const perGameRatings = await fetchPerGameRatings(data.playerId);
+			const days = RANGE_DAYS[data.range];
+			const now = new Date();
+			const windowStart =
+				days === null
+					? new Date(0)
+					: new Date(now.getTime() - days * 86_400_000);
 
-			// Get the most recent N games for this player/side, then sort ascending.
-			const rows = await db
-				.select({
-					playedAt: games.playedAt,
-					predicted,
-					ciLow,
-					ciHigh,
-				})
-				.from(games)
-				.innerJoin(analysisJobs, eq(games.id, analysisJobs.gameId))
-				.where(
-					and(
-						eq(games.playerId, data.playerId),
-						eq(games.playerColor, data.side),
-						isNotNull(predicted),
-					),
-				)
-				.orderBy(desc(games.playedAt))
-				.limit(data.limit);
+			const snapshots = pickSnapshotDates(perGameRatings, windowStart);
+			const trend = aggregateRatingTrend(perGameRatings, snapshots, { now });
 
-			// Reverse so the chart renders oldest-to-newest
-			const sorted = rows.slice().reverse();
-
-			return {
-				points: sorted.map((r) => ({
-					playedAt: r.playedAt.toISOString(),
-					predicted: r.predicted as number,
-					ciLow: (r.ciLow ?? r.predicted) as number,
-					ciHigh: (r.ciHigh ?? r.predicted) as number,
-				})) as MaiaRatingTrendPoint[],
-			};
+			const points: RatingTrendPoint[] = trend.map((p) => ({
+				date: p.date.toISOString(),
+				rating: Math.round(p.aggregate.rating),
+			}));
+			return { points };
 		} catch (err) {
-			console.error("[getMaiaRatingTrend] Error:", err);
-			return { error: "Failed to load Maia rating trend" };
+			console.error("[getRatingTrend] Error:", err);
+			return { error: "Failed to load rating trend" };
 		}
 	});

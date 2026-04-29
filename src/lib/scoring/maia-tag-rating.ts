@@ -42,7 +42,11 @@ type TaggedPosition = {
 	fen: string;
 	uci: string;
 	dimensionValue: string;
+	playedAt: Date;
 };
+
+/** Same default tau as the per-game recency aggregator. Keep in sync. */
+const TAU_DAYS = 60;
 
 // ── Window helper ──────────────────────────────────────────────────────
 
@@ -84,9 +88,11 @@ async function fetchTaggedPositions(
 			fen: moves.fenBefore,
 			uci: moves.uci,
 			dimensionValue: moveTags.dimensionValue,
+			playedAt: games.playedAt,
 		})
 		.from(moveTags)
 		.innerJoin(moves, eq(moves.id, moveTags.moveId))
+		.innerJoin(games, eq(games.id, moveTags.gameId))
 		.where(and(...conditions));
 
 	return rows;
@@ -94,30 +100,33 @@ async function fetchTaggedPositions(
 
 // ── Aggregator layer ───────────────────────────────────────────────────
 
+type GroupPosition = { fen: string; uci: string; playedAt: Date };
+
 function groupByDimensionValue(
 	tagged: TaggedPosition[],
-): Map<string, { fen: string; uci: string }[]> {
-	const groups = new Map<string, { fen: string; uci: string }[]>();
-	for (const { fen, uci, dimensionValue } of tagged) {
+): Map<string, GroupPosition[]> {
+	const groups = new Map<string, GroupPosition[]>();
+	for (const { fen, uci, dimensionValue, playedAt } of tagged) {
 		const list = groups.get(dimensionValue) ?? [];
-		list.push({ fen, uci });
+		list.push({ fen, uci, playedAt });
 		groups.set(dimensionValue, list);
 	}
 	return groups;
 }
 
 function rateGroup(
-	positions: { fen: string; uci: string }[],
+	positions: GroupPosition[],
 	maiaMap: Map<string, MaiaOutput>,
+	now: Date,
 ): MaiaTagRating | null {
 	const ratingPositions: Position[] = [];
-	for (const { fen, uci } of positions) {
+	for (const { fen, uci, playedAt } of positions) {
 		const maia = maiaMap.get(fen);
 		if (!maia) {
 			console.warn(`[maia-tag-rating] cache miss for fen=${fen.slice(0, 20)}`);
 			continue;
 		}
-		ratingPositions.push({ fen, playedMove: uci, maia });
+		ratingPositions.push({ fen, playedMove: uci, maia, playedAt });
 	}
 	if (ratingPositions.length === 0) return null;
 
@@ -131,6 +140,8 @@ function rateGroup(
 	const estimate = estimateRating(ratingPositions, {
 		epsilon: PRODUCTION_MAIA_EPSILON,
 		prior,
+		now,
+		tauDays: TAU_DAYS,
 	});
 
 	// dimensionValue filled by caller
@@ -179,9 +190,10 @@ export async function computeMaiaTagRatings(
 		PRODUCTION_MAIA_VERSIONS.maiaVersion,
 	);
 
+	const now = new Date();
 	const results: MaiaTagRating[] = [];
 	for (const [dimValue, positions] of groups) {
-		const rating = rateGroup(positions, maiaMap);
+		const rating = rateGroup(positions, maiaMap, now);
 		if (rating !== null) {
 			results.push({ ...rating, dimensionValue: dimValue });
 		}
