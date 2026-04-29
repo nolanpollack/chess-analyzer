@@ -16,6 +16,12 @@ export type EvalConfig = {
 	smokeN: number | null;
 	versions: AnalysisVersions;
 	waitTimeoutMs: number;
+	/**
+	 * When true, skip Stockfish ensure + polling entirely. Maia only.
+	 * Useful for smoke runs and eval harness benchmarks where SF output
+	 * is not consumed by the rating aggregator. Default false.
+	 */
+	skipStockfish: boolean;
 };
 
 export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
@@ -26,9 +32,10 @@ export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
 	hardCap: 50_000,
 	smokeN: null,
 	versions: {
-		maiaVersion: "maia-1500",
+		maiaVersion: "maia2-rapid-v1.0",
 		stockfishVersion: "sf18",
 		stockfishDepth: 18,
 	},
 	waitTimeoutMs: 600_000,
+	skipStockfish: false,
 };

@@ -26,6 +26,7 @@ type EvaluateGameOptions = {
 	epsilon: number;
 	prior: PriorName;
 	waitTimeoutMs: number;
+	skipStockfish?: boolean;
 };
 
 async function buildPositionsForSide(
@@ -59,6 +60,7 @@ export async function evaluateGame(
 	await ensureAnalyzed(allFens, opts.versions, cache, {
 		wait: true,
 		waitTimeoutMs: opts.waitTimeoutMs,
+		skipStockfish: opts.skipStockfish,
 	});
 
 	const maiaMap = await cache.getMaiaBatch(allFens, opts.versions.maiaVersion);

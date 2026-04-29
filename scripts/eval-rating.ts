@@ -89,6 +89,7 @@ function parseArgs(): {
 			? parseInt(get("--hard-cap")!, 10)
 			: DEFAULT_CONFIG.hardCap,
 		smokeN,
+		skipStockfish: has("--skip-stockfish"),
 	};
 
 	return { config, epsilonSweep, priorSweep };

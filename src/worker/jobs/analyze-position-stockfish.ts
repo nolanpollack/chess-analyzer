@@ -6,6 +6,9 @@
  *
  * Idempotent: checks for an existing cache row before running the engine.
  * Retries: pg-boss handles retries by re-throwing on error.
+ *
+ * Engine pool: engines are initialised once and reused across jobs.
+ * Pool size defaults to STOCKFISH_POOL_SIZE env var or 4.
  */
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Job, PgBoss } from "pg-boss";
@@ -14,10 +17,11 @@ import {
 	ANALYZE_POSITION_STOCKFISH,
 	type AnalyzePositionStockfishPayload,
 } from "#/lib/analysis-dispatcher/job-names";
+import type { StockfishPool } from "#/lib/engine-pool/stockfish-pool";
+import { createStockfishPool } from "#/lib/engine-pool/stockfish-pool";
 import { createPositionCache } from "#/lib/position-cache";
 import type { StockfishOutput } from "#/lib/position-cache/types";
-import type { PositionEval } from "#/providers/analysis-engine";
-import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
+import type { AnalysisEngine, PositionEval } from "#/providers/analysis-engine";
 
 export { ANALYZE_POSITION_STOCKFISH };
 
@@ -27,20 +31,54 @@ export const STOCKFISH_VERSION = "stockfish-wasm-18.0.5";
 /** Number of principal variations to fetch per position */
 const MULTIPV = 5;
 
+const POOL_SIZE = process.env.STOCKFISH_POOL_SIZE
+	? parseInt(process.env.STOCKFISH_POOL_SIZE, 10)
+	: 4;
+
+let pool: StockfishPool | null = null;
+let shutdownRegistered = false;
+
+function getPool(): StockfishPool {
+	if (!pool) {
+		pool = createStockfishPool({ size: POOL_SIZE, multipv: MULTIPV });
+		registerShutdownHook();
+	}
+	return pool;
+}
+
+function registerShutdownHook(): void {
+	if (shutdownRegistered) return;
+	shutdownRegistered = true;
+
+	async function shutdown(signal: string) {
+		console.log(
+			`[analyze-position-stockfish] ${signal} received — destroying engine pool`,
+		);
+		if (pool) {
+			await pool.destroyAll();
+		}
+	}
+
+	process.once("SIGTERM", () => shutdown("SIGTERM").catch(console.error));
+	process.once("SIGINT", () => shutdown("SIGINT").catch(console.error));
+}
+
 export function registerAnalyzePositionStockfishJob(boss: PgBoss) {
 	boss.work<AnalyzePositionStockfishPayload>(
 		ANALYZE_POSITION_STOCKFISH,
 		{ pollingIntervalSeconds: 5, batchSize: 4 },
 		async (jobs: Job<AnalyzePositionStockfishPayload>[]) => {
-			for (const job of jobs) {
-				await handleAnalyzePositionStockfish(job.data);
-			}
+			const activePool = getPool();
+			await Promise.all(
+				jobs.map((job) => handleAnalyzePositionStockfish(job.data, activePool)),
+			);
 		},
 	);
 }
 
-async function handleAnalyzePositionStockfish(
+export async function handleAnalyzePositionStockfish(
 	data: AnalyzePositionStockfishPayload,
+	activePool: StockfishPool,
 ): Promise<void> {
 	const { fen, stockfishVersion, stockfishDepth } = data;
 	console.log(
@@ -62,11 +100,10 @@ async function handleAnalyzePositionStockfish(
 		return;
 	}
 
-	const engine = createStockfishWasmEngine({ multipv: MULTIPV });
-
 	try {
-		await engine.init();
-		const result = await engine.analyzePosition(fen, stockfishDepth);
+		const result = await activePool.run((engine: AnalysisEngine) =>
+			engine.analyzePosition(fen, stockfishDepth),
+		);
 		const output = buildStockfishOutput(result);
 
 		await cache.putStockfish(fen, stockfishVersion, stockfishDepth, output);
@@ -77,8 +114,6 @@ async function handleAnalyzePositionStockfish(
 	} catch (err) {
 		console.error(`[analyze-position-stockfish] Failed for fen="${fen}":`, err);
 		throw err;
-	} finally {
-		await engine.destroy();
 	}
 }
 

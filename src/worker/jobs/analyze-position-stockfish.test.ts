@@ -15,18 +15,20 @@ vi.mock("#/lib/position-cache", () => ({
 	})),
 }));
 
-// Mock the Stockfish engine
-const mockInit = vi.fn().mockResolvedValue(undefined);
-const mockAnalyzePosition = vi.fn();
-const mockDestroy = vi.fn().mockResolvedValue(undefined);
-
-vi.mock("#/providers/stockfish-wasm-engine", () => ({
-	createStockfishWasmEngine: vi.fn(() => ({
-		init: mockInit,
-		analyzePosition: mockAnalyzePosition,
-		destroy: mockDestroy,
+// Mock the engine pool — the pool's run() calls through to the engine fn
+vi.mock("#/lib/engine-pool/stockfish-pool", () => ({
+	createStockfishPool: vi.fn(() => ({
+		run: vi.fn((fn: (e: unknown) => Promise<unknown>) => fn(mockEngine)),
+		destroyAll: vi.fn().mockResolvedValue(undefined),
+		size: vi.fn().mockReturnValue(4),
 	})),
 }));
+
+const mockEngine = {
+	init: vi.fn().mockResolvedValue(undefined),
+	analyzePosition: vi.fn(),
+	destroy: vi.fn().mockResolvedValue(undefined),
+};
 
 const { registerAnalyzePositionStockfishJob, STOCKFISH_VERSION } = await import(
 	"./analyze-position-stockfish"
@@ -53,7 +55,7 @@ function makeBoss() {
 describe("analyze-position-stockfish job", () => {
 	it("is idempotent: skips engine and put when cache hit", async () => {
 		mockHasStockfish.mockResolvedValue(true);
-		mockAnalyzePosition.mockReset();
+		mockEngine.analyzePosition.mockReset();
 		mockPutStockfish.mockReset();
 
 		const boss = makeBoss();
@@ -66,11 +68,11 @@ describe("analyze-position-stockfish job", () => {
 		const handler = getBossHandler(boss);
 		await handler([makeJob()]);
 
-		expect(mockAnalyzePosition).not.toHaveBeenCalled();
+		expect(mockEngine.analyzePosition).not.toHaveBeenCalled();
 		expect(mockPutStockfish).not.toHaveBeenCalled();
 	});
 
-	it("happy path: runs engine and stores result with correct shape", async () => {
+	it("happy path: runs engine via pool and stores result with correct shape", async () => {
 		mockHasStockfish.mockResolvedValue(false);
 		mockPutStockfish.mockResolvedValue(undefined);
 
@@ -87,7 +89,7 @@ describe("analyze-position-stockfish job", () => {
 				{ eval_cp: 10, move_uci: "g1f3", move_san: "Nf3" },
 			],
 		};
-		mockAnalyzePosition.mockResolvedValue(fakeResult);
+		mockEngine.analyzePosition.mockResolvedValue(fakeResult);
 
 		const boss = makeBoss();
 		registerAnalyzePositionStockfishJob(

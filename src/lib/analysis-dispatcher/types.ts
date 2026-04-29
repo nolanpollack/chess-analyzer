@@ -15,4 +15,9 @@ export type EnsureAnalyzedOptions = {
 	waitTimeoutMs?: number;
 	/** Polling interval in ms when wait=true. Default 1000. */
 	pollIntervalMs?: number;
+	/**
+	 * When true, skip Stockfish ensure + polling. Maia only. Default false.
+	 * Use in eval harness smoke runs where SF output is not consumed.
+	 */
+	skipStockfish?: boolean;
 };

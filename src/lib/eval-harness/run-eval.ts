@@ -75,6 +75,7 @@ async function evaluateAllGames(
 				epsilon,
 				prior,
 				waitTimeoutMs: config.waitTimeoutMs,
+				skipStockfish: config.skipStockfish,
 			});
 			rows.push(...gameRows);
 		} catch (err) {

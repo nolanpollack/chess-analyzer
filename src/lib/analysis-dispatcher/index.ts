@@ -117,10 +117,43 @@ async function enqueueStockfishJobs(
 function countUnfinished(
 	fens: string[],
 	maiaPresent: Map<string, unknown>,
-	sfPresent: Map<string, unknown>,
+	sfPresent: Map<string, unknown> | null,
 ): number {
-	return fens.filter((fen) => !maiaPresent.has(fen) || !sfPresent.has(fen))
-		.length;
+	return fens.filter(
+		(fen) =>
+			!maiaPresent.has(fen) || (sfPresent !== null && !sfPresent.has(fen)),
+	).length;
+}
+
+async function fetchPresentMaps(
+	fens: string[],
+	versions: AnalysisVersions,
+	cache: PositionCache,
+	skipStockfish: boolean,
+): Promise<[Map<string, unknown>, Map<string, unknown> | null]> {
+	if (skipStockfish) {
+		const maiaPresent = await cache.getMaiaBatch(fens, versions.maiaVersion);
+		return [maiaPresent, null];
+	}
+	const [maiaPresent, sfPresent] = await Promise.all([
+		cache.getMaiaBatch(fens, versions.maiaVersion),
+		cache.getStockfishBatch(
+			fens,
+			versions.stockfishVersion,
+			versions.stockfishDepth,
+		),
+	]);
+	return [maiaPresent, sfPresent];
+}
+
+function allComplete(
+	fens: string[],
+	maiaPresent: Map<string, unknown>,
+	sfPresent: Map<string, unknown> | null,
+): boolean {
+	return fens.every(
+		(fen) => maiaPresent.has(fen) && (sfPresent === null || sfPresent.has(fen)),
+	);
 }
 
 async function pollUntilComplete(
@@ -129,20 +162,19 @@ async function pollUntilComplete(
 	cache: PositionCache,
 	waitTimeoutMs: number,
 	pollIntervalMs: number,
+	skipStockfish: boolean,
 ): Promise<void> {
 	const deadline = Date.now() + waitTimeoutMs;
 
 	while (Date.now() < deadline) {
-		const [maiaPresent, sfPresent] = await Promise.all([
-			cache.getMaiaBatch(fens, versions.maiaVersion),
-			cache.getStockfishBatch(
-				fens,
-				versions.stockfishVersion,
-				versions.stockfishDepth,
-			),
-		]);
+		const [maiaPresent, sfPresent] = await fetchPresentMaps(
+			fens,
+			versions,
+			cache,
+			skipStockfish,
+		);
 
-		if (fens.every((fen) => maiaPresent.has(fen) && sfPresent.has(fen))) {
+		if (allComplete(fens, maiaPresent, sfPresent)) {
 			return;
 		}
 
@@ -155,14 +187,12 @@ async function pollUntilComplete(
 	}
 
 	// Final check after timeout to get accurate unfinished count
-	const [maiaPresent, sfPresent] = await Promise.all([
-		cache.getMaiaBatch(fens, versions.maiaVersion),
-		cache.getStockfishBatch(
-			fens,
-			versions.stockfishVersion,
-			versions.stockfishDepth,
-		),
-	]);
+	const [maiaPresent, sfPresent] = await fetchPresentMaps(
+		fens,
+		versions,
+		cache,
+		skipStockfish,
+	);
 	const unfinished = countUnfinished(fens, maiaPresent, sfPresent);
 	throw new AnalysisDispatcherTimeoutError(unfinished);
 }
@@ -176,14 +206,16 @@ export async function ensureAnalyzed(
 	const unique = deduplicateFens(fens);
 	if (unique.length === 0) return;
 
-	const [missingMaia, missingStockfish] = await Promise.all([
-		findMissingMaia(unique, versions, cache),
-		findMissingStockfish(unique, versions, cache),
-	]);
+	const skipSf = opts?.skipStockfish ?? false;
+
+	const missingMaia = await findMissingMaia(unique, versions, cache);
+	const missingStockfish = skipSf
+		? []
+		: await findMissingStockfish(unique, versions, cache);
 
 	await Promise.all([
 		enqueueMaiaJobs(missingMaia, versions),
-		enqueueStockfishJobs(missingStockfish, versions),
+		...(skipSf ? [] : [enqueueStockfishJobs(missingStockfish, versions)]),
 	]);
 
 	if (opts?.wait) {
@@ -193,6 +225,7 @@ export async function ensureAnalyzed(
 			cache,
 			opts.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
 			opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
+			skipSf,
 		);
 	}
 }

@@ -169,6 +169,55 @@ describe("ensureAnalyzed", () => {
 		vi.useRealTimers();
 	});
 
+	it("skipStockfish=true: only Maia jobs enqueued; polling completes when Maia satisfied", async () => {
+		vi.useFakeTimers();
+
+		// Both Maia and SF are missing initially; Maia becomes present after 1 poll
+		let maiaCallCount = 0;
+		const getMaiaBatch = vi.fn().mockImplementation(() => {
+			maiaCallCount++;
+			if (maiaCallCount <= 1) return Promise.resolve(new Map()); // initial check: missing
+			return Promise.resolve(new Map([[FEN1, {}]])); // poll: present
+		});
+		const getStockfishBatch = vi.fn().mockResolvedValue(new Map()); // never present
+
+		const cache: PositionCache = {
+			hasMaia: vi.fn(),
+			hasStockfish: vi.fn(),
+			getMaiaBatch,
+			getStockfishBatch,
+			getPositionDataBatch: vi.fn(),
+			putMaia: vi.fn(),
+			putStockfish: vi.fn(),
+		};
+
+		const promise = ensureAnalyzed([FEN1], VERSIONS, cache, {
+			wait: true,
+			pollIntervalMs: 500,
+			waitTimeoutMs: 5000,
+			skipStockfish: true,
+		});
+
+		// Advance past the polling interval
+		await vi.advanceTimersByTimeAsync(600);
+		await promise;
+
+		// Only Maia jobs enqueued — no SF jobs
+		const maiaJobs = mockSend.mock.calls.filter(
+			(c) => c[0] === "analyze-position-maia",
+		);
+		const sfJobs = mockSend.mock.calls.filter(
+			(c) => c[0] === "analyze-position-stockfish",
+		);
+		expect(maiaJobs).toHaveLength(1);
+		expect(sfJobs).toHaveLength(0);
+
+		// SF cache was never consulted
+		expect(getStockfishBatch).not.toHaveBeenCalled();
+
+		vi.useRealTimers();
+	});
+
 	it("wait=true throws AnalysisDispatcherTimeoutError when timeout expires", async () => {
 		vi.useFakeTimers();
 
