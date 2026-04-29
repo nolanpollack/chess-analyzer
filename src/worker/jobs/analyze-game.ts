@@ -88,6 +88,15 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 	try {
 		await engine.init();
 		const pgnMoves = walkPgn(game.pgn);
+
+		// Position list (fen + uci) comes purely from the PGN walk — no engine
+		// dependency — so the Maia path can start immediately while Stockfish
+		// is still grinding through per-move evaluation.
+		const { whitePositions, blackPositions } = collectSidePositions(
+			pgnMoves,
+			game.playerColor,
+		);
+
 		await db
 			.update(analysisJobs)
 			.set({
@@ -97,64 +106,67 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			})
 			.where(eq(analysisJobs.id, jobId));
 
-		const positionEvals = await evaluateAllPositions(
-			engine,
-			pgnMoves,
-			db,
-			jobId,
-		);
-
-		const {
-			moveRows,
-			accuracyWhite,
-			accuracyBlack,
-			whitePositions,
-			blackPositions,
-		} = buildMoveRows({
-			pgnMoves,
-			positionEvals,
-			playerColor: game.playerColor,
-			playerId: game.playerId,
-			gameId,
-			analysisJobId: jobId,
-		});
-
-		// Replace any prior moves + tags for this job (re-run safety).
-		// move_tags FK to moves so the moves delete cascades via the explicit
-		// tag delete below.
-		await deleteJobTags(db, jobId);
-		await db.delete(moves).where(eq(moves.analysisJobId, jobId));
-
-		let insertedMoves: Move[] = [];
-		if (moveRows.length > 0) {
-			insertedMoves = await db.insert(moves).values(moveRows).returning();
-		}
-
-		await runAndInsertTags(db, insertedMoves, await loadGameRow(db, gameId));
-
-		await db
-			.update(analysisJobs)
-			.set({
-				accuracyWhite,
-				accuracyBlack,
-				movesAnalyzed: pgnMoves.length,
-				status: "complete",
-				completedAt: new Date(),
-			})
-			.where(eq(analysisJobs.id, jobId));
-
-		// Phase 7: Maia-2 rating estimation.
-		// This runs AFTER legacy accuracy/classifications are persisted so that a
-		// Maia failure does not lose the legacy analysis. The job will retry and
-		// computeAndPersistMaiaRating is idempotent.
 		const positionCache = createPositionCache(db);
-		await computeAndPersistMaiaRating({
+
+		// Maia and Stockfish are independent; run in parallel. They write to
+		// disjoint columns of the same analysis_jobs row (Maia → maia_*,
+		// Stockfish → accuracy_*/status="complete") so there is no conflict.
+		// Stockfish path is the slow one; Maia typically lands first and the
+		// game-list gameScore appears well before status flips to "complete".
+		const stockfishWork = (async () => {
+			const positionEvals = await evaluateAllPositions(
+				engine,
+				pgnMoves,
+				db,
+				jobId,
+			);
+
+			const { moveRows, accuracyWhite, accuracyBlack } = buildMoveRows({
+				pgnMoves,
+				positionEvals,
+				playerColor: game.playerColor,
+				playerId: game.playerId,
+				gameId,
+				analysisJobId: jobId,
+			});
+
+			// Replace any prior moves + tags for this job (re-run safety).
+			await deleteJobTags(db, jobId);
+			await db.delete(moves).where(eq(moves.analysisJobId, jobId));
+
+			let insertedMoves: Move[] = [];
+			if (moveRows.length > 0) {
+				insertedMoves = await db.insert(moves).values(moveRows).returning();
+			}
+
+			await runAndInsertTags(db, insertedMoves, await loadGameRow(db, gameId));
+
+			await db
+				.update(analysisJobs)
+				.set({
+					accuracyWhite,
+					accuracyBlack,
+					movesAnalyzed: pgnMoves.length,
+					status: "complete",
+					completedAt: new Date(),
+				})
+				.where(eq(analysisJobs.id, jobId));
+
+			return { accuracyWhite, accuracyBlack };
+		})();
+
+		const maiaWork = computeAndPersistMaiaRating({
 			db,
 			cache: positionCache,
 			analysisJobId: jobId,
 			whitePositions,
 			blackPositions,
 		});
+
+		const [{ accuracyWhite, accuracyBlack }] = await Promise.all([
+			stockfishWork,
+			maiaWork,
+		]);
 
 		console.log(
 			`[analyze-game] Completed game ${gameId}: ${pgnMoves.length} moves, white ${accuracyWhite}%, black ${accuracyBlack}%`,
@@ -166,6 +178,24 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 	} finally {
 		await engine.destroy();
 	}
+}
+
+/**
+ * Extract per-side (fen, uci) lists from the parsed PGN. Independent of any
+ * engine output — used by the Maia rating step that runs in parallel with
+ * Stockfish per-move analysis.
+ */
+function collectSidePositions(
+	pgnMoves: PgnMove[],
+	_playerColor: "white" | "black",
+): { whitePositions: SidePositions; blackPositions: SidePositions } {
+	const whitePositions: SidePositions = [];
+	const blackPositions: SidePositions = [];
+	for (const move of pgnMoves) {
+		const target = move.isWhite ? whitePositions : blackPositions;
+		target.push({ fen: move.fenBefore, playedMove: move.uci });
+	}
+	return { whitePositions, blackPositions };
 }
 
 /**
@@ -328,8 +358,6 @@ type BuildMoveRowsResult = {
 	moveRows: MoveRow[];
 	accuracyWhite: number;
 	accuracyBlack: number;
-	whitePositions: SidePositions;
-	blackPositions: SidePositions;
 };
 
 function buildMoveRows(args: {
@@ -343,8 +371,6 @@ function buildMoveRows(args: {
 	const isPlayerWhite = args.playerColor === "white";
 	const moveRows: MoveRow[] = [];
 	const allEvals: MoveEvalData[] = [];
-	const whitePositions: SidePositions = [];
-	const blackPositions: SidePositions = [];
 	let prevWinPctLost: number | null = null;
 
 	for (const move of args.pgnMoves) {
@@ -397,10 +423,6 @@ function buildMoveRows(args: {
 		};
 		const accuracyScore = computeMoveAccuracy(evalData);
 
-		// Collect FEN-before + UCI move for Maia rating estimation (Phase 7).
-		const sidePositions = move.isWhite ? whitePositions : blackPositions;
-		sidePositions.push({ fen: move.fenBefore, playedMove: move.uci });
-
 		moveRows.push({
 			analysisJobId: args.analysisJobId,
 			gameId: args.gameId,
@@ -430,8 +452,6 @@ function buildMoveRows(args: {
 		moveRows,
 		accuracyWhite: gameAccuracy?.white ?? 0,
 		accuracyBlack: gameAccuracy?.black ?? 0,
-		whitePositions,
-		blackPositions,
 	};
 }
 

@@ -4,7 +4,6 @@ import { z } from "zod";
 import { db } from "#/db/index";
 import { type AnalysisStatus, analysisJobs, games, players } from "#/db/schema";
 import { getResultDetails, lookupOpeningName } from "#/lib/chess-utils";
-import { accuracyToRating } from "#/lib/scoring/rating-mapping";
 
 type UiAnalysisStatus = "pending" | "complete" | "failed";
 
@@ -130,29 +129,14 @@ export const listGames = createServerFn({ method: "GET" })
 							status: analysisJobs.status,
 							accuracyWhite: analysisJobs.accuracyWhite,
 							accuracyBlack: analysisJobs.accuracyBlack,
+							maiaPredictedWhite: analysisJobs.maiaPredictedWhite,
+							maiaPredictedBlack: analysisJobs.maiaPredictedBlack,
 						})
 						.from(analysisJobs)
 						.where(inArray(analysisJobs.gameId, pageGameIds))
 						.orderBy(analysisJobs.gameId, desc(analysisJobs.enqueuedAt))
 				: [];
 		const jobByGameId = new Map(latestJobs.map((j) => [j.gameId, j]));
-
-		console.log(
-			`[listGames] username=${username} page=${page} pageSize=${pageSize} returnedRows=${gameRows.length} jobsFound=${latestJobs.length}`,
-		);
-		if (gameRows.length > 0) {
-			const sample = gameRows.slice(0, 3).map((g) => {
-				const job = jobByGameId.get(g.id);
-				return {
-					id: g.id.slice(0, 8),
-					color: g.playerColor,
-					status: job?.status ?? null,
-					jobAccW: job?.accuracyWhite ?? null,
-					jobAccB: job?.accuracyBlack ?? null,
-				};
-			});
-			console.log("[listGames] sample rows:", JSON.stringify(sample, null, 2));
-		}
 
 		const items = gameRows.map((g) => {
 			const job = jobByGameId.get(g.id);
@@ -162,6 +146,13 @@ export const listGames = createServerFn({ method: "GET" })
 						? job.accuracyWhite
 						: job.accuracyBlack
 					: null;
+			// gameScore is the Maia-predicted Elo for the player's side. Surfaces
+			// as soon as the Maia step writes it, independent of the legacy
+			// Stockfish accuracy/status columns.
+			const maiaPlayerRating =
+				g.playerColor === "white"
+					? (job?.maiaPredictedWhite ?? null)
+					: (job?.maiaPredictedBlack ?? null);
 			return {
 				id: g.id,
 				platformGameId: g.platformGameId,
@@ -181,8 +172,7 @@ export const listGames = createServerFn({ method: "GET" })
 				accuracyBlack: g.accuracyBlack,
 				analysisStatus: toUiStatus(job?.status ?? null),
 				overallAccuracy: playerAccuracy,
-				gameScore:
-					playerAccuracy != null ? accuracyToRating(playerAccuracy) : null,
+				gameScore: maiaPlayerRating != null ? Math.round(maiaPlayerRating) : null,
 			};
 		});
 

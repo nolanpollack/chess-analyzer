@@ -9,11 +9,48 @@
  * engine lands in Phase 3.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
 import { analysisJobs, games, players } from "#/db/schema";
-import { getPlayerOverall } from "#/lib/scoring/overall";
+
+const ELO_ESTIMATE_WINDOW_GAMES = 20;
+
+/**
+ * Mean Maia-predicted Elo for the player's side over the most recent N
+ * analyzed games. Used by EloEstimateCard and the profile factor cards.
+ */
+async function getPlayerMaiaOverall(
+	playerId: string,
+): Promise<{ ratingEstimate: number | null; sampleSize: number }> {
+	const rows = await db
+		.select({
+			playerColor: games.playerColor,
+			maiaPredictedWhite: analysisJobs.maiaPredictedWhite,
+			maiaPredictedBlack: analysisJobs.maiaPredictedBlack,
+		})
+		.from(games)
+		.innerJoin(analysisJobs, eq(games.id, analysisJobs.gameId))
+		.where(
+			and(
+				eq(games.playerId, playerId),
+				sql`${analysisJobs.maiaPredictedWhite} IS NOT NULL OR ${analysisJobs.maiaPredictedBlack} IS NOT NULL`,
+			),
+		)
+		.orderBy(desc(games.playedAt))
+		.limit(ELO_ESTIMATE_WINDOW_GAMES);
+
+	const ratings = rows
+		.map((r) =>
+			r.playerColor === "white" ? r.maiaPredictedWhite : r.maiaPredictedBlack,
+		)
+		.filter((v): v is number => v != null);
+
+	if (ratings.length === 0) return { ratingEstimate: null, sampleSize: 0 };
+
+	const mean = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+	return { ratingEstimate: Math.round(mean), sampleSize: ratings.length };
+}
 
 export const getPlayerSummary = createServerFn({ method: "GET" })
 	.inputValidator(z.object({ username: z.string().min(1) }))
@@ -45,9 +82,8 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 
 			const currentRating = gameRows[0]?.playerRating ?? null;
 
-			const overall = await getPlayerOverall(db, player.id);
-			const eloEstimate =
-				overall.sampleSize > 0 ? overall.ratingEstimate : null;
+			const overall = await getPlayerMaiaOverall(player.id);
+			const eloEstimate = overall.ratingEstimate;
 
 			return {
 				summary: {
