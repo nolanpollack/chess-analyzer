@@ -80,23 +80,9 @@ export async function handleAnalyzePositionStockfish(
 	activePool: StockfishPool,
 ): Promise<void> {
 	const { fen, stockfishVersion, stockfishDepth } = data;
-	console.log(
-		`[analyze-position-stockfish] fen="${fen}" version=${stockfishVersion} depth=${stockfishDepth}`,
-	);
-
 	const cache = createPositionCache(getWorkerDb());
 
-	const already = await cache.hasStockfish(
-		fen,
-		stockfishVersion,
-		stockfishDepth,
-	);
-	if (already) {
-		console.log(
-			`[analyze-position-stockfish] Cache hit, skipping fen="${fen}"`,
-		);
-		return;
-	}
+	if (await cache.hasStockfish(fen, stockfishVersion, stockfishDepth)) return;
 
 	try {
 		const result = await activePool.run((engine: AnalysisEngine) =>
@@ -105,10 +91,6 @@ export async function handleAnalyzePositionStockfish(
 		const output = buildStockfishOutput(result);
 
 		await cache.putStockfish(fen, stockfishVersion, stockfishDepth, output);
-
-		console.log(
-			`[analyze-position-stockfish] Cached fen="${fen}" (${output.topMoves.length} top moves)`,
-		);
 	} catch (err) {
 		console.error(`[analyze-position-stockfish] Failed for fen="${fen}":`, err);
 		throw err;

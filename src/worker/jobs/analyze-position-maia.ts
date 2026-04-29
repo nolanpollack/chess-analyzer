@@ -32,15 +32,9 @@ async function handleAnalyzePositionMaia(
 	data: AnalyzePositionMaiaPayload,
 ): Promise<void> {
 	const { fen, maiaVersion } = data;
-	console.log(`[analyze-position-maia] fen="${fen}" version=${maiaVersion}`);
-
 	const cache = createPositionCache(getWorkerDb());
 
-	const already = await cache.hasMaia(fen, maiaVersion);
-	if (already) {
-		console.log(`[analyze-position-maia] Cache hit, skipping fen="${fen}"`);
-		return;
-	}
+	if (await cache.hasMaia(fen, maiaVersion)) return;
 
 	try {
 		const response = await inferMaia(fen);
@@ -57,12 +51,8 @@ async function handleAnalyzePositionMaia(
 			moveIndex: response.moveIndex,
 			probabilities,
 		});
-
-		console.log(
-			`[analyze-position-maia] Cached fen="${fen}" (${response.ratingGrid.length} ratings × ${response.moveIndex.length} moves)`,
-		);
 	} catch (err) {
-		console.error(`[analyze-position-maia] Failed for fen="${fen}":`, err);
+		console.error(`[analyze-position-maia] failed fen="${fen}":`, err);
 		throw err;
 	}
 }
