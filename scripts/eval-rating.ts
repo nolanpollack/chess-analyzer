@@ -109,8 +109,14 @@ const EPSILON_SWEEP_VALUES = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7];
 const PRIOR_SWEEP_VALUES: PriorName[] = [
 	"uniform",
 	"lichess-empirical",
-	{ gaussian: { mean: 1500, std: 400 } },
 	{ gaussian: { mean: 1500, std: 200 } },
+	{ gaussian: { mean: 1500, std: 400 } },
+	{ gaussian: { mean: 1500, std: 500 } },
+	{ gaussian: { mean: 1500, std: 600 } },
+	{ gaussian: { mean: 1500, std: 800 } },
+	{ gaussian: { mean: 1550, std: 500 } },
+	{ gaussian: { mean: 1600, std: 400 } },
+	{ gaussian: { mean: 1600, std: 500 } },
 ];
 
 async function main() {
