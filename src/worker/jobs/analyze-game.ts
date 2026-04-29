@@ -166,7 +166,7 @@ async function enqueueMaiaJob(
 ): Promise<void> {
 	await ensureQueue(ANALYZE_GAME_MAIA_QUEUE);
 	const boss = await getBoss();
-	await boss.send(
+	const id = await boss.send(
 		ANALYZE_GAME_MAIA_QUEUE,
 		{ gameId, analysisJobId } satisfies AnalyzeGameMaiaPayload,
 		{
@@ -175,6 +175,13 @@ async function enqueueMaiaJob(
 			retryBackoff: true,
 		},
 	);
+	if (!id) {
+		// pg-boss returns null when a singleton dedupe rejects the enqueue —
+		// useful to know if we accidentally collide with an in-flight job.
+		console.warn(
+			`[analyze-game] maia enqueue dedup'd for job ${analysisJobId} (gameId=${gameId})`,
+		);
+	}
 }
 
 /**

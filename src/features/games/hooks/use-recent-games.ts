@@ -24,9 +24,11 @@ function toSummary(game: Game): GameSummary {
 	const category = classifyResult(game.resultDetail);
 	const result: GameResultLetter =
 		category === "win" ? "W" : category === "loss" ? "L" : "D";
-	const chessComAccuracy =
-		game.playerColor === "white" ? game.accuracyWhite : game.accuracyBlack;
-	const accuracy = game.overallAccuracy ?? chessComAccuracy;
+	// Only show accuracy from our completed analysis_jobs row — never the
+	// chess.com / lichess provider-supplied column on `games`. Otherwise a
+	// reanalyze wipe leaves the row showing stale platform numbers as if it
+	// had been analyzed.
+	const accuracy = game.overallAccuracy;
 
 	return {
 		id: game.id,

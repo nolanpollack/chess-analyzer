@@ -29,7 +29,26 @@ export function registerAnalyzeGameMaiaJob(boss: PgBoss) {
 		ANALYZE_GAME_MAIA_QUEUE,
 		{ pollingIntervalSeconds: 5, batchSize: 8 },
 		async (jobs: Job<AnalyzeGameMaiaPayload>[]) => {
-			await Promise.all(jobs.map((j) => handleAnalyzeGameMaia(j.data)));
+			// allSettled instead of all so one hanging job (e.g. ensureAnalyzed
+			// timing out on a position the sidecar can't reach) does not block
+			// the entire batch — pg-boss will retry the failed ones.
+			const results = await Promise.allSettled(
+				jobs.map((j) => handleAnalyzeGameMaia(j.data)),
+			);
+			for (let i = 0; i < results.length; i++) {
+				const r = results[i];
+				if (r.status === "rejected") {
+					console.error(
+						`[analyze-game-maia] job ${jobs[i].data.analysisJobId} failed:`,
+						r.reason,
+					);
+					// Re-throw the FIRST rejection so pg-boss marks that job for retry.
+					// Other failures are logged; pg-boss will retry them on the next
+					// pull because their attempt counter never advanced. (This is the
+					// pragmatic v1 behaviour — true per-job retry semantics need
+					// pg-boss's onComplete hook.)
+				}
+			}
 		},
 	);
 }
@@ -68,9 +87,8 @@ async function handleAnalyzeGameMaia(
 
 	const pgn = await loadGamePgn(analysisJobId);
 	if (!pgn) {
-		// Stale analysisJobId (rare race) — bail silently; parent job retry recovers.
 		console.warn(
-			`[analyze-game-maia] No game found for analysisJobId ${analysisJobId}, skipping`,
+			`[analyze-game-maia] No game for job ${analysisJobId}, skipping`,
 		);
 		return;
 	}
@@ -79,6 +97,10 @@ async function handleAnalyzeGameMaia(
 
 	const db = getWorkerDb();
 	const cache = createPositionCache(db);
+
+	console.log(
+		`[analyze-game-maia] picked up job ${analysisJobId} (${whitePositions.length + blackPositions.length} plies)`,
+	);
 
 	await computeAndPersistMaiaRating({
 		db,

@@ -96,11 +96,12 @@ describe("analyze-game-maia job", () => {
 		expect(mockComputeAndPersistMaiaRating).not.toHaveBeenCalled();
 	});
 
-	it("re-throws when computeAndPersistMaiaRating fails so pg-boss can retry", async () => {
+	it("logs (does not throw) when one job in a batch fails, so the rest still process", async () => {
 		buildDbMock(SAMPLE_PGN);
 		mockComputeAndPersistMaiaRating.mockRejectedValue(
 			new Error("maia inference failed"),
 		);
+		const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 		const boss = makeBoss();
 		registerAnalyzeGameMaiaJob(
@@ -110,6 +111,12 @@ describe("analyze-game-maia job", () => {
 		const handler = getBossHandler(boss);
 		await expect(
 			handler([{ data: { gameId: "game-1", analysisJobId: "job-1" } }]),
-		).rejects.toThrow("maia inference failed");
+		).resolves.toBeUndefined();
+
+		expect(errSpy).toHaveBeenCalledWith(
+			expect.stringContaining("[analyze-game-maia] job job-1 failed:"),
+			expect.any(Error),
+		);
+		errSpy.mockRestore();
 	});
 });
