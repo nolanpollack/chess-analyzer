@@ -4,12 +4,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { games, players } from "#/db/schema";
 import { env } from "#/env";
+import { enqueueGameAnalysis } from "#/lib/enqueue-analysis";
 import { createChessComProvider } from "#/providers/chess-com-provider";
 import type { RawGame } from "#/providers/game-provider";
-import {
-	ANALYZE_GAME_QUEUE,
-	type AnalyzeGamePayload,
-} from "#/worker/jobs/analyze-game";
 
 // ── Job Types ──────────────────────────────────────────────────────────
 
@@ -29,13 +26,13 @@ export function registerSyncGamesJob(boss: PgBoss) {
 		{ pollingIntervalSeconds: 2 },
 		async (jobs) => {
 			for (const job of jobs) {
-				await handleSyncGames(job.data, boss);
+				await handleSyncGames(job.data);
 			}
 		},
 	);
 }
 
-async function handleSyncGames(data: SyncGamesPayload, boss: PgBoss) {
+async function handleSyncGames(data: SyncGamesPayload) {
 	const { playerId, username, platform } = data;
 	console.log(`[sync-games] Starting sync for ${username} (${platform})`);
 
@@ -93,9 +90,7 @@ async function handleSyncGames(data: SyncGamesPayload, boss: PgBoss) {
 		if (newGames.length > 0) {
 			newGames.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime());
 			for (const game of newGames) {
-				await boss.send(ANALYZE_GAME_QUEUE, {
-					gameId: game.id,
-				} satisfies AnalyzeGamePayload);
+				await enqueueGameAnalysis(game.id);
 			}
 			console.log(
 				`[sync-games] Enqueued analysis for ${newGames.length} new games (newest first)`,

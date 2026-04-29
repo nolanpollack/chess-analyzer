@@ -41,6 +41,11 @@
 - Use `ensureQueue()` from `src/lib/queue.ts` before any `send()` or `findJobs()`
   call on the server side
 - Queue client file: `src/lib/queue.ts`
+- Analyze-game jobs MUST be enqueued via `enqueueGameAnalysis(gameId)` from
+  `src/lib/enqueue-analysis.ts` — it is the single source of truth for the
+  retry policy (`retryLimit: 3, retryBackoff: true`) and the singleton key
+  (`analyze-game:${gameId}`) that prevents concurrent duplicate enqueues.
+  Never call `boss.send(ANALYZE_GAME_QUEUE, ...)` directly.
 
 ## Import boundaries
 - src/worker/ ↔ src/server/ — no cross-imports
@@ -53,6 +58,19 @@
 - pg-boss and the web server share DATABASE_URL but use separate pools
 - The Drizzle `db` instance is never imported by src/worker/ directly;
   the worker creates its own postgres connection
+
+## Reconciliation
+- `reconcile-analysis` (`src/worker/jobs/reconcile-analysis.ts`) is a pg-boss
+  cron (`*/10 * * * *`) that recovers games which fell through the normal
+  enqueue path — currently scoped to **orphaned** games (rows in `games`
+  with no matching `analysis_jobs` row). This is the safety net for the
+  case where every pg-boss attempt of `analyze-game` failed before
+  `claimOrCreateJob` could insert a row.
+- Failed `analysis_jobs` are NOT auto-retried — `resetAndTriggerAnalysis`
+  is the user-facing recovery path. Auto-retrying could mask real bugs.
+- To extend reconciliation coverage (e.g. stuck `running` rows), add a
+  query and union it into `findGameIdsNeedingReconcile`. Do not change
+  the handler.
 
 ## Server functions + loaders
 - Loaders call server functions directly (no HTTP round-trip)
@@ -107,6 +125,21 @@ existing ones.
 
 ## Route structure
 - `$username.tsx` is a layout route (renders `<Outlet />`)
-- `$username/index.tsx` is the dashboard (game list + filters)
+- `$username/index.tsx` is the profile dashboard (Elo estimate, factors, recent games)
+- `$username/games/index.tsx` is the full games list (filters, sort, pagination, stats panel)
 - `$username/games/$gameId.tsx` is the game detail (analysis view)
 - Feature modules: `src/features/{feature}/` with components/, hooks/, types.ts, utils.ts
+
+## Games table
+- `src/features/games/components/GamesTable.tsx` is the shared table shell. It uses
+  `@tanstack/react-table` for column metadata, sort state, and header rendering — but
+  rows are rendered directly by `GameTableRow` (not via `flexRender`). The library's
+  value here is a typed column-def system that lets the recent-games card (sort=null)
+  and the full Games page consume the same column list.
+- Column definitions live in `src/features/games/components/game-columns.ts`. Each
+  `ColumnDef` carries `id`, header label, sortability flag, and `meta.align`. Sort is
+  server-driven (`manualSorting: true`); the table emits `onSortChange` events.
+- Sort + pagination are server-side via `listGames` (sortKey/sortDir/page/pageSize).
+- `getGamesStats` is the aggregation endpoint behind the stats panel — counts +
+  averages over the same filter set as `listGames`, plus a separate blunder-count
+  query against the `moves` table.

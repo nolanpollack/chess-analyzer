@@ -4,22 +4,10 @@ import { z } from "zod";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
 import { db } from "#/db/index";
 import { analysisJobs } from "#/db/schema";
-import { ensureQueue, getBoss } from "#/lib/queue";
-import {
-	ANALYZE_GAME_QUEUE,
-	type AnalyzeGamePayload,
-	PIPELINE_VERSION,
-} from "#/worker/jobs/analyze-game";
+import { enqueueGameAnalysis } from "#/lib/enqueue-analysis";
+import { PIPELINE_VERSION } from "#/worker/jobs/analyze-game";
 
 const ENGINE = "stockfish-wasm";
-
-async function enqueueAnalysis(gameId: string) {
-	await ensureQueue(ANALYZE_GAME_QUEUE);
-	const boss = await getBoss();
-	await boss.send(ANALYZE_GAME_QUEUE, {
-		gameId,
-	} satisfies AnalyzeGamePayload);
-}
 
 export const triggerAnalysis = createServerFn({ method: "POST" })
 	.inputValidator(z.object({ gameId: z.string().uuid() }))
@@ -51,7 +39,7 @@ export const triggerAnalysis = createServerFn({ method: "POST" })
 				status: "queued",
 			});
 
-			await enqueueAnalysis(gameId);
+			await enqueueGameAnalysis(gameId);
 			return { enqueued: true };
 		} catch (err) {
 			console.error("[triggerAnalysis] Error:", err);
@@ -75,7 +63,7 @@ export const resetAndTriggerAnalysis = createServerFn({ method: "POST" })
 				status: "queued",
 			});
 
-			await enqueueAnalysis(gameId);
+			await enqueueGameAnalysis(gameId);
 			return { enqueued: true };
 		} catch (err) {
 			console.error("[resetAndTriggerAnalysis] Error:", err);

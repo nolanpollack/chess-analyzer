@@ -17,6 +17,10 @@ import {
 	registerAnalyzePositionStockfishJob,
 } from "#/worker/jobs/analyze-position-stockfish";
 import {
+	RECONCILE_ANALYSIS_QUEUE,
+	registerReconcileAnalysisJob,
+} from "#/worker/jobs/reconcile-analysis";
+import {
 	registerSyncGamesJob,
 	SYNC_GAMES_QUEUE,
 } from "#/worker/jobs/sync-games";
@@ -48,6 +52,11 @@ async function start() {
 	await boss.createQueue(ANALYZE_POSITION_STOCKFISH);
 	registerAnalyzePositionStockfishJob(boss);
 	console.log("[worker] registered analyze-position-stockfish handler");
+
+	await boss.createQueue(RECONCILE_ANALYSIS_QUEUE);
+	registerReconcileAnalysisJob(boss);
+	await boss.schedule(RECONCILE_ANALYSIS_QUEUE, "*/10 * * * *");
+	console.log("[worker] registered reconcile-analysis handler (every 10 min)");
 }
 
 start().catch((err: unknown) => {
