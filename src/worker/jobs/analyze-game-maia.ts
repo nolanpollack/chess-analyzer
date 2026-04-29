@@ -29,25 +29,31 @@ export function registerAnalyzeGameMaiaJob(boss: PgBoss) {
 		ANALYZE_GAME_MAIA_QUEUE,
 		{ pollingIntervalSeconds: 5, batchSize: 8 },
 		async (jobs: Job<AnalyzeGameMaiaPayload>[]) => {
-			// allSettled instead of all so one hanging job (e.g. ensureAnalyzed
-			// timing out on a position the sidecar can't reach) does not block
-			// the entire batch — pg-boss will retry the failed ones.
+			// allSettled so one slow/timing-out handler does not abort sibling
+			// jobs in the batch. Each handler is fully independent and idempotent
+			// (computeAndPersistMaiaRating short-circuits via isAlreadyPersisted),
+			// so retrying the whole batch on partial failure is cheap.
 			const results = await Promise.allSettled(
 				jobs.map((j) => handleAnalyzeGameMaia(j.data)),
 			);
+			let rejected = 0;
 			for (let i = 0; i < results.length; i++) {
 				const r = results[i];
 				if (r.status === "rejected") {
+					rejected++;
 					console.error(
 						`[analyze-game-maia] job ${jobs[i].data.analysisJobId} failed:`,
 						r.reason,
 					);
-					// Re-throw the FIRST rejection so pg-boss marks that job for retry.
-					// Other failures are logged; pg-boss will retry them on the next
-					// pull because their attempt counter never advanced. (This is the
-					// pragmatic v1 behaviour — true per-job retry semantics need
-					// pg-boss's onComplete hook.)
 				}
+			}
+			if (rejected > 0) {
+				// Throw so pg-boss retries the batch. Successful siblings will
+				// short-circuit on retry via isAlreadyPersisted; failed jobs get
+				// another attempt (subject to retryLimit on the parent send).
+				throw new Error(
+					`${rejected}/${jobs.length} analyze-game-maia jobs failed in batch`,
+				);
 			}
 		},
 	);

@@ -3,6 +3,10 @@ import {
 	ANALYZE_GAME_QUEUE,
 	type AnalyzeGamePayload,
 } from "#/worker/jobs/analyze-game";
+import {
+	ANALYZE_GAME_MAIA_QUEUE,
+	type AnalyzeGameMaiaPayload,
+} from "#/worker/jobs/analyze-game-maia";
 
 /**
  * Single entry point for enqueueing analyze-game jobs.
@@ -23,4 +27,34 @@ export async function enqueueGameAnalysis(gameId: string): Promise<void> {
 		retryBackoff: true,
 		singletonKey: `analyze-game:${gameId}`,
 	});
+}
+
+/**
+ * Enqueue a Maia-only run for an existing analysis_jobs row.
+ *
+ * Used by:
+ *  - analyze-game (after Stockfish claims/creates the row, fans out Maia)
+ *  - reconcile-analysis (recovers analysis_jobs whose Stockfish completed
+ *    but whose maia_predicted_* columns are null — typically because a
+ *    prior analyze-game-maia batch silently swallowed an error)
+ *
+ * Idempotent: `computeAndPersistMaiaRating` skips when `maiaPredictedWhite`
+ * is already set, and `singletonKey` prevents concurrent duplicate sends
+ * for the same `analysisJobId`.
+ */
+export async function enqueueMaiaOnly(
+	gameId: string,
+	analysisJobId: string,
+): Promise<void> {
+	await ensureQueue(ANALYZE_GAME_MAIA_QUEUE);
+	const boss = await getBoss();
+	await boss.send(
+		ANALYZE_GAME_MAIA_QUEUE,
+		{ gameId, analysisJobId } satisfies AnalyzeGameMaiaPayload,
+		{
+			retryLimit: 3,
+			retryBackoff: true,
+			singletonKey: `analyze-game-maia:${analysisJobId}`,
+		},
+	);
 }

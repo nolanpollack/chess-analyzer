@@ -1,29 +1,42 @@
 import { describe, expect, it, vi } from "vitest";
-import { findGameIdsNeedingReconcile } from "./reconcile-analysis";
+import { findReconcileTargets } from "./reconcile-analysis";
 
-describe("findGameIdsNeedingReconcile", () => {
-	it("returns ids for games with no analysis_jobs row", async () => {
-		const execute = vi.fn().mockResolvedValue({
-			rows: [{ id: "abc" }, { id: "def" }],
-		});
-		const db = { execute } as unknown as Parameters<
-			typeof findGameIdsNeedingReconcile
-		>[0];
+function mockDb(
+	orphans: { id: string }[],
+	stragglers: { game_id: string; analysis_job_id: string }[],
+) {
+	const execute = vi
+		.fn()
+		.mockResolvedValueOnce({ rows: orphans })
+		.mockResolvedValueOnce({ rows: stragglers });
+	return { execute } as unknown as Parameters<typeof findReconcileTargets>[0];
+}
 
-		const ids = await findGameIdsNeedingReconcile(db);
+describe("findReconcileTargets", () => {
+	it("returns orphan game ids and maia straggler pairs", async () => {
+		const db = mockDb(
+			[{ id: "orphan-1" }, { id: "orphan-2" }],
+			[
+				{ game_id: "g1", analysis_job_id: "aj1" },
+				{ game_id: "g2", analysis_job_id: "aj2" },
+			],
+		);
 
-		expect(ids).toEqual(["abc", "def"]);
-		expect(execute).toHaveBeenCalledOnce();
+		const targets = await findReconcileTargets(db);
+
+		expect(targets.orphanGameIds).toEqual(["orphan-1", "orphan-2"]);
+		expect(targets.maiaStragglers).toEqual([
+			{ gameId: "g1", analysisJobId: "aj1" },
+			{ gameId: "g2", analysisJobId: "aj2" },
+		]);
 	});
 
-	it("returns empty array when no orphans", async () => {
-		const execute = vi.fn().mockResolvedValue({ rows: [] });
-		const db = { execute } as unknown as Parameters<
-			typeof findGameIdsNeedingReconcile
-		>[0];
+	it("returns empty arrays when nothing to reconcile", async () => {
+		const db = mockDb([], []);
 
-		const ids = await findGameIdsNeedingReconcile(db);
+		const targets = await findReconcileTargets(db);
 
-		expect(ids).toEqual([]);
+		expect(targets.orphanGameIds).toEqual([]);
+		expect(targets.maiaStragglers).toEqual([]);
 	});
 });

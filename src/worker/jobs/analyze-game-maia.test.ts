@@ -96,7 +96,7 @@ describe("analyze-game-maia job", () => {
 		expect(mockComputeAndPersistMaiaRating).not.toHaveBeenCalled();
 	});
 
-	it("logs (does not throw) when one job in a batch fails, so the rest still process", async () => {
+	it("logs every rejection and throws so pg-boss retries the batch", async () => {
 		buildDbMock(SAMPLE_PGN);
 		mockComputeAndPersistMaiaRating.mockRejectedValue(
 			new Error("maia inference failed"),
@@ -110,11 +110,18 @@ describe("analyze-game-maia job", () => {
 
 		const handler = getBossHandler(boss);
 		await expect(
-			handler([{ data: { gameId: "game-1", analysisJobId: "job-1" } }]),
-		).resolves.toBeUndefined();
+			handler([
+				{ data: { gameId: "game-1", analysisJobId: "job-1" } },
+				{ data: { gameId: "game-2", analysisJobId: "job-2" } },
+			]),
+		).rejects.toThrow(/2\/2 analyze-game-maia jobs failed/);
 
 		expect(errSpy).toHaveBeenCalledWith(
 			expect.stringContaining("[analyze-game-maia] job job-1 failed:"),
+			expect.any(Error),
+		);
+		expect(errSpy).toHaveBeenCalledWith(
+			expect.stringContaining("[analyze-game-maia] job job-2 failed:"),
 			expect.any(Error),
 		);
 		errSpy.mockRestore();

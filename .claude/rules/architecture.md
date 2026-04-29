@@ -62,15 +62,27 @@
 ## Reconciliation
 - `reconcile-analysis` (`src/worker/jobs/reconcile-analysis.ts`) is a pg-boss
   cron (`*/10 * * * *`) that recovers games which fell through the normal
-  enqueue path — currently scoped to **orphaned** games (rows in `games`
-  with no matching `analysis_jobs` row). This is the safety net for the
-  case where every pg-boss attempt of `analyze-game` failed before
-  `claimOrCreateJob` could insert a row.
+  enqueue path. Two recovery criteria today:
+  1. **Orphans** — `games` with no `analysis_jobs` row (pg-boss exhausted
+     all retries before `claimOrCreateJob` could insert a row).
+     Re-enqueued via `enqueueGameAnalysis`.
+  2. **Maia stragglers** — `analysis_jobs` where Stockfish completed but
+     `maia_predicted_*` is null (caused by the pre-fix
+     `analyze-game-maia` swallow bug, or future similar). Re-enqueued via
+     `enqueueMaiaOnly` so we don't redo Stockfish.
 - Failed `analysis_jobs` are NOT auto-retried — `resetAndTriggerAnalysis`
   is the user-facing recovery path. Auto-retrying could mask real bugs.
-- To extend reconciliation coverage (e.g. stuck `running` rows), add a
-  query and union it into `findGameIdsNeedingReconcile`. Do not change
-  the handler.
+- To extend reconciliation, add a finder + dispatch case to the handler;
+  the existing `findReconcileTargets` orchestrator pattern is intentionally
+  open to extension.
+
+## Maia handler exception policy
+- `analyze-game-maia` runs jobs concurrently via `Promise.allSettled`, but
+  if any rejection occurred the handler MUST throw so pg-boss retries the
+  batch. Successful siblings are idempotent (`isAlreadyPersisted` short-
+  circuits) so retry cost is minimal. Silently swallowing rejections caused
+  the April 2026 silent-data-loss incident (23 games marked `completed`
+  with null maia data).
 
 ## Server functions + loaders
 - Loaders call server functions directly (no HTTP round-trip)
