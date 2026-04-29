@@ -13,6 +13,11 @@ export const env = createEnv({
 		LLM_MODEL: z.string().min(1).optional(),
 		LLM_BASE_URL: z.string().url().optional(),
 		ANALYSIS_ENGINE_DEPTH: z.coerce.number().int().min(1).max(30).optional(),
+		MAIA_INFERENCE_URL: z
+			.string()
+			.url()
+			.optional()
+			.default("http://localhost:8765"),
 	},
 
 	clientPrefix: "VITE_",

@@ -37,10 +37,10 @@ function uciToSan(fen: string, uci: string): string {
 }
 
 /**
- * Number of principal variations to request from Stockfish.
- * Phase 1 only needs 2 (PV1 vs PV2 for complexity). Cap at 2 for timing predictability.
+ * Default number of principal variations to request from Stockfish.
+ * Phase 1 uses 2 (PV1 vs PV2 for complexity).
  */
-const MULTIPV = 2;
+const DEFAULT_MULTIPV = 2;
 
 type ParsedInfo = {
 	depth: number;
@@ -82,7 +82,8 @@ function parseInfoLine(line: string): ParsedInfo | null {
 	return { depth, multipv, scoreCp, scoreMate, pv };
 }
 
-export function createStockfishWasmEngine(): AnalysisEngine {
+export function createStockfishWasmEngine(opts?: { multipv?: number }): AnalysisEngine {
+	const MULTIPV = opts?.multipv ?? DEFAULT_MULTIPV;
 	let process: ChildProcess | null = null;
 	let outputBuffer = "";
 	let lineListeners: ((line: string) => void)[] = [];

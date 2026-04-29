@@ -5,6 +5,14 @@ import {
 	registerAnalyzeGameJob,
 } from "#/worker/jobs/analyze-game";
 import {
+	ANALYZE_POSITION_MAIA,
+	registerAnalyzePositionMaiaJob,
+} from "#/worker/jobs/analyze-position-maia";
+import {
+	ANALYZE_POSITION_STOCKFISH,
+	registerAnalyzePositionStockfishJob,
+} from "#/worker/jobs/analyze-position-stockfish";
+import {
 	registerSyncGamesJob,
 	SYNC_GAMES_QUEUE,
 } from "#/worker/jobs/sync-games";
@@ -24,6 +32,14 @@ async function start() {
 	await boss.createQueue(ANALYZE_GAME_QUEUE);
 	registerAnalyzeGameJob(boss);
 	console.log("[worker] registered analyze-game handler");
+
+	await boss.createQueue(ANALYZE_POSITION_MAIA);
+	registerAnalyzePositionMaiaJob(boss);
+	console.log("[worker] registered analyze-position-maia handler");
+
+	await boss.createQueue(ANALYZE_POSITION_STOCKFISH);
+	registerAnalyzePositionStockfishJob(boss);
+	console.log("[worker] registered analyze-position-stockfish handler");
 }
 
 start().catch((err: unknown) => {
