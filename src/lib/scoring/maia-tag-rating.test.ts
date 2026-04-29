@@ -169,4 +169,38 @@ describe("computeMaiaTagRatings", () => {
 		expect(typeof result.ciHigh).toBe("number");
 		expect(result.nPositions).toBe(1);
 	});
+
+	it("when gameId is supplied, skips the window query and uses gameId directly", async () => {
+		// When gameId is given, the DB is only called once (the tagged positions
+		// query); the window query is bypassed entirely.
+		const taggedRows = [{ fen: "fen1", uci: "e2e4", dimensionValue: "pawn" }];
+		let selectCallCount = 0;
+		const db = {
+			select: vi.fn(() => {
+				selectCallCount++;
+				// Only one call expected: the tagged positions query
+				const chain = {
+					from: vi.fn().mockReturnThis(),
+					innerJoin: vi.fn().mockReturnThis(),
+					where: vi.fn().mockResolvedValue(taggedRows),
+				};
+				return chain;
+			}),
+		} as unknown as Db;
+
+		const maiaMap = new Map([["fen1", makeMaiaOutput()]]);
+		const cache = makeCache(maiaMap);
+
+		const result = await computeMaiaTagRatings(db, cache, {
+			playerId: PLAYER_ID,
+			dimensionType: "piece",
+			gameId: GAME_ID_1,
+		});
+
+		// Should produce one rating entry from the single tagged row
+		expect(result).toHaveLength(1);
+		expect(result[0].dimensionValue).toBe("pawn");
+		// select() called exactly once (no window query)
+		expect(selectCallCount).toBe(1);
+	});
 });

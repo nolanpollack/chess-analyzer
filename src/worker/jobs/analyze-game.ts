@@ -27,16 +27,10 @@ import {
 import { type PgnMove, walkPgn } from "#/lib/analysis/pgn";
 import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
 import { createPositionCache } from "#/lib/position-cache";
-import { invalidatePlayerCache } from "#/lib/scoring/cache";
-import { moveComplexity } from "#/lib/scoring/complexity";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
-import {
-	computeWeightedAccuracy,
-	type WeightedMove,
-} from "#/lib/scoring/weighted-accuracy";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
-import type { AnalysisEngine, PositionEval } from "#/providers/analysis-engine";
+import type { AnalysisEngine } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
 import { computeAndPersistMaiaRating } from "./maia-rating";
 
@@ -70,8 +64,6 @@ type CachedPositionEval = {
 	evalCp: number;
 	bestMoveUci: string;
 	bestMoveSan: string;
-	/** Eval of the second-best PV (side-to-move perspective), null if only one PV. */
-	pv2EvalCp: number | null;
 };
 
 type GameRow = {
@@ -118,8 +110,6 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			moveRows,
 			accuracyWhite,
 			accuracyBlack,
-			weightedAccuracyWhite,
-			weightedAccuracyBlack,
 			whitePositions,
 			blackPositions,
 		} = buildMoveRows({
@@ -149,15 +139,11 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			.set({
 				accuracyWhite,
 				accuracyBlack,
-				weightedAccuracyWhite,
-				weightedAccuracyBlack,
 				movesAnalyzed: pgnMoves.length,
 				status: "complete",
 				completedAt: new Date(),
 			})
 			.where(eq(analysisJobs.id, jobId));
-
-		await invalidatePlayerCache(db, game.playerId);
 
 		// Phase 7: Maia-2 rating estimation.
 		// This runs AFTER legacy accuracy/classifications are persisted so that a
@@ -291,17 +277,6 @@ async function runAndInsertTags(
 	await db.insert(moveTags).values(tagRows);
 }
 
-/** Extract pv2 eval from side-to-move perspective given the engine result. */
-function extractPv2SideToMove(
-	result: PositionEval,
-	isBlackToMove: boolean,
-): number | null {
-	if (result.pvs.length < 2) return null;
-	const pv2WhitePerspective = result.pvs[1].eval_cp;
-	// Convert back to side-to-move perspective for complexity computation
-	return isBlackToMove ? -pv2WhitePerspective : pv2WhitePerspective;
-}
-
 async function evaluateAllPositions(
 	engine: AnalysisEngine,
 	pgnMoves: PgnMove[],
@@ -314,12 +289,10 @@ async function evaluateAllPositions(
 		const move = pgnMoves[i];
 		if (!evals.has(move.fenBefore)) {
 			const result = await engine.analyzePosition(move.fenBefore, ENGINE_DEPTH);
-			const isBlackToMove = move.fenBefore.split(" ")[1] === "b";
 			evals.set(move.fenBefore, {
 				evalCp: result.eval_cp,
 				bestMoveUci: result.best_move_uci,
 				bestMoveSan: result.best_move_san,
-				pv2EvalCp: extractPv2SideToMove(result, isBlackToMove),
 			});
 		}
 
@@ -338,12 +311,10 @@ async function evaluateAllPositions(
 				lastMove.fenAfter,
 				ENGINE_DEPTH,
 			);
-			const isBlackToMove = lastMove.fenAfter.split(" ")[1] === "b";
 			evals.set(lastMove.fenAfter, {
 				evalCp: result.eval_cp,
 				bestMoveUci: result.best_move_uci,
 				bestMoveSan: result.best_move_san,
-				pv2EvalCp: extractPv2SideToMove(result, isBlackToMove),
 			});
 		}
 	}
@@ -359,8 +330,6 @@ type BuildMoveRowsResult = {
 	moveRows: MoveRow[];
 	accuracyWhite: number;
 	accuracyBlack: number;
-	weightedAccuracyWhite: number;
-	weightedAccuracyBlack: number;
 	whitePositions: SidePositions;
 	blackPositions: SidePositions;
 };
@@ -376,7 +345,6 @@ function buildMoveRows(args: {
 	const isPlayerWhite = args.playerColor === "white";
 	const moveRows: MoveRow[] = [];
 	const allEvals: MoveEvalData[] = [];
-	const allWeightedMoves: WeightedMove[] = [];
 	const whitePositions: SidePositions = [];
 	const blackPositions: SidePositions = [];
 	let prevWinPctLost: number | null = null;
@@ -431,10 +399,6 @@ function buildMoveRows(args: {
 		};
 		const accuracyScore = computeMoveAccuracy(evalData);
 
-		// Complexity: pv1 is white-perspective; convert to side-to-move for comparison.
-		const pv1SideToMove = move.isWhite ? before.evalCp : -before.evalCp;
-		const complexity = moveComplexity(pv1SideToMove, before.pv2EvalCp);
-
 		// Collect FEN-before + UCI move for Maia rating estimation (Phase 7).
 		const sidePositions = move.isWhite ? whitePositions : blackPositions;
 		sidePositions.push({ fen: move.fenBefore, playedMove: move.uci });
@@ -457,26 +421,17 @@ function buildMoveRows(args: {
 			evalDeltaCp: evalDelta,
 			classification,
 			accuracyScore: isPlayerMove ? accuracyScore : null,
-			complexity,
 		});
 
 		allEvals.push(evalData);
-		allWeightedMoves.push({
-			accuracy: accuracyScore,
-			complexity,
-			isWhite: move.isWhite,
-		});
 	}
 
 	const gameAccuracy = computeGameAccuracy(allEvals);
-	const weightedAccuracy = computeWeightedAccuracy(allWeightedMoves);
 
 	return {
 		moveRows,
 		accuracyWhite: gameAccuracy?.white ?? 0,
 		accuracyBlack: gameAccuracy?.black ?? 0,
-		weightedAccuracyWhite: weightedAccuracy?.white ?? 0,
-		weightedAccuracyBlack: weightedAccuracy?.black ?? 0,
 		whitePositions,
 		blackPositions,
 	};

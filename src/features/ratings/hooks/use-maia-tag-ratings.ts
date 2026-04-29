@@ -7,6 +7,8 @@ type UseMaiaTagRatingsInput = {
 	dimensionType: string;
 	dimensionValue?: string;
 	windowKey?: "trailing_20";
+	/** When provided, restricts to a single game's positions (game-detail view). */
+	gameId?: string;
 };
 
 export function useMaiaTagRatings(input: UseMaiaTagRatingsInput): {
@@ -21,6 +23,7 @@ export function useMaiaTagRatings(input: UseMaiaTagRatingsInput): {
 			input.dimensionType,
 			input.dimensionValue ?? null,
 			input.windowKey ?? "trailing_20",
+			input.gameId ?? null,
 		],
 		queryFn: async () => {
 			const result = await getMaiaTagRatings({
@@ -29,6 +32,7 @@ export function useMaiaTagRatings(input: UseMaiaTagRatingsInput): {
 					dimensionType: input.dimensionType,
 					dimensionValue: input.dimensionValue,
 					windowKey: input.windowKey ?? "trailing_20",
+					gameId: input.gameId,
 				},
 			});
 			if ("error" in result) throw new Error(result.error);

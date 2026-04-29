@@ -1,5 +1,9 @@
+import { useQueries } from "@tanstack/react-query";
 import { BarChart2 } from "lucide-react";
-import { useDimensionRatings } from "#/features/ratings/hooks/use-dimension-ratings";
+import { DIMENSION_TYPES, type DimensionType } from "#/config/dimensions";
+import type { Factor } from "#/features/profile/types";
+import { getMaiaTagRatings } from "#/features/ratings/server/maia-queries";
+import { maiaTagRatingsToFactors } from "#/features/ratings/utils/to-maia-factor";
 import { usePlayerSummary } from "../hooks/use-player-summary";
 import { FactorRow } from "./FactorRow";
 
@@ -9,21 +13,36 @@ type FactorBreakdownCardProps = {
 
 export function FactorBreakdownCard({ username }: FactorBreakdownCardProps) {
 	const { data: summary } = usePlayerSummary(username);
-	const {
-		factors: allFactors,
-		isLoading,
-		isError,
-	} = useDimensionRatings(username);
-	console.log("[FactorBreakdownCard]", {
-		username,
-		isLoading,
-		isError,
-		factorCount: allFactors.length,
-		first: allFactors[0],
-	});
-	const factors = isLoading ? null : allFactors.length > 0 ? allFactors : null;
+	const playerId = summary?.playerId ?? null;
 	const playerElo = summary?.eloEstimate ?? null;
 	const baseline = playerElo ?? 1500;
+
+	const queries = useQueries({
+		queries: DIMENSION_TYPES.map((dimensionType: DimensionType) => ({
+			queryKey: [
+				"maiaTagRatings",
+				playerId,
+				dimensionType,
+				null,
+				"trailing_20",
+				null,
+			] as const,
+			queryFn: async () => {
+				if (!playerId) return [];
+				const result = await getMaiaTagRatings({
+					data: { playerId, dimensionType, windowKey: "trailing_20" },
+				});
+				if ("error" in result) throw new Error(result.error);
+				return maiaTagRatingsToFactors(dimensionType, result.ratings, baseline);
+			},
+			enabled: !!playerId,
+		})),
+	});
+
+	const isLoading = !playerId || queries.some((q) => q.isLoading);
+	const isError = queries.some((q) => q.isError);
+	const allFactors: Factor[] = queries.flatMap((q) => q.data ?? []);
+	const factors = isLoading ? null : allFactors.length > 0 ? allFactors : null;
 
 	return (
 		<div className="rounded-[10px] border border-divider bg-surface p-5">
@@ -53,7 +72,9 @@ export function FactorBreakdownCard({ username }: FactorBreakdownCardProps) {
 						<div className="text-ui text-fg-3">
 							{isLoading
 								? "Loading factor breakdown…"
-								: "No analyzed games yet"}
+								: isError
+									? "Failed to load factors"
+									: "No analyzed games yet"}
 						</div>
 						<div className="mt-0.5 text-xs text-fg-4">
 							{isLoading

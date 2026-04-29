@@ -24,6 +24,8 @@ const tagSliceSchema = z.object({
 	dimensionType: z.string(),
 	dimensionValue: z.string().optional(),
 	windowKey: z.enum(["trailing_20"]).default("trailing_20"),
+	/** When provided, restricts to a single game's positions (game-detail view). */
+	gameId: z.string().uuid().optional(),
 });
 
 export const getMaiaTagRatings = createServerFn({ method: "GET" })
@@ -36,6 +38,7 @@ export const getMaiaTagRatings = createServerFn({ method: "GET" })
 				dimensionType: data.dimensionType,
 				dimensionValue: data.dimensionValue,
 				windowKey: data.windowKey,
+				gameId: data.gameId,
 			});
 			return { ratings };
 		} catch (err) {

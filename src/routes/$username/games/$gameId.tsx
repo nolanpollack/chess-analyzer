@@ -1,3 +1,4 @@
+import { useQueries } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { PageContainer } from "#/components/layout/PageContainer";
@@ -12,10 +13,12 @@ import { GamePageHeader } from "#/features/game/components/GamePageHeader";
 import { MoveListCard } from "#/features/game/components/MoveListCard";
 import { useGameDetail } from "#/features/game/hooks/use-game-detail";
 import { useMoveNavigation } from "#/features/game/hooks/use-move-navigation";
+import type { GameFactor } from "#/features/game/types";
 import { findCriticalMoveIndex } from "#/features/game/utils/critical-move";
 import { flattenMoves } from "#/features/game/utils/flat-moves";
-import { useGameDimensionRatings } from "#/features/ratings/hooks/use-game-dimension-ratings";
-import { toGameFactors } from "#/features/ratings/utils/to-game-factor";
+import { useMaiaGameRating } from "#/features/ratings/hooks/use-maia-game-rating";
+import { getMaiaTagRatings } from "#/features/ratings/server/maia-queries";
+import { maiaTagRatingsToGameFactors } from "#/features/ratings/utils/to-maia-game-factor";
 
 export const Route = createFileRoute("/$username/games/$gameId")({
 	component: GameDetailPage,
@@ -92,6 +95,9 @@ type GameDetailBodyProps = {
 	initialCursor: number;
 };
 
+const GAME_DIMENSION_TYPES = ["phase", "piece", "agency"] as const;
+type GameDimensionType = (typeof GAME_DIMENSION_TYPES)[number];
+
 function GameDetailBody({
 	username,
 	gameId,
@@ -105,16 +111,47 @@ function GameDetailBody({
 		useMoveNavigation(moves.length, initialCursor);
 
 	const cur = moves[cursor];
-	const { data: ratings } = useGameDimensionRatings(gameId);
 
-	const accuracy = ratings?.gameOverall.overallAccuracy ?? null;
-	const overallElo = ratings?.gameOverall.ratingEstimate ?? null;
+	// Headline Maia rating for this game
+	const { data: maiaRating } = useMaiaGameRating(analysisId);
+	const playerColor = game.playerColor;
+	const sideMaia =
+		playerColor === "white" ? maiaRating?.white : maiaRating?.black;
+	const overallElo = sideMaia ? Math.round(sideMaia.predicted) : null;
 	const gameScore = overallElo;
 
-	const factors =
-		ratings && overallElo !== null
-			? toGameFactors(ratings.scores, overallElo)
-			: [];
+	// Per-dimension Maia tag ratings — one query per dimension, scoped to this game
+	const dimensionQueries = useQueries({
+		queries: GAME_DIMENSION_TYPES.map((dimensionType) => ({
+			queryKey: [
+				"maiaTagRatings",
+				game.playerId,
+				dimensionType,
+				null,
+				"trailing_20",
+				gameId,
+			] as const,
+			queryFn: async () => {
+				const result = await getMaiaTagRatings({
+					data: {
+						playerId: game.playerId,
+						dimensionType,
+						windowKey: "trailing_20",
+						gameId,
+					},
+				});
+				if ("error" in result) throw new Error(result.error);
+				return maiaTagRatingsToGameFactors(
+					dimensionType as GameDimensionType,
+					result.ratings,
+					overallElo ?? 1500,
+				);
+			},
+			enabled: !!game.playerId && !!gameId,
+		})),
+	});
+
+	const factors: GameFactor[] = dimensionQueries.flatMap((q) => q.data ?? []);
 
 	return (
 		<>
@@ -132,7 +169,7 @@ function GameDetailBody({
 				moveCount={moves.length}
 				gameScore={gameScore}
 				overallElo={overallElo}
-				accuracy={accuracy}
+				accuracy={null}
 			/>
 
 			<div className="mb-4 grid grid-cols-[56px_minmax(0,1fr)_minmax(0,360px)] gap-4">

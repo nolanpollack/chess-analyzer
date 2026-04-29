@@ -14,4 +14,8 @@ todos.json
 logfile
 build/
 bench/cache/
+bench/eval/
 bench/*.json
+bench/*.zst
+bench/*.pgn
+bench/*.csv

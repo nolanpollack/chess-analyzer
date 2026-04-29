@@ -22,7 +22,7 @@ export type FlatMove = MoveAnalysis & {
 
 /**
  * A single row in the per-game factor breakdown. Built by
- * `features/ratings/utils/to-game-factor.ts` from a per-game DimensionScore[].
+ * `features/ratings/utils/to-maia-game-factor.ts` from per-game MaiaTagRatings.
  */
 export type GameFactor = {
 	label: string;

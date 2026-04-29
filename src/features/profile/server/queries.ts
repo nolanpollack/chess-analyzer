@@ -9,7 +9,7 @@
  * engine lands in Phase 3.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
 import { analysisJobs, games, players } from "#/db/schema";
@@ -51,6 +51,7 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 
 			return {
 				summary: {
+					playerId: player.id,
 					currentRating,
 					gameCount: gameRows.length,
 					analyzedGameCount: completedJobs.length,
@@ -84,4 +85,80 @@ export const getRatingTrend = createServerFn({ method: "GET" })
 	.handler(async ({ data: _data }) => {
 		// TODO Phase 3 — compute weekly rating trend from scoring engine output
 		return { weeks: [] as RatingTrendWeek[] };
+	});
+
+// ── Maia rating trend ────────────────────────────────────────────────────
+
+export type MaiaRatingTrendPoint = {
+	playedAt: string;
+	predicted: number;
+	ciLow: number;
+	ciHigh: number;
+};
+
+export type MaiaRatingSide = "white" | "black";
+
+const maiaRatingTrendSchema = z.object({
+	playerId: z.string().uuid(),
+	side: z.enum(["white", "black"]),
+	limit: z.number().int().min(1).max(200).default(50),
+});
+
+/**
+ * Returns per-game Maia predicted rating for a player on a given side,
+ * ordered ascending by played_at so charts render left-to-right.
+ * Only games with a completed Maia estimate for the requested side are included.
+ */
+export const getMaiaRatingTrend = createServerFn({ method: "GET" })
+	.inputValidator(maiaRatingTrendSchema)
+	.handler(async ({ data }) => {
+		try {
+			const predicted =
+				data.side === "white"
+					? analysisJobs.maiaPredictedWhite
+					: analysisJobs.maiaPredictedBlack;
+			const ciLow =
+				data.side === "white"
+					? analysisJobs.maiaCiLowWhite
+					: analysisJobs.maiaCiLowBlack;
+			const ciHigh =
+				data.side === "white"
+					? analysisJobs.maiaCiHighWhite
+					: analysisJobs.maiaCiHighBlack;
+
+			// Get the most recent N games for this player/side, then sort ascending.
+			const rows = await db
+				.select({
+					playedAt: games.playedAt,
+					predicted,
+					ciLow,
+					ciHigh,
+				})
+				.from(games)
+				.innerJoin(analysisJobs, eq(games.id, analysisJobs.gameId))
+				.where(
+					and(
+						eq(games.playerId, data.playerId),
+						eq(games.playerColor, data.side),
+						isNotNull(predicted),
+					),
+				)
+				.orderBy(desc(games.playedAt))
+				.limit(data.limit);
+
+			// Reverse so the chart renders oldest-to-newest
+			const sorted = rows.slice().reverse();
+
+			return {
+				points: sorted.map((r) => ({
+					playedAt: r.playedAt.toISOString(),
+					predicted: r.predicted as number,
+					ciLow: (r.ciLow ?? r.predicted) as number,
+					ciHigh: (r.ciHigh ?? r.predicted) as number,
+				})) as MaiaRatingTrendPoint[],
+			};
+		} catch (err) {
+			console.error("[getMaiaRatingTrend] Error:", err);
+			return { error: "Failed to load Maia rating trend" };
+		}
 	});

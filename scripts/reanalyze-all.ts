@@ -9,7 +9,6 @@ import { PgBoss } from "pg-boss";
 import pg from "pg";
 import {
 	analysisJobs,
-	dimensionScoreCache,
 	games,
 	moveExplanations,
 	moves,
@@ -31,7 +30,6 @@ const db = drizzle(pool);
 console.log("Wiping analysis tables...");
 await db.delete(moveExplanations);
 await db.delete(moveTags);
-await db.delete(dimensionScoreCache);
 await db.delete(moves);
 await db.delete(analysisJobs);
 

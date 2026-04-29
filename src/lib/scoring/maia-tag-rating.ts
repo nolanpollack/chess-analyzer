@@ -26,6 +26,8 @@ export type TagSliceQuery = {
 	dimensionType: string;
 	dimensionValue?: string;
 	windowKey?: string; // default: "trailing_20"
+	/** When set, restricts the query to a single game instead of using the window. */
+	gameId?: string;
 };
 
 export type MaiaTagRating = {
@@ -152,7 +154,11 @@ export async function computeMaiaTagRatings(
 	cache: PositionCache,
 	query: TagSliceQuery,
 ): Promise<MaiaTagRating[]> {
-	const gameIds = await getWindowGameIds(db, query.playerId);
+	// When gameId is supplied, score only that game (game-detail view).
+	// Otherwise, use the trailing-window of recent games.
+	const gameIds = query.gameId
+		? [query.gameId]
+		: await getWindowGameIds(db, query.playerId);
 	if (gameIds.length === 0) return [];
 
 	const tagged = await fetchTaggedPositions(

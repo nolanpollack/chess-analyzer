@@ -138,9 +138,6 @@ export const analysisJobs = pgTable(
 		// Computed once on completion for fast listing without re-aggregating moves
 		accuracyWhite: doublePrecision("accuracy_white"),
 		accuracyBlack: doublePrecision("accuracy_black"),
-		// Complexity-weighted accuracy (Phase 1 A/B comparison). Null on old analyses.
-		weightedAccuracyWhite: doublePrecision("weighted_accuracy_white"),
-		weightedAccuracyBlack: doublePrecision("weighted_accuracy_black"),
 		errorMessage: text("error_message"),
 		enqueuedAt: timestamp("enqueued_at").defaultNow().notNull(),
 		startedAt: timestamp("started_at"),
@@ -193,11 +190,6 @@ export const moves = pgTable(
 		evalDeltaCp: integer("eval_delta_cp"),
 		// Per-move accuracy 0–100 (only meaningful for player moves; null otherwise)
 		accuracyScore: doublePrecision("accuracy_score"),
-		/**
-		 * Position complexity: win%(PV1) − win%(PV2) from side-to-move perspective,
-		 * clamped to [0, 50]. Requires multipv=2 engine output. Null on old analyses.
-		 */
-		complexity: doublePrecision("complexity"),
 		classification: moveClassificationEnum(),
 
 		// Future: depth at which engine's best move stabilized. Null until generator added.
@@ -280,38 +272,6 @@ export const moveExplanations = pgTable("move_explanations", {
 	promptVersion: text("prompt_version").notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-// ── Dimension score cache (lazy-filled, player-scoped invalidation) ────
-
-export const dimensionScoreCache = pgTable(
-	"dimension_score_cache",
-	{
-		id: uuid().primaryKey().defaultRandom(),
-		playerId: uuid("player_id")
-			.references(() => players.id)
-			.notNull(),
-		dimensionType: text("dimension_type").notNull(),
-		dimensionValue: text("dimension_value").notNull(),
-		// Opaque window identifier — e.g. "trailing_20", "all", "trailing_90d"
-		windowKey: text("window_key").notNull(),
-
-		rawScore: doublePrecision("raw_score").notNull(),
-		adjustedScore: doublePrecision("adjusted_score").notNull(),
-		sampleSize: integer("sample_size").notNull(),
-		ratingEstimate: integer("rating_estimate"),
-
-		computedAt: timestamp("computed_at").defaultNow().notNull(),
-	},
-	(t) => [
-		unique("dimension_score_cache_unique").on(
-			t.playerId,
-			t.dimensionType,
-			t.dimensionValue,
-			t.windowKey,
-		),
-		index("dimension_score_cache_player_idx").on(t.playerId),
-	],
-);
 
 // ── Code-level taxonomy types (no longer pgEnum — see src/config/dimensions.ts) ─
 
