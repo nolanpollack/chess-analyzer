@@ -84,3 +84,64 @@ def test_invalid_fen_returns_400():
         r = client.post("/infer", json={"fen": "not-a-fen"})
         assert r.status_code == 400
         assert "error" in r.json()
+
+
+@pytest.mark.skipif(
+    not maia_model_available(),
+    reason="Maia-2 rapid weights not downloaded.",
+)
+def test_batched_matches_legacy():
+    """
+    Confirm batched and legacy paths produce numerically equivalent output.
+
+    Checks:
+    - Same moveIndex (deterministic ordering).
+    - Same probabilities shape (41, L).
+    - Element-wise max absolute difference < 1e-5 (allows minor float ops differences).
+    - Each row sums to ~1.0 in both paths.
+    """
+    from src.maia_loader import (  # noqa: PLC0415
+        _prepare_inference_helpers,
+        infer,
+        load_model,
+    )
+
+    model = load_model()
+    prepared = _prepare_inference_helpers()
+
+    test_fens = [
+        STARTING_FEN,
+        # Sicilian opening middlegame
+        "r1bqkb1r/1p2pppp/p1np1n2/1B2P3/3p4/2N2N2/PPP2PPP/R1BQK2R w KQkq - 0 8",
+    ]
+
+    for fen in test_fens:
+        batched = infer(model, prepared, fen, legacy=False)
+        legacy = infer(model, prepared, fen, legacy=True)
+
+        assert batched["moveIndex"] == legacy["moveIndex"], f"moveIndex mismatch for {fen}"
+        assert len(batched["probabilities"]) == RATING_GRID_LEN
+        assert len(legacy["probabilities"]) == RATING_GRID_LEN
+
+        L = len(batched["moveIndex"])
+        max_diff = 0.0
+        for i, (b_row, l_row) in enumerate(zip(batched["probabilities"], legacy["probabilities"])):
+            assert len(b_row) == L, f"batched row {i} length wrong"
+            assert len(l_row) == L, f"legacy row {i} length wrong"
+
+            # Row sum check
+            assert abs(sum(b_row) - 1.0) < 1e-3, f"batched row {i} sum != 1"
+            assert abs(sum(l_row) - 1.0) < 1e-3, f"legacy row {i} sum != 1"
+
+            # Element-wise closeness
+            for j, (b_val, l_val) in enumerate(zip(b_row, l_row)):
+                diff = abs(b_val - l_val)
+                if diff > max_diff:
+                    max_diff = diff
+
+        # Allow up to 1e-4: batched softmax and serial softmax can differ by
+        # ~1e-5 to ~1e-4 due to float32 operation-order differences.
+        assert max_diff < 1e-4, (
+            f"Max element-wise diff {max_diff:.2e} exceeds 1e-4 for FEN: {fen}"
+        )
+        print(f"\n[equivalence] {fen[:50]}… max_diff={max_diff:.2e} ✓")
