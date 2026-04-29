@@ -58,21 +58,22 @@ export async function computeAndPersistMaiaRating(
 ): Promise<void> {
 	const { db, cache, analysisJobId, whitePositions, blackPositions } = opts;
 
-	if (await isAlreadyPersisted(db, analysisJobId)) {
-		console.log(
-			`[maia-rating] ${analysisJobId} already has Maia estimates — skipping`,
-		);
-		return;
-	}
+	if (await isAlreadyPersisted(db, analysisJobId)) return;
 
 	const uniqueFens = collectUniqueFens(whitePositions, blackPositions);
+	const t0 = Date.now();
+	console.log(
+		`[maia-rating] ${analysisJobId} starting — ${uniqueFens.length} unique positions`,
+	);
 
 	// Enqueue Maia jobs for any cache misses and poll until all are satisfied.
 	// skipStockfish=true because the legacy per-move Stockfish path is already done.
+	const tEnsureStart = Date.now();
 	await ensureAnalyzed(uniqueFens, PRODUCTION_MAIA_VERSIONS, cache, {
 		wait: true,
 		skipStockfish: true,
 	});
+	const ensureMs = Date.now() - tEnsureStart;
 
 	const maiaMap = await cache.getMaiaBatch(
 		uniqueFens,
@@ -97,7 +98,8 @@ export async function computeAndPersistMaiaRating(
 		})
 		.where(eq(analysisJobs.id, analysisJobId));
 
+	const totalMs = Date.now() - t0;
 	console.log(
-		`[maia-rating] ${analysisJobId} — white: ${whiteResult?.predicted?.toFixed(0) ?? "n/a"}, black: ${blackResult?.predicted?.toFixed(0) ?? "n/a"}`,
+		`[maia-rating] ${analysisJobId} done in ${totalMs}ms (ensure ${ensureMs}ms) — white: ${whiteResult?.predicted?.toFixed(0) ?? "n/a"}, black: ${blackResult?.predicted?.toFixed(0) ?? "n/a"}`,
 	);
 }
