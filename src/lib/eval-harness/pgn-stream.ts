@@ -1,8 +1,12 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as readline from "node:readline";
 import type { Readable } from "node:stream";
 import { applyEvalFilters } from "./filter";
+
+function isUrl(s: string): boolean {
+	return s.startsWith("http://") || s.startsWith("https://");
+}
 
 export type RawGame = {
 	headers: Record<string, string>;
@@ -75,35 +79,99 @@ async function* streamGamesFromReadable(
 	}
 }
 
-function openZstdStream(filePath: string): Readable {
+type ProcStream = { readable: Readable; cleanup: () => void };
+
+function openZstdStream(filePath: string): ProcStream {
 	const proc = spawn("zstdcat", [filePath], {
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 	proc.stderr.on("data", (d: Buffer) => {
 		process.stderr.write(`zstdcat: ${d}`);
 	});
-	return proc.stdout as Readable;
+	return {
+		readable: proc.stdout as Readable,
+		cleanup: () => killProcs(proc),
+	};
 }
 
-function openPlainStream(filePath: string): Readable {
-	return fs.createReadStream(filePath, { encoding: "utf8" }) as Readable;
+function openPlainStream(filePath: string): ProcStream {
+	return {
+		readable: fs.createReadStream(filePath, { encoding: "utf8" }) as Readable,
+		cleanup: () => {},
+	};
 }
 
 /**
- * Async generator that yields filtered games from a PGN file.
- * Supports plain .pgn and zstd-compressed .pgn.zst files.
+ * Stream a remote PGN URL via `curl | zstdcat`. curl writes to its stdout,
+ * which is wired into zstdcat's stdin; we return zstdcat's stdout. When the
+ * consumer stops reading, SIGPIPE propagates and both procs exit; cleanup()
+ * is a belt-and-suspenders kill in case they don't.
+ *
+ * For non-zstd URLs (rare for Lichess), we just pipe curl's stdout straight
+ * through.
+ */
+function openHttpStream(url: string): ProcStream {
+	const isZstd = url.endsWith(".zst");
+	const curl = spawn("curl", ["-sNL", "--fail", url], {
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+	curl.stderr.on("data", (d: Buffer) => {
+		process.stderr.write(`curl: ${d}`);
+	});
+
+	if (!isZstd) {
+		return {
+			readable: curl.stdout as Readable,
+			cleanup: () => killProcs(curl),
+		};
+	}
+
+	const zstd = spawn("zstdcat", [], { stdio: ["pipe", "pipe", "pipe"] });
+	zstd.stderr.on("data", (d: Buffer) => {
+		process.stderr.write(`zstdcat: ${d}`);
+	});
+	if (curl.stdout && zstd.stdin) curl.stdout.pipe(zstd.stdin);
+
+	return {
+		readable: zstd.stdout as Readable,
+		cleanup: () => killProcs(curl, zstd),
+	};
+}
+
+function killProcs(...procs: ChildProcess[]): void {
+	for (const p of procs) {
+		if (p.exitCode === null && p.signalCode === null) {
+			try {
+				p.kill("SIGTERM");
+			} catch {
+				// already gone
+			}
+		}
+	}
+}
+
+/**
+ * Async generator that yields filtered games from a PGN source.
+ * Supports plain .pgn and zstd .pgn.zst, on local disk OR via http(s) URL.
+ * Remote sources are streamed (curl | zstdcat); no full download to disk.
  * Only yields games that pass applyEvalFilters.
  */
 export async function* streamFilteredGames(
-	filePath: string,
+	source: string,
 ): AsyncGenerator<RawGame> {
-	const readable = filePath.endsWith(".zst")
-		? openZstdStream(filePath)
-		: openPlainStream(filePath);
+	const stream = isUrl(source)
+		? openHttpStream(source)
+		: source.endsWith(".zst")
+			? openZstdStream(source)
+			: openPlainStream(source);
 
-	for await (const game of streamGamesFromReadable(readable)) {
-		if (applyEvalFilters(game.headers, game.plyCount)) {
-			yield game;
+	try {
+		for await (const game of streamGamesFromReadable(stream.readable)) {
+			if (applyEvalFilters(game.headers, game.plyCount)) {
+				yield game;
+			}
 		}
+	} finally {
+		stream.cleanup();
 	}
 }
