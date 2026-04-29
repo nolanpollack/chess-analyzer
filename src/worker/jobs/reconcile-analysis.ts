@@ -89,9 +89,12 @@ async function findOrphanGameIds(db: Db): Promise<string[]> {
 
 /**
  * `analysis_jobs` rows where Stockfish is complete but Maia data was never
- * persisted. Returns the `gameId` + `analysisJobId` pair the maia handler
- * expects.
+ * persisted. Bounded by `completed_at` so we only catch truly stuck rows,
+ * not ones whose maia job is normally queued/in-flight (Maia typically
+ * finishes within seconds of Stockfish; 10 minutes is well past that).
  */
+const MAIA_STRAGGLER_GRACE_MINUTES = 10;
+
 async function findMaiaStragglers(db: Db): Promise<MaiaStraggler[]> {
 	const rows = await db.execute<{
 		game_id: string;
@@ -102,6 +105,7 @@ async function findMaiaStragglers(db: Db): Promise<MaiaStraggler[]> {
 		WHERE aj.status = 'complete'
 		  AND aj.maia_predicted_white IS NULL
 		  AND aj.maia_predicted_black IS NULL
+		  AND aj.completed_at < NOW() - (${MAIA_STRAGGLER_GRACE_MINUTES}::int * INTERVAL '1 minute')
 	`);
 	return rows.rows.map((r) => ({
 		gameId: r.game_id,

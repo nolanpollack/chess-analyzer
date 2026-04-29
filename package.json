@@ -24,7 +24,9 @@
     "calibrate": "bun scripts/calibrate-rating-formula.ts",
     "benchmark": "bun scripts/benchmark-analysis.ts",
     "clear-all": "dotenv -e .env.local -- bun scripts/clear-all.ts",
-    "backfill-maia": "dotenv -e .env.local -- bun scripts/backfill-maia-game-ratings.ts"
+    "reconcile": "dotenv -e .env.local -- bun scripts/reconcile.ts",
+    "backfill-maia": "dotenv -e .env.local -- bun scripts/backfill-maia-game-ratings.ts",
+    "maia": "cd services/maia-inference && uv run uvicorn src.main:app --port 8765"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
