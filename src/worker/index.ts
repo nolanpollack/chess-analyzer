@@ -5,6 +5,10 @@ import {
 	registerAnalyzeGameJob,
 } from "#/worker/jobs/analyze-game";
 import {
+	ANALYZE_GAME_MAIA_QUEUE,
+	registerAnalyzeGameMaiaJob,
+} from "#/worker/jobs/analyze-game-maia";
+import {
 	ANALYZE_POSITION_MAIA,
 	registerAnalyzePositionMaiaJob,
 } from "#/worker/jobs/analyze-position-maia";
@@ -32,6 +36,10 @@ async function start() {
 	await boss.createQueue(ANALYZE_GAME_QUEUE);
 	registerAnalyzeGameJob(boss);
 	console.log("[worker] registered analyze-game handler");
+
+	await boss.createQueue(ANALYZE_GAME_MAIA_QUEUE);
+	registerAnalyzeGameMaiaJob(boss);
+	console.log("[worker] registered analyze-game-maia handler");
 
 	await boss.createQueue(ANALYZE_POSITION_MAIA);
 	registerAnalyzePositionMaiaJob(boss);

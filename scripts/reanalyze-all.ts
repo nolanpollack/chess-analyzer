@@ -15,6 +15,7 @@ import {
 	moveTags,
 } from "#/db/schema";
 import { ANALYZE_GAME_QUEUE } from "#/worker/jobs/analyze-game";
+import { ANALYZE_GAME_MAIA_QUEUE } from "#/worker/jobs/analyze-game-maia";
 
 config({ path: ".env.local" });
 
@@ -45,7 +46,9 @@ const boss = new PgBoss(DATABASE_URL);
 await boss.start();
 await boss.createQueue(ANALYZE_GAME_QUEUE);
 await boss.deleteAllJobs(ANALYZE_GAME_QUEUE);
-console.log("Cleared stale jobs from queue.");
+await boss.createQueue(ANALYZE_GAME_MAIA_QUEUE);
+await boss.deleteAllJobs(ANALYZE_GAME_MAIA_QUEUE);
+console.log("Cleared stale jobs from queues.");
 
 for (const game of allGames) {
 	await boss.send(ANALYZE_GAME_QUEUE, { gameId: game.id });

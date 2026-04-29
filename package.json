@@ -23,7 +23,8 @@
     "reanalyze": "bun scripts/reanalyze-all.ts",
     "calibrate": "bun scripts/calibrate-rating-formula.ts",
     "benchmark": "bun scripts/benchmark-analysis.ts",
-    "clear-all": "dotenv -e .env.local -- bun scripts/clear-all.ts"
+    "clear-all": "dotenv -e .env.local -- bun scripts/clear-all.ts",
+    "backfill-maia": "dotenv -e .env.local -- bun scripts/backfill-maia-game-ratings.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

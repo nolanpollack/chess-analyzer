@@ -16,10 +16,11 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
-import * as schema from "#/db/schema";
+import type * as schema from "#/db/schema";
 import { analysisJobs, games, moves, moveTags } from "#/db/schema";
 
 type Db = NodePgDatabase<typeof schema>;
+
 import {
 	computeEvalDelta,
 	computeMoveAccuracy,
@@ -28,14 +29,17 @@ import {
 } from "#/lib/analysis/accuracy";
 import { type PgnMove, walkPgn } from "#/lib/analysis/pgn";
 import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
-import { createPositionCache } from "#/lib/position-cache";
+import { ensureQueue, getBoss } from "#/lib/queue";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
 import type { AnalysisEngine } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
 import { getWorkerDb } from "../db";
-import { computeAndPersistMaiaRating } from "./maia-rating";
+import {
+	ANALYZE_GAME_MAIA_QUEUE,
+	type AnalyzeGameMaiaPayload,
+} from "./analyze-game-maia";
 
 export const ANALYZE_GAME_QUEUE = "analyze-game";
 export const PIPELINE_VERSION = "v1";
@@ -85,20 +89,17 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 		return;
 	}
 
+	// Enqueue Maia inference as an independent job so it can run at higher
+	// concurrency (batchSize=8) without being blocked by Stockfish (batchSize=2).
+	// singletonKey prevents duplicate enqueues if analyze-game is retried.
+	await enqueueMaiaJob(gameId, jobId);
+
 	const game = await loadGame(db, gameId);
 	const engine = createStockfishWasmEngine();
 
 	try {
 		await engine.init();
 		const pgnMoves = walkPgn(game.pgn);
-
-		// Position list (fen + uci) comes purely from the PGN walk — no engine
-		// dependency — so the Maia path can start immediately while Stockfish
-		// is still grinding through per-move evaluation.
-		const { whitePositions, blackPositions } = collectSidePositions(
-			pgnMoves,
-			game.playerColor,
-		);
 
 		await db
 			.update(analysisJobs)
@@ -109,67 +110,43 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			})
 			.where(eq(analysisJobs.id, jobId));
 
-		const positionCache = createPositionCache(db);
-
-		// Maia and Stockfish are independent; run in parallel. They write to
-		// disjoint columns of the same analysis_jobs row (Maia → maia_*,
-		// Stockfish → accuracy_*/status="complete") so there is no conflict.
-		// Stockfish path is the slow one; Maia typically lands first and the
-		// game-list gameScore appears well before status flips to "complete".
-		const stockfishWork = (async () => {
-			const positionEvals = await evaluateAllPositions(
-				engine,
-				pgnMoves,
-				db,
-				jobId,
-			);
-
-			const { moveRows, accuracyWhite, accuracyBlack } = buildMoveRows({
-				pgnMoves,
-				positionEvals,
-				playerColor: game.playerColor,
-				playerId: game.playerId,
-				gameId,
-				analysisJobId: jobId,
-			});
-
-			// Replace any prior moves + tags for this job (re-run safety).
-			await deleteJobTags(db, jobId);
-			await db.delete(moves).where(eq(moves.analysisJobId, jobId));
-
-			let insertedMoves: Move[] = [];
-			if (moveRows.length > 0) {
-				insertedMoves = await db.insert(moves).values(moveRows).returning();
-			}
-
-			await runAndInsertTags(db, insertedMoves, await loadGameRow(db, gameId));
-
-			await db
-				.update(analysisJobs)
-				.set({
-					accuracyWhite,
-					accuracyBlack,
-					movesAnalyzed: pgnMoves.length,
-					status: "complete",
-					completedAt: new Date(),
-				})
-				.where(eq(analysisJobs.id, jobId));
-
-			return { accuracyWhite, accuracyBlack };
-		})();
-
-		const maiaWork = computeAndPersistMaiaRating({
+		const positionEvals = await evaluateAllPositions(
+			engine,
+			pgnMoves,
 			db,
-			cache: positionCache,
+			jobId,
+		);
+
+		const { moveRows, accuracyWhite, accuracyBlack } = buildMoveRows({
+			pgnMoves,
+			positionEvals,
+			playerColor: game.playerColor,
+			playerId: game.playerId,
+			gameId,
 			analysisJobId: jobId,
-			whitePositions,
-			blackPositions,
 		});
 
-		const [{ accuracyWhite, accuracyBlack }] = await Promise.all([
-			stockfishWork,
-			maiaWork,
-		]);
+		// Replace any prior moves + tags for this job (re-run safety).
+		await deleteJobTags(db, jobId);
+		await db.delete(moves).where(eq(moves.analysisJobId, jobId));
+
+		let insertedMoves: Move[] = [];
+		if (moveRows.length > 0) {
+			insertedMoves = await db.insert(moves).values(moveRows).returning();
+		}
+
+		await runAndInsertTags(db, insertedMoves, await loadGameRow(db, gameId));
+
+		await db
+			.update(analysisJobs)
+			.set({
+				accuracyWhite,
+				accuracyBlack,
+				movesAnalyzed: pgnMoves.length,
+				status: "complete",
+				completedAt: new Date(),
+			})
+			.where(eq(analysisJobs.id, jobId));
 
 		console.log(
 			`[analyze-game] Completed game ${gameId}: ${pgnMoves.length} moves, white ${accuracyWhite}%, black ${accuracyBlack}%`,
@@ -183,22 +160,21 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 	}
 }
 
-/**
- * Extract per-side (fen, uci) lists from the parsed PGN. Independent of any
- * engine output — used by the Maia rating step that runs in parallel with
- * Stockfish per-move analysis.
- */
-function collectSidePositions(
-	pgnMoves: PgnMove[],
-	_playerColor: "white" | "black",
-): { whitePositions: SidePositions; blackPositions: SidePositions } {
-	const whitePositions: SidePositions = [];
-	const blackPositions: SidePositions = [];
-	for (const move of pgnMoves) {
-		const target = move.isWhite ? whitePositions : blackPositions;
-		target.push({ fen: move.fenBefore, playedMove: move.uci });
-	}
-	return { whitePositions, blackPositions };
+async function enqueueMaiaJob(
+	gameId: string,
+	analysisJobId: string,
+): Promise<void> {
+	await ensureQueue(ANALYZE_GAME_MAIA_QUEUE);
+	const boss = await getBoss();
+	await boss.send(
+		ANALYZE_GAME_MAIA_QUEUE,
+		{ gameId, analysisJobId } satisfies AnalyzeGameMaiaPayload,
+		{
+			singletonKey: `analyze-game-maia:${analysisJobId}`,
+			retryLimit: 3,
+			retryBackoff: true,
+		},
+	);
 }
 
 /**
@@ -355,8 +331,6 @@ async function evaluateAllPositions(
 
 type MoveRow = typeof moves.$inferInsert;
 
-type SidePositions = { fen: string; playedMove: string }[];
-
 type BuildMoveRowsResult = {
 	moveRows: MoveRow[];
 	accuracyWhite: number;
@@ -458,11 +432,7 @@ function buildMoveRows(args: {
 	};
 }
 
-async function markFailed(
-	db: Db,
-	jobId: string,
-	err: unknown,
-): Promise<void> {
+async function markFailed(db: Db, jobId: string, err: unknown): Promise<void> {
 	await db
 		.update(analysisJobs)
 		.set({
