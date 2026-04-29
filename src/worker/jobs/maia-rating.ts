@@ -1,16 +1,16 @@
 /**
- * Worker-side glue: enqueues Maia analysis jobs for all positions in a game,
- * polls until they are satisfied, then estimates per-side ratings and persists
- * them to analysis_jobs.
+ * Worker-side glue: fetches Maia inference for every unique position in a
+ * game via the sidecar's `/infer-batch` endpoint (direct, no per-position
+ * queue), then estimates per-side ratings and persists them to analysis_jobs.
  *
  * Idempotent: if maiaPredictedWhite is already set, the function returns early.
  * Re-throws on failure so pg-boss can retry the parent analyze-game job.
  */
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import * as schema from "#/db/schema";
+import type * as schema from "#/db/schema";
 import { analysisJobs } from "#/db/schema";
-import { ensureAnalyzed } from "#/lib/analysis-dispatcher";
+import { ensureMaiaDirectBatch } from "#/lib/maia-direct-batch";
 import type { PositionCache } from "#/lib/position-cache";
 import {
 	estimateGameSideRating,
@@ -67,19 +67,16 @@ export async function computeAndPersistMaiaRating(
 		`[maia-rating] ${analysisJobId} starting — ${uniqueFens.length} unique positions`,
 	);
 
-	// Enqueue Maia jobs for any cache misses and poll until all are satisfied.
-	// skipStockfish=true because the legacy per-move Stockfish path is already done.
-	const tEnsureStart = Date.now();
-	await ensureAnalyzed(uniqueFens, PRODUCTION_MAIA_VERSIONS, cache, {
-		wait: true,
-		skipStockfish: true,
-	});
-	const ensureMs = Date.now() - tEnsureStart;
-
-	const maiaMap = await cache.getMaiaBatch(
+	// Direct /infer-batch: one HTTP call to the sidecar for every cache miss,
+	// no per-position queue or polling. The map returned already includes
+	// previously-cached entries.
+	const tInferStart = Date.now();
+	const maiaMap = await ensureMaiaDirectBatch(
 		uniqueFens,
-		PRODUCTION_MAIA_VERSIONS.maiaVersion,
+		PRODUCTION_MAIA_VERSIONS,
+		cache,
 	);
+	const inferMs = Date.now() - tInferStart;
 
 	const whiteResult = estimateGameSideRating("white", whitePositions, maiaMap);
 	const blackResult = estimateGameSideRating("black", blackPositions, maiaMap);
@@ -101,6 +98,6 @@ export async function computeAndPersistMaiaRating(
 
 	const totalMs = Date.now() - t0;
 	console.log(
-		`[maia-rating] ${analysisJobId} done in ${totalMs}ms (ensure ${ensureMs}ms) — white: ${whiteResult?.predicted?.toFixed(0) ?? "n/a"}, black: ${blackResult?.predicted?.toFixed(0) ?? "n/a"}`,
+		`[maia-rating] ${analysisJobId} done in ${totalMs}ms (infer ${inferMs}ms) — white: ${whiteResult?.predicted?.toFixed(0) ?? "n/a"}, black: ${blackResult?.predicted?.toFixed(0) ?? "n/a"}`,
 	);
 }

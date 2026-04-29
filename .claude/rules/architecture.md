@@ -13,13 +13,21 @@
 ## Maia-2 inference sidecar (Phase 2A)
 - Service location: `services/maia-inference/` (Python, uv-managed)
 - Start: `uv run uvicorn src.main:app --port 8765` from `services/maia-inference/`
-- Exposes `POST /infer {fen}` → `{maiaVersion, ratingGrid, moveIndex, probabilities}`
+- Exposes `POST /infer {fen}`, `POST /infer-batch {fens}` → `{maiaVersion, ratingGrid, moveIndex, probabilities}`
   where `probabilities` is shape (41, L) — 41 ELO buckets 600..2600@50, L legal moves.
 - Exposes `GET /health` for readiness.
 - Weights auto-downloaded from Google Drive on first run into `maia2_models/` (gitignored).
 - Maia-2 internally uses 11 coarse ELO buckets; the service deduplicates forward passes
   and broadcasts, then renormalizes rows to sum to 1.0.
 - TS worker calls this service via fetch — never import Python code from TS.
+- **Production maia inference uses `/infer-batch` directly** via
+  `ensureMaiaDirectBatch` (`src/lib/maia-direct-batch.ts`). One HTTP call
+  per game, results written straight to `maia_cache`. The legacy
+  `analyze-position-maia` queue still exists and may be used by the eval
+  harness with `directBatch: false`, but the per-game worker
+  (`computeAndPersistMaiaRating`) no longer uses it. Going through the
+  queue caused multi-minute polling stalls when any backlog existed
+  (`batchSize: 2`, single-FEN `/infer` calls).
 
 ## Worker
 - Worker entry point: src/worker/index.ts

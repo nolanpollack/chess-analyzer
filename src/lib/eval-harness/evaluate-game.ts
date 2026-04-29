@@ -1,7 +1,6 @@
 import type { AnalysisVersions } from "#/lib/analysis-dispatcher";
 import { ensureAnalyzed } from "#/lib/analysis-dispatcher";
-import type { MaiaInferBatchResult } from "#/lib/maia-client";
-import { inferMaiaBatch } from "#/lib/maia-client";
+import { ensureMaiaDirectBatch } from "#/lib/maia-direct-batch";
 import type { MaiaOutput, PositionCache } from "#/lib/position-cache";
 import type { Position } from "#/lib/rating-aggregator";
 import { estimateRating } from "#/lib/rating-aggregator";
@@ -63,69 +62,6 @@ async function countCacheHits(
 ): Promise<number> {
 	const present = await cache.getMaiaBatch(fens, versions.maiaVersion);
 	return present.size;
-}
-
-/**
- * Convert a raw /infer-batch result row into the Float32Array-based MaiaOutput
- * expected by the rating aggregator.
- * Probabilities from the service are number[][] (row-major, 41 × L);
- * we flatten to a single Float32Array in row-major order.
- */
-function batchResultToMaiaOutput(
-	result: MaiaInferBatchResult,
-	ratingGrid: number[],
-): MaiaOutput {
-	const rows = result.probabilities;
-	const totalLen = rows.reduce((s, row) => s + row.length, 0);
-	const flat = new Float32Array(totalLen);
-	let offset = 0;
-	for (const row of rows) {
-		flat.set(row, offset);
-		offset += row.length;
-	}
-	return {
-		ratingGrid,
-		moveIndex: result.moveIndex,
-		probabilities: flat,
-	};
-}
-
-/**
- * Direct-batch path: check cache for misses, call /infer-batch for any missing
- * positions, write results back to cache, return the final merged map.
- *
- * When skipStockfish is true we skip SF entirely (safe because the aggregator
- * does not consume SF data).
- */
-async function ensureMaiaDirectBatch(
-	uniqueFens: string[],
-	versions: AnalysisVersions,
-	cache: PositionCache,
-): Promise<Map<string, MaiaOutput>> {
-	const cached = await cache.getMaiaBatch(uniqueFens, versions.maiaVersion);
-	const missingFens = uniqueFens.filter((fen) => !cached.has(fen));
-
-	if (missingFens.length > 0) {
-		const batchResponse = await inferMaiaBatch(missingFens);
-		await Promise.all(
-			batchResponse.results.map((result) => {
-				const output = batchResultToMaiaOutput(
-					result,
-					batchResponse.ratingGrid,
-				);
-				return cache.putMaia(result.fen, versions.maiaVersion, output);
-			}),
-		);
-		// Merge newly fetched into cached map
-		for (const result of batchResponse.results) {
-			cached.set(
-				result.fen,
-				batchResultToMaiaOutput(result, batchResponse.ratingGrid),
-			);
-		}
-	}
-
-	return cached;
 }
 
 /**

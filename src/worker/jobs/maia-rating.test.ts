@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MaiaOutput } from "#/lib/position-cache";
 
-// ── Mock #/lib/analysis-dispatcher ────────────────────────────────────────
-const mockEnsureAnalyzed = vi
-	.fn<() => Promise<void>>()
-	.mockResolvedValue(undefined);
-vi.mock("#/lib/analysis-dispatcher", () => ({
-	ensureAnalyzed: (...args: unknown[]) => mockEnsureAnalyzed(...args),
+// ── Mock #/lib/maia-direct-batch ──────────────────────────────────────────
+const mockEnsureMaiaDirectBatch = vi
+	.fn<() => Promise<Map<string, MaiaOutput>>>()
+	.mockResolvedValue(new Map());
+vi.mock("#/lib/maia-direct-batch", () => ({
+	ensureMaiaDirectBatch: (...args: unknown[]) =>
+		mockEnsureMaiaDirectBatch(...args),
 }));
 
 // ── Mock #/lib/scoring/maia-game-rating ───────────────────────────────────
@@ -89,11 +90,10 @@ describe("computeAndPersistMaiaRating", () => {
 			blackPositions: BLACK_POSITIONS,
 		});
 
-		expect(mockEnsureAnalyzed).not.toHaveBeenCalled();
-		expect(cache.getMaiaBatch).not.toHaveBeenCalled();
+		expect(mockEnsureMaiaDirectBatch).not.toHaveBeenCalled();
 	});
 
-	it("happy path: calls ensureAnalyzed once with skipStockfish=true, reads cache, writes both sides", async () => {
+	it("happy path: calls ensureMaiaDirectBatch with unique fens and writes both sides", async () => {
 		const db = makeDb(null); // not yet populated
 		const fen1 = WHITE_POSITIONS[0].fen;
 		const fen2 = BLACK_POSITIONS[0].fen;
@@ -102,7 +102,8 @@ describe("computeAndPersistMaiaRating", () => {
 			[fen1, maia],
 			[fen2, maia],
 		]);
-		const cache = makeCache(maiaMap);
+		const cache = makeCache();
+		mockEnsureMaiaDirectBatch.mockResolvedValueOnce(maiaMap);
 
 		const whiteResult = {
 			side: "white" as const,
@@ -130,15 +131,10 @@ describe("computeAndPersistMaiaRating", () => {
 			blackPositions: BLACK_POSITIONS,
 		});
 
-		// ensureAnalyzed called once with skipStockfish: true
-		expect(mockEnsureAnalyzed).toHaveBeenCalledOnce();
-		const [, , , opts] = mockEnsureAnalyzed.mock.calls[0];
-		expect(opts).toMatchObject({ wait: true, skipStockfish: true });
+		expect(mockEnsureMaiaDirectBatch).toHaveBeenCalledOnce();
+		const [fensArg] = mockEnsureMaiaDirectBatch.mock.calls[0];
+		expect(new Set(fensArg as string[])).toEqual(new Set([fen1, fen2]));
 
-		// Cache read happened
-		expect(cache.getMaiaBatch).toHaveBeenCalledOnce();
-
-		// DB update called with both sides
 		const updateMock = (
 			db as unknown as { _updateSet: ReturnType<typeof vi.fn> }
 		)._updateSet;
@@ -148,10 +144,10 @@ describe("computeAndPersistMaiaRating", () => {
 		expect(setArg.maiaVersion).toBe("maia2-rapid-v1.0");
 	});
 
-	it("re-throws when ensureAnalyzed throws, so pg-boss can retry", async () => {
+	it("re-throws when ensureMaiaDirectBatch throws, so pg-boss can retry", async () => {
 		const db = makeDb(null);
 		const cache = makeCache();
-		mockEnsureAnalyzed.mockRejectedValueOnce(new Error("timeout"));
+		mockEnsureMaiaDirectBatch.mockRejectedValueOnce(new Error("sidecar down"));
 
 		await expect(
 			computeAndPersistMaiaRating({
@@ -161,6 +157,6 @@ describe("computeAndPersistMaiaRating", () => {
 				whitePositions: WHITE_POSITIONS,
 				blackPositions: BLACK_POSITIONS,
 			}),
-		).rejects.toThrow("timeout");
+		).rejects.toThrow("sidecar down");
 	});
 });
