@@ -50,12 +50,10 @@ export function registerAnalyzeGameJob(boss: PgBoss) {
 		ANALYZE_GAME_QUEUE,
 		{
 			pollingIntervalSeconds: 5,
-			batchSize: 1,
+			batchSize: 2,
 		},
 		async (jobs) => {
-			for (const job of jobs) {
-				await handleAnalyzeGame(job.data);
-			}
+			await Promise.all(jobs.map((job) => handleAnalyzeGame(job.data)));
 		},
 	);
 }
