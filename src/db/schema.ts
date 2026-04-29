@@ -145,6 +145,16 @@ export const analysisJobs = pgTable(
 		enqueuedAt: timestamp("enqueued_at").defaultNow().notNull(),
 		startedAt: timestamp("started_at"),
 		completedAt: timestamp("completed_at"),
+		// Maia-2 rating estimates (Phase 7). Nullable — absent on legacy analyses.
+		maiaVersion: text("maia_version"),
+		maiaPredictedWhite: doublePrecision("maia_predicted_white"),
+		maiaCiLowWhite: doublePrecision("maia_ci_low_white"),
+		maiaCiHighWhite: doublePrecision("maia_ci_high_white"),
+		maiaNPositionsWhite: integer("maia_n_positions_white"),
+		maiaPredictedBlack: doublePrecision("maia_predicted_black"),
+		maiaCiLowBlack: doublePrecision("maia_ci_low_black"),
+		maiaCiHighBlack: doublePrecision("maia_ci_high_black"),
+		maiaNPositionsBlack: integer("maia_n_positions_black"),
 	},
 	(t) => [index("analysis_jobs_game_id_idx").on(t.gameId)],
 );

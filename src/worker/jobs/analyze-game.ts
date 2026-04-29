@@ -26,6 +26,7 @@ import {
 } from "#/lib/analysis/accuracy";
 import { type PgnMove, walkPgn } from "#/lib/analysis/pgn";
 import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
+import { createPositionCache } from "#/lib/position-cache";
 import { invalidatePlayerCache } from "#/lib/scoring/cache";
 import { moveComplexity } from "#/lib/scoring/complexity";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
@@ -37,6 +38,7 @@ import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
 import type { AnalysisEngine, PositionEval } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
+import { computeAndPersistMaiaRating } from "./maia-rating";
 
 export const ANALYZE_GAME_QUEUE = "analyze-game";
 export const PIPELINE_VERSION = "v1";
@@ -118,6 +120,8 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			accuracyBlack,
 			weightedAccuracyWhite,
 			weightedAccuracyBlack,
+			whitePositions,
+			blackPositions,
 		} = buildMoveRows({
 			pgnMoves,
 			positionEvals,
@@ -154,6 +158,19 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			.where(eq(analysisJobs.id, jobId));
 
 		await invalidatePlayerCache(db, game.playerId);
+
+		// Phase 7: Maia-2 rating estimation.
+		// This runs AFTER legacy accuracy/classifications are persisted so that a
+		// Maia failure does not lose the legacy analysis. The job will retry and
+		// computeAndPersistMaiaRating is idempotent.
+		const positionCache = createPositionCache(db);
+		await computeAndPersistMaiaRating({
+			db,
+			cache: positionCache,
+			analysisJobId: jobId,
+			whitePositions,
+			blackPositions,
+		});
 
 		console.log(
 			`[analyze-game] Completed game ${gameId}: ${pgnMoves.length} moves, white ${accuracyWhite}%, black ${accuracyBlack}%`,
@@ -336,12 +353,16 @@ async function evaluateAllPositions(
 
 type MoveRow = typeof moves.$inferInsert;
 
+type SidePositions = { fen: string; playedMove: string }[];
+
 type BuildMoveRowsResult = {
 	moveRows: MoveRow[];
 	accuracyWhite: number;
 	accuracyBlack: number;
 	weightedAccuracyWhite: number;
 	weightedAccuracyBlack: number;
+	whitePositions: SidePositions;
+	blackPositions: SidePositions;
 };
 
 function buildMoveRows(args: {
@@ -356,6 +377,8 @@ function buildMoveRows(args: {
 	const moveRows: MoveRow[] = [];
 	const allEvals: MoveEvalData[] = [];
 	const allWeightedMoves: WeightedMove[] = [];
+	const whitePositions: SidePositions = [];
+	const blackPositions: SidePositions = [];
 	let prevWinPctLost: number | null = null;
 
 	for (const move of args.pgnMoves) {
@@ -412,6 +435,10 @@ function buildMoveRows(args: {
 		const pv1SideToMove = move.isWhite ? before.evalCp : -before.evalCp;
 		const complexity = moveComplexity(pv1SideToMove, before.pv2EvalCp);
 
+		// Collect FEN-before + UCI move for Maia rating estimation (Phase 7).
+		const sidePositions = move.isWhite ? whitePositions : blackPositions;
+		sidePositions.push({ fen: move.fenBefore, playedMove: move.uci });
+
 		moveRows.push({
 			analysisJobId: args.analysisJobId,
 			gameId: args.gameId,
@@ -450,6 +477,8 @@ function buildMoveRows(args: {
 		accuracyBlack: gameAccuracy?.black ?? 0,
 		weightedAccuracyWhite: weightedAccuracy?.white ?? 0,
 		weightedAccuracyBlack: weightedAccuracy?.black ?? 0,
+		whitePositions,
+		blackPositions,
 	};
 }
 
