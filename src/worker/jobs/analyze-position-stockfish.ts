@@ -10,9 +10,7 @@
  * Engine pool: engines are initialised once and reused across jobs.
  * Pool size defaults to STOCKFISH_POOL_SIZE env var or 4.
  */
-import { drizzle } from "drizzle-orm/node-postgres";
 import type { Job, PgBoss } from "pg-boss";
-import * as schema from "#/db/schema";
 import {
 	ANALYZE_POSITION_STOCKFISH,
 	type AnalyzePositionStockfishPayload,
@@ -22,6 +20,7 @@ import { createStockfishPool } from "#/lib/engine-pool/stockfish-pool";
 import { createPositionCache } from "#/lib/position-cache";
 import type { StockfishOutput } from "#/lib/position-cache/types";
 import type { AnalysisEngine, PositionEval } from "#/providers/analysis-engine";
+import { getWorkerDb } from "#/worker/db";
 
 export { ANALYZE_POSITION_STOCKFISH };
 
@@ -85,8 +84,7 @@ export async function handleAnalyzePositionStockfish(
 		`[analyze-position-stockfish] fen="${fen}" version=${stockfishVersion} depth=${stockfishDepth}`,
 	);
 
-	const db = drizzle(process.env.DATABASE_URL as string, { schema });
-	const cache = createPositionCache(db);
+	const cache = createPositionCache(getWorkerDb());
 
 	const already = await cache.hasStockfish(
 		fen,

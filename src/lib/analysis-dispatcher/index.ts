@@ -16,7 +16,7 @@ export type {
 } from "./job-names";
 
 const DEFAULT_WAIT_TIMEOUT_MS = 600_000;
-const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_POLL_INTERVAL_MS = 200;
 
 export class AnalysisDispatcherTimeoutError extends Error {
 	constructor(public readonly unfinishedCount: number) {

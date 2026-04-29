@@ -64,11 +64,18 @@ async function evaluateAllGames(
 	prior: PriorName,
 ): Promise<EvalRow[]> {
 	const rows: EvalRow[] = [];
+	const total = sampledGames.length;
+	let i = 0;
 
 	for (const { pgn } of sampledGames) {
+		i++;
 		const parsed = pgnGameToSides(pgn);
-		if (!parsed) continue;
+		if (!parsed) {
+			console.error(`[eval] ${i}/${total}: skipped (parse failed)`);
+			continue;
+		}
 
+		const t0 = Date.now();
 		try {
 			const gameRows = await evaluateGame(parsed, cache, {
 				versions: config.versions,
@@ -78,8 +85,16 @@ async function evaluateAllGames(
 				skipStockfish: config.skipStockfish,
 			});
 			rows.push(...gameRows);
+			const ms = Date.now() - t0;
+			const summary = gameRows
+				.map(
+					(r) =>
+						`${r.side[0]}: true=${r.trueRating} pred=${r.predicted.toFixed(0)}`,
+				)
+				.join("  ");
+			console.error(`[eval] ${i}/${total} (${ms}ms) ${parsed.gameId}  ${summary}`);
 		} catch (err) {
-			console.error(`Failed to evaluate game ${parsed.gameId}:`, err);
+			console.error(`[eval] ${i}/${total} FAILED ${parsed.gameId}:`, err);
 		}
 	}
 

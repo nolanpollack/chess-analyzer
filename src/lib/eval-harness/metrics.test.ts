@@ -14,6 +14,9 @@ function makeRow(overrides: Partial<EvalRow> = {}): EvalRow {
 		ciLow: 1400,
 		ciHigh: 1600,
 		withinCi: true,
+		cacheHits: 10,
+		cacheMisses: 5,
+		uniquePositions: 15,
 		...overrides,
 	};
 }
@@ -98,5 +101,65 @@ describe("computeStratifiedMetrics", () => {
 		const { overall } = computeStratifiedMetrics([]);
 		expect(overall.n).toBe(0);
 		expect(overall.mae).toBe(0);
+	});
+
+	it("computes cacheHitRate correctly", () => {
+		// Two side rows for one game: cacheHits=8, cacheMisses=2, uniquePositions=10
+		const rows = [
+			makeRow({
+				gameId: "g1",
+				side: "white",
+				cacheHits: 8,
+				cacheMisses: 2,
+				uniquePositions: 10,
+			}),
+			makeRow({
+				gameId: "g1",
+				side: "black",
+				cacheHits: 8,
+				cacheMisses: 2,
+				uniquePositions: 10,
+			}),
+		];
+		const { overall } = computeStratifiedMetrics(rows);
+		// After dividing by 2: hits=8, misses=2 → rate=0.8
+		expect(overall.cacheHitRate).toBeCloseTo(0.8, 5);
+		expect(overall.totalUniquePositions).toBe(10);
+	});
+
+	it("computes totalUniquePositions across multiple games", () => {
+		// Game A: 10 unique positions; Game B: 20 unique positions
+		const rows = [
+			makeRow({
+				gameId: "gA",
+				side: "white",
+				cacheHits: 5,
+				cacheMisses: 5,
+				uniquePositions: 10,
+			}),
+			makeRow({
+				gameId: "gA",
+				side: "black",
+				cacheHits: 5,
+				cacheMisses: 5,
+				uniquePositions: 10,
+			}),
+			makeRow({
+				gameId: "gB",
+				side: "white",
+				cacheHits: 20,
+				cacheMisses: 0,
+				uniquePositions: 20,
+			}),
+			makeRow({
+				gameId: "gB",
+				side: "black",
+				cacheHits: 20,
+				cacheMisses: 0,
+				uniquePositions: 20,
+			}),
+		];
+		const { overall } = computeStratifiedMetrics(rows);
+		expect(overall.totalUniquePositions).toBe(30);
 	});
 });

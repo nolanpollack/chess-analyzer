@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-// Mock Drizzle connection
-vi.mock("drizzle-orm/node-postgres", () => ({
-	drizzle: vi.fn(() => ({})),
+// Mock the worker DB singleton so tests don't need a real DATABASE_URL
+vi.mock("#/worker/db", () => ({
+	getWorkerDb: vi.fn(() => ({})),
 }));
 
 // Mock the position cache

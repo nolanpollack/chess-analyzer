@@ -7,15 +7,14 @@
  * Idempotent: checks for an existing cache row before calling the service.
  * Retries: pg-boss handles retries by re-throwing on error.
  */
-import { drizzle } from "drizzle-orm/node-postgres";
 import type { Job, PgBoss } from "pg-boss";
-import * as schema from "#/db/schema";
 import {
 	ANALYZE_POSITION_MAIA,
 	type AnalyzePositionMaiaPayload,
 } from "#/lib/analysis-dispatcher/job-names";
 import { inferMaia } from "#/lib/maia-client";
 import { createPositionCache } from "#/lib/position-cache";
+import { getWorkerDb } from "#/worker/db";
 
 export { ANALYZE_POSITION_MAIA };
 
@@ -24,9 +23,7 @@ export function registerAnalyzePositionMaiaJob(boss: PgBoss) {
 		ANALYZE_POSITION_MAIA,
 		{ pollingIntervalSeconds: 5, batchSize: 2 },
 		async (jobs: Job<AnalyzePositionMaiaPayload>[]) => {
-			for (const job of jobs) {
-				await handleAnalyzePositionMaia(job.data);
-			}
+			await Promise.all(jobs.map((job) => handleAnalyzePositionMaia(job.data)));
 		},
 	);
 }
@@ -37,8 +34,7 @@ async function handleAnalyzePositionMaia(
 	const { fen, maiaVersion } = data;
 	console.log(`[analyze-position-maia] fen="${fen}" version=${maiaVersion}`);
 
-	const db = drizzle(process.env.DATABASE_URL as string, { schema });
-	const cache = createPositionCache(db);
+	const cache = createPositionCache(getWorkerDb());
 
 	const already = await cache.hasMaia(fen, maiaVersion);
 	if (already) {

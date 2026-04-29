@@ -19,6 +19,10 @@ export type EvalRow = {
 	ciLow: number;
 	ciHigh: number;
 	withinCi: boolean;
+	// Game-level cache stats repeated on each side row for convenience
+	cacheHits: number;
+	cacheMisses: number;
+	uniquePositions: number;
 };
 
 type EvaluateGameOptions = {
@@ -47,6 +51,15 @@ async function buildPositionsForSide(
  * Ensures all positions in the game are analyzed, then estimates ratings
  * for both sides. Returns two EvalRows (one per side).
  */
+async function countCacheHits(
+	fens: string[],
+	versions: EvaluateGameOptions["versions"],
+	cache: PositionCache,
+): Promise<number> {
+	const present = await cache.getMaiaBatch(fens, versions.maiaVersion);
+	return present.size;
+}
+
 export async function evaluateGame(
 	game: ParsedGame,
 	cache: PositionCache,
@@ -56,12 +69,23 @@ export async function evaluateGame(
 		...game.white.positions.map((p) => p.fen),
 		...game.black.positions.map((p) => p.fen),
 	];
+	const uniqueFens = [...new Set(allFens)];
+	const uniquePositions = uniqueFens.length;
+
+	const hitsBeforeAnalysis = await countCacheHits(
+		uniqueFens,
+		opts.versions,
+		cache,
+	);
 
 	await ensureAnalyzed(allFens, opts.versions, cache, {
 		wait: true,
 		waitTimeoutMs: opts.waitTimeoutMs,
 		skipStockfish: opts.skipStockfish,
 	});
+
+	const cacheHits = hitsBeforeAnalysis;
+	const cacheMisses = uniquePositions - cacheHits;
 
 	const maiaMap = await cache.getMaiaBatch(allFens, opts.versions.maiaVersion);
 
@@ -94,6 +118,9 @@ export async function evaluateGame(
 			ciHigh: estimate.ciHigh,
 			withinCi:
 				side.trueRating >= estimate.ciLow && side.trueRating <= estimate.ciHigh,
+			cacheHits,
+			cacheMisses,
+			uniquePositions,
 		});
 	}
 

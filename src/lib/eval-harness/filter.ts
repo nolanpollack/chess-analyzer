@@ -6,6 +6,7 @@
 export type GameHeaders = {
 	Variant?: string;
 	Rated?: string;
+	Event?: string;
 	WhiteElo?: string;
 	BlackElo?: string;
 	TimeControl?: string;
@@ -41,9 +42,12 @@ export function applyEvalFilters(
 		return false;
 	}
 
-	// Rated games only
+	// Rated games only.
+	// Lichess PGNs encode this in the Event header (e.g. "Rated Blitz game")
+	// rather than a separate Rated header.
 	const rated = headers.Rated?.toLowerCase();
-	if (rated !== "true") return false;
+	const eventIsRated = headers.Event?.toLowerCase().startsWith("rated");
+	if (rated !== "true" && !eventIsRated) return false;
 
 	// Both elos present and >= 600
 	const whiteElo = headers.WhiteElo ? parseInt(headers.WhiteElo, 10) : NaN;

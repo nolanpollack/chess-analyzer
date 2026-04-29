@@ -9,8 +9,13 @@ export type MetricSet = {
 	n: number;
 };
 
+export type CacheMetrics = {
+	cacheHitRate: number;
+	totalUniquePositions: number;
+};
+
 export type StratifiedMetrics = {
-	overall: MetricSet;
+	overall: MetricSet & CacheMetrics;
 	byRatingBand: Array<{ band: string } & MetricSet>;
 	byPositionCount: Array<{ bucket: string } & MetricSet>;
 	byTimeControl: Array<{ class: string } & MetricSet>;
@@ -58,8 +63,26 @@ function positionCountBucket(n: number): string {
 	return "≥60";
 }
 
+function computeCacheMetrics(rows: EvalRow[]): CacheMetrics {
+	if (rows.length === 0) {
+		return { cacheHitRate: 0, totalUniquePositions: 0 };
+	}
+	// Rows are per-side but cache stats are game-level. Sum hits/misses across all rows
+	// (each game contributes the same game-level numbers twice, once per side row).
+	// Divide by 2 to avoid double-counting per-game stats.
+	const totalHits = rows.reduce((s, r) => s + r.cacheHits, 0) / 2;
+	const totalMisses = rows.reduce((s, r) => s + r.cacheMisses, 0) / 2;
+	const totalUniquePositions =
+		rows.reduce((s, r) => s + r.uniquePositions, 0) / 2;
+	const total = totalHits + totalMisses;
+	return {
+		cacheHitRate: total === 0 ? 0 : totalHits / total,
+		totalUniquePositions,
+	};
+}
+
 export function computeStratifiedMetrics(rows: EvalRow[]): StratifiedMetrics {
-	const overall = computeMetricSet(rows);
+	const overall = { ...computeMetricSet(rows), ...computeCacheMetrics(rows) };
 
 	// By rating band
 	const bandMap = new Map<string, EvalRow[]>();

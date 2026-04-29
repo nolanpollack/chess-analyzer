@@ -23,11 +23,18 @@ function makeMaiaOutput(peakIdx: number): MaiaOutput {
 	};
 }
 
-function makeCache(maiaMap: Map<string, MaiaOutput>): PositionCache {
+function makeCache(
+	maiaMap: Map<string, MaiaOutput>,
+	initialHits?: Map<string, MaiaOutput>,
+): PositionCache {
+	// First call to getMaiaBatch (pre-analysis cache check) returns initialHits if provided
+	const getMaiaBatch = initialHits
+		? vi.fn().mockResolvedValueOnce(initialHits).mockResolvedValue(maiaMap)
+		: vi.fn().mockResolvedValue(maiaMap);
 	return {
 		hasMaia: vi.fn(),
 		hasStockfish: vi.fn(),
-		getMaiaBatch: vi.fn().mockResolvedValue(maiaMap),
+		getMaiaBatch,
 		getStockfishBatch: vi.fn().mockResolvedValue(new Map()),
 		getPositionDataBatch: vi.fn(),
 		putMaia: vi.fn(),
@@ -148,6 +155,39 @@ describe("evaluateGame", () => {
 		expect(rows[0].opponentRating).toBe(1600);
 		expect(rows[0].timeControlClass).toBe("blitz");
 		expect(rows[0].nPositions).toBe(2);
+	});
+
+	it("records cache stats on each row", async () => {
+		const allPositions = [
+			...MOCK_GAME.white.positions,
+			...MOCK_GAME.black.positions,
+		];
+		const maiaMap = new Map<string, MaiaOutput>();
+		for (const pos of allPositions) {
+			maiaMap.set(pos.fen, makeMaiaOutput(5));
+		}
+		// Pre-analysis: only one FEN is already cached
+		const initialHits = new Map<string, MaiaOutput>();
+		initialHits.set(allPositions[0].fen, makeMaiaOutput(5));
+
+		const cache = makeCache(maiaMap, initialHits);
+		const rows = await evaluateGame(MOCK_GAME, cache, {
+			versions: {
+				maiaVersion: "maia-1500",
+				stockfishVersion: "sf18",
+				stockfishDepth: 18,
+			},
+			epsilon: 1e-6,
+			prior: "uniform",
+			waitTimeoutMs: 5000,
+		});
+
+		// 3 unique FENs total (2 white + 1 black), 1 pre-cached
+		expect(rows[0].uniquePositions).toBe(3);
+		expect(rows[0].cacheHits).toBe(1);
+		expect(rows[0].cacheMisses).toBe(2);
+		// Stats are repeated on both side rows
+		expect(rows[1].cacheHits).toBe(1);
 	});
 
 	it("skips a side if no maia data is available", async () => {

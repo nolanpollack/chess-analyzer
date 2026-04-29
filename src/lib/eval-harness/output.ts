@@ -18,7 +18,7 @@ export type SummaryReport = {
 };
 
 const CSV_HEADER =
-	"gameId,side,trueRating,opponentRating,timeControlClass,nPositions,predicted,ciLow,ciHigh,withinCi\n";
+	"gameId,side,trueRating,opponentRating,timeControlClass,nPositions,predicted,ciLow,ciHigh,withinCi,cacheHits,cacheMisses,uniquePositions\n";
 
 function rowToCsv(row: EvalRow): string {
 	return (
@@ -33,6 +33,9 @@ function rowToCsv(row: EvalRow): string {
 			row.ciLow.toFixed(2),
 			row.ciHigh.toFixed(2),
 			row.withinCi ? "true" : "false",
+			row.cacheHits,
+			row.cacheMisses,
+			row.uniquePositions,
 		].join(",") + "\n"
 	);
 }
