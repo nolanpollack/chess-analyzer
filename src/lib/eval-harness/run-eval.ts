@@ -83,6 +83,7 @@ async function evaluateAllGames(
 				prior,
 				waitTimeoutMs: config.waitTimeoutMs,
 				skipStockfish: config.skipStockfish,
+				directBatch: config.directBatch,
 			});
 			rows.push(...gameRows);
 			const ms = Date.now() - t0;
@@ -92,7 +93,13 @@ async function evaluateAllGames(
 						`${r.side[0]}: true=${r.trueRating} pred=${r.predicted.toFixed(0)}`,
 				)
 				.join("  ");
-			console.error(`[eval] ${i}/${total} (${ms}ms) ${parsed.gameId}  ${summary}`);
+			const firstRow = gameRows[0];
+			const cacheStr = firstRow
+				? `cache=${firstRow.cacheHits}/${firstRow.uniquePositions}`
+				: "";
+			console.error(
+				`[eval] ${i}/${total} (${ms}ms ${cacheStr}) ${parsed.gameId}  ${summary}`,
+			);
 		} catch (err) {
 			console.error(`[eval] ${i}/${total} FAILED ${parsed.gameId}:`, err);
 		}

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { inferMaiaBatch } from "#/lib/maia-client";
 import type { MaiaOutput, PositionCache } from "#/lib/position-cache";
 import { evaluateGame } from "./evaluate-game";
 import type { ParsedGame } from "./game-to-positions";
@@ -6,6 +7,11 @@ import type { ParsedGame } from "./game-to-positions";
 // Mock the analysis dispatcher
 vi.mock("#/lib/analysis-dispatcher", () => ({
 	ensureAnalyzed: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock the maia client
+vi.mock("#/lib/maia-client", () => ({
+	inferMaiaBatch: vi.fn(),
 }));
 
 const MOCK_RATING_GRID = [1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800];
@@ -74,7 +80,7 @@ const MOCK_GAME: ParsedGame = {
 	},
 };
 
-describe("evaluateGame", () => {
+describe("evaluateGame (queue path)", () => {
 	it("returns two EvalRows for a game with both sides having positions", async () => {
 		const maiaMap = new Map<string, MaiaOutput>();
 		for (const pos of [
@@ -94,6 +100,7 @@ describe("evaluateGame", () => {
 			epsilon: 1e-6,
 			prior: "uniform",
 			waitTimeoutMs: 5000,
+			directBatch: false,
 		});
 
 		expect(rows).toHaveLength(2);
@@ -120,6 +127,7 @@ describe("evaluateGame", () => {
 			epsilon: 1e-6,
 			prior: "uniform",
 			waitTimeoutMs: 5000,
+			directBatch: false,
 		});
 
 		for (const row of rows) {
@@ -148,6 +156,7 @@ describe("evaluateGame", () => {
 			epsilon: 1e-6,
 			prior: "uniform",
 			waitTimeoutMs: 5000,
+			directBatch: false,
 		});
 
 		expect(rows[0].gameId).toBe("testgame1");
@@ -180,6 +189,7 @@ describe("evaluateGame", () => {
 			epsilon: 1e-6,
 			prior: "uniform",
 			waitTimeoutMs: 5000,
+			directBatch: false,
 		});
 
 		// 3 unique FENs total (2 white + 1 black), 1 pre-cached
@@ -208,10 +218,114 @@ describe("evaluateGame", () => {
 			epsilon: 1e-6,
 			prior: "uniform",
 			waitTimeoutMs: 5000,
+			directBatch: false,
 		});
 
 		// Should only have white row (black has no maia data → 0 positions)
 		expect(rows).toHaveLength(1);
 		expect(rows[0].side).toBe("white");
+	});
+});
+
+describe("evaluateGame (directBatch path)", () => {
+	it("all-cached input: no inferMaiaBatch call", async () => {
+		vi.mocked(inferMaiaBatch).mockClear();
+
+		const maiaMap = new Map<string, MaiaOutput>();
+		for (const pos of [
+			...MOCK_GAME.white.positions,
+			...MOCK_GAME.black.positions,
+		]) {
+			maiaMap.set(pos.fen, makeMaiaOutput(5));
+		}
+
+		const cache = makeCache(maiaMap);
+		const rows = await evaluateGame(MOCK_GAME, cache, {
+			versions: {
+				maiaVersion: "maia-1500",
+				stockfishVersion: "sf18",
+				stockfishDepth: 18,
+			},
+			epsilon: 1e-6,
+			prior: "uniform",
+			waitTimeoutMs: 5000,
+			directBatch: true,
+			skipStockfish: true,
+		});
+
+		// All FENs were in cache — inferMaiaBatch should not have been called
+		expect(vi.mocked(inferMaiaBatch)).not.toHaveBeenCalled();
+		expect(rows).toHaveLength(2);
+	});
+
+	it("all-miss input: calls inferMaiaBatch with the right FEN list and writes to cache", async () => {
+		vi.mocked(inferMaiaBatch).mockClear();
+
+		const allPositions = [
+			...MOCK_GAME.white.positions,
+			...MOCK_GAME.black.positions,
+		];
+		const uniqueFens = [...new Set(allPositions.map((p) => p.fen))];
+
+		// Build a batch response matching the unique FENs
+		const batchResults = uniqueFens.map((fen) => ({
+			fen,
+			moveIndex: ["e2e4", "d2d4", "g1f3"],
+			probabilities: MOCK_RATING_GRID.map(() => [0.5, 0.3, 0.2]),
+		}));
+
+		vi.mocked(inferMaiaBatch).mockResolvedValueOnce({
+			maiaVersion: "maia-1500",
+			ratingGrid: MOCK_RATING_GRID,
+			results: batchResults,
+		});
+
+		// Cache starts empty for the first getMaiaBatch (miss check), then returns
+		// the populated map after putMaia calls
+		const fullMaiaMap = new Map<string, MaiaOutput>();
+		for (const pos of allPositions) {
+			fullMaiaMap.set(pos.fen, makeMaiaOutput(5));
+		}
+
+		const emptyMap = new Map<string, MaiaOutput>();
+		const cache: PositionCache = {
+			hasMaia: vi.fn(),
+			hasStockfish: vi.fn(),
+			getMaiaBatch: vi
+				.fn()
+				// 1st call: countCacheHits (hitsBeforeAnalysis) → empty
+				.mockResolvedValueOnce(emptyMap)
+				// 2nd call: ensureMaiaDirectBatch miss check → empty (triggers inferMaiaBatch)
+				.mockResolvedValueOnce(emptyMap)
+				// 3rd+ calls: post-putMaia re-read → full data
+				.mockResolvedValue(fullMaiaMap),
+			getStockfishBatch: vi.fn().mockResolvedValue(new Map()),
+			getPositionDataBatch: vi.fn(),
+			putMaia: vi.fn().mockResolvedValue(undefined),
+			putStockfish: vi.fn(),
+		} as unknown as PositionCache;
+
+		const rows = await evaluateGame(MOCK_GAME, cache, {
+			versions: {
+				maiaVersion: "maia-1500",
+				stockfishVersion: "sf18",
+				stockfishDepth: 18,
+			},
+			epsilon: 1e-6,
+			prior: "uniform",
+			waitTimeoutMs: 5000,
+			directBatch: true,
+			skipStockfish: true,
+		});
+
+		// inferMaiaBatch was called once with all unique missing FENs
+		expect(vi.mocked(inferMaiaBatch)).toHaveBeenCalledTimes(1);
+		const calledFens = vi.mocked(inferMaiaBatch).mock.calls[0][0];
+		expect(calledFens.sort()).toEqual(uniqueFens.sort());
+
+		// putMaia was called once per unique FEN result
+		expect(vi.mocked(cache.putMaia)).toHaveBeenCalledTimes(uniqueFens.length);
+
+		expect(rows).toHaveLength(2);
 	});
 });

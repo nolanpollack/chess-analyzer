@@ -59,6 +59,112 @@ function validateResponseShape(
 	}
 }
 
+export type MaiaInferBatchResult = {
+	fen: string;
+	moveIndex: string[];
+	/** shape: (ratingGrid.length × moveIndex.length), row-major */
+	probabilities: number[][];
+};
+
+export type MaiaInferBatchResponse = {
+	maiaVersion: string;
+	ratingGrid: number[];
+	/** Aligned with the input fens array order */
+	results: MaiaInferBatchResult[];
+};
+
+function validateBatchResponseShape(
+	body: unknown,
+): asserts body is MaiaInferBatchResponse {
+	if (typeof body !== "object" || body === null) {
+		throw new Error("Maia batch response is not an object");
+	}
+
+	const r = body as Record<string, unknown>;
+
+	if (!Array.isArray(r.ratingGrid)) {
+		throw new Error(
+			"Maia batch response shape invalid: ratingGrid is not an array",
+		);
+	}
+
+	if (!Array.isArray(r.results)) {
+		throw new Error(
+			"Maia batch response shape invalid: results is not an array",
+		);
+	}
+
+	for (let i = 0; i < r.results.length; i++) {
+		const item = (r.results as unknown[])[i];
+		if (typeof item !== "object" || item === null) {
+			throw new Error(
+				`Maia batch response shape invalid: results[${i}] is not an object`,
+			);
+		}
+		const entry = item as Record<string, unknown>;
+		if (!Array.isArray(entry.probabilities)) {
+			throw new Error(
+				`Maia batch response shape invalid: results[${i}].probabilities is not an array`,
+			);
+		}
+		if (!Array.isArray(entry.moveIndex)) {
+			throw new Error(
+				`Maia batch response shape invalid: results[${i}].moveIndex is not an array`,
+			);
+		}
+		if (entry.probabilities.length !== r.ratingGrid.length) {
+			throw new Error(
+				`Maia batch response shape mismatch: results[${i}].probabilities.length (${(entry.probabilities as unknown[]).length}) !== ratingGrid.length (${(r.ratingGrid as unknown[]).length})`,
+			);
+		}
+	}
+}
+
+export async function inferMaiaBatch(
+	fens: string[],
+	opts?: { baseUrl?: string; timeoutMs?: number },
+): Promise<MaiaInferBatchResponse> {
+	const baseUrl = getBaseUrl(opts?.baseUrl);
+	const timeoutMs = opts?.timeoutMs ?? 60_000;
+
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+	let response: Response;
+	try {
+		response = await fetch(`${baseUrl}/infer-batch`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ fens }),
+			signal: controller.signal,
+		});
+	} catch (err) {
+		if (err instanceof Error && err.name === "AbortError") {
+			throw new Error(`Maia batch inference timed out after ${timeoutMs}ms`);
+		}
+		throw err;
+	} finally {
+		clearTimeout(timer);
+	}
+
+	if (!response.ok) {
+		let errorMessage = `Maia service returned ${response.status}`;
+		try {
+			const body = await response.json();
+			if (typeof body === "object" && body !== null && "error" in body) {
+				errorMessage = String((body as Record<string, unknown>).error);
+			}
+		} catch {
+			// non-JSON body — use status code message
+		}
+		throw new Error(errorMessage);
+	}
+
+	const body: unknown = await response.json();
+	validateBatchResponseShape(body);
+	return body;
+}
+
 export async function inferMaia(
 	fen: string,
 	opts?: { baseUrl?: string; timeoutMs?: number },

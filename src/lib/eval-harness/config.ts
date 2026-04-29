@@ -22,6 +22,12 @@ export type EvalConfig = {
 	 * is not consumed by the rating aggregator. Default false.
 	 */
 	skipStockfish: boolean;
+	/**
+	 * When true (default), bypass the worker queue for Maia inference and call
+	 * /infer-batch directly for cache misses. Set to false to use the worker
+	 * queue path (production flow). Default true.
+	 */
+	directBatch: boolean;
 };
 
 export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
@@ -38,4 +44,5 @@ export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
 	},
 	waitTimeoutMs: 600_000,
 	skipStockfish: false,
+	directBatch: true,
 };

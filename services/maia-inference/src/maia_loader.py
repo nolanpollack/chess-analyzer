@@ -218,6 +218,128 @@ def _build_probability_matrix(
     return move_index, probabilities
 
 
+def _run_batched_multi(
+    model,
+    prepared,
+    fens: list[str],
+    unique_buckets: dict[int, int],
+) -> list[dict[int, dict[str, float]]]:
+    """
+    Run a single batched forward pass over K FENs × N unique ELO buckets.
+
+    Stacks all (fen, bucket) pairs into one (K*N, ...) input tensor, calls
+    ``model(...)`` once, then slices the output back per-FEN per-bucket.
+
+    Returns a list of length K; each element is {bucket_idx: {uci_move: prob}}
+    for that FEN (same structure as ``_run_batched`` / ``_run_legacy``).
+    """
+    from maia2.inference import preprocessing  # type: ignore[import]
+    from maia2.utils import mirror_move  # type: ignore[import]
+
+    all_moves_dict, elo_dict, all_moves_dict_reversed = prepared
+    device = next(model.parameters()).device
+    bucket_order = list(unique_buckets.keys())
+    n_buckets = len(bucket_order)
+
+    # --- Build input tensors: one row per (fen, bucket) pair ---
+    boards_list, elos_self_list, elos_oppo_list, legal_moves_list = [], [], [], []
+    # Per-FEN metadata needed for post-processing
+    black_flags: list[bool] = []
+    per_fen_legal_indices: list[list[int]] = []
+
+    for fen in fens:
+        black_flag = fen.split(" ")[1] == "b"
+        black_flags.append(black_flag)
+        # All buckets share the same legal move set for a given FEN, so read it once.
+        rep_rating_first = unique_buckets[bucket_order[0]]
+        _, _, _, legal_moves_1d = preprocessing(
+            fen, rep_rating_first, rep_rating_first, elo_dict, all_moves_dict
+        )
+        fen_legal_indices = legal_moves_1d.nonzero().flatten().tolist()
+        per_fen_legal_indices.append(fen_legal_indices)
+
+        for bucket in bucket_order:
+            rep_rating = unique_buckets[bucket]
+            board_input, elo_self_idx, elo_oppo_idx, legal_moves = preprocessing(
+                fen, rep_rating, rep_rating, elo_dict, all_moves_dict
+            )
+            boards_list.append(board_input.unsqueeze(0))
+            elos_self_list.append(elo_self_idx)
+            elos_oppo_list.append(elo_oppo_idx)
+            legal_moves_list.append(legal_moves.unsqueeze(0))
+
+    boards = torch.cat(boards_list, dim=0).to(device)
+    elos_self = torch.tensor(elos_self_list).to(device)
+    elos_oppo = torch.tensor(elos_oppo_list).to(device)
+    legal_moves_batch = torch.cat(legal_moves_list, dim=0).to(device)
+
+    model.eval()
+    with torch.no_grad():
+        logits_maia, _, _ = model(boards, elos_self, elos_oppo)
+        logits_maia_legal = logits_maia * legal_moves_batch
+        probs_batch = logits_maia_legal.softmax(dim=-1).cpu()
+
+    # --- Slice output back per-FEN per-bucket ---
+    results: list[dict[int, dict[str, float]]] = []
+    for fen_idx, fen in enumerate(fens):
+        black_flag = black_flags[fen_idx]
+        fen_legal_indices = per_fen_legal_indices[fen_idx]
+
+        legal_moves_uci = [
+            mirror_move(all_moves_dict_reversed[idx]) if black_flag else all_moves_dict_reversed[idx]
+            for idx in fen_legal_indices
+        ]
+
+        bucket_probs: dict[int, dict[str, float]] = {}
+        for bucket_offset, bucket in enumerate(bucket_order):
+            row_idx = fen_idx * n_buckets + bucket_offset
+            row = probs_batch[row_idx].tolist()
+            move_probs = {
+                legal_moves_uci[j]: round(row[fen_legal_indices[j]], 4)
+                for j in range(len(fen_legal_indices))
+            }
+            move_probs = dict(sorted(move_probs.items(), key=lambda item: item[1], reverse=True))
+            bucket_probs[bucket] = move_probs
+
+        results.append(bucket_probs)
+
+    return results
+
+
+def infer_batch(model, prepared, fens: list[str]) -> dict:
+    """
+    Run Maia-2 inference for all 41 rating buckets across K FENs in a single
+    forward pass (K*11 rows stacked into one tensor).
+
+    Returns a dict ready to serialise as the /infer-batch API response body:
+      {
+        "maiaVersion": str,
+        "ratingGrid": [600, 650, ..., 2600],
+        "results": [
+          {"fen": "...", "moveIndex": [...], "probabilities": [[...], ...]},
+          ...
+        ]
+      }
+    """
+    bucket_for_rating, unique_buckets = _deduplicate_buckets(prepared)
+    per_fen_bucket_probs = _run_batched_multi(model, prepared, fens, unique_buckets)
+
+    results = []
+    for fen, bucket_probs in zip(fens, per_fen_bucket_probs):
+        move_index, probabilities = _build_probability_matrix(bucket_probs, bucket_for_rating)
+        results.append({
+            "fen": fen,
+            "moveIndex": move_index,
+            "probabilities": probabilities,
+        })
+
+    return {
+        "maiaVersion": "maia2-rapid-v1.0",
+        "ratingGrid": RATING_GRID,
+        "results": results,
+    }
+
+
 def infer(model, prepared, fen: str, *, legacy: bool | None = None) -> dict:
     """
     Run Maia-2 inference for all 41 rating buckets in RATING_GRID.

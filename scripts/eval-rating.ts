@@ -15,6 +15,13 @@
  *     --input /path/to/lichess.pgn.zst \
  *     --smoke 20
  *
+ * Direct-batch mode (default, bypasses worker queue for Maia inference):
+ *   Enabled by default. Use --no-direct-batch to route through the worker queue.
+ *   With --direct-batch (default): Maia misses are fetched via POST /infer-batch;
+ *   no worker job is enqueued for Maia. If --skip-stockfish is also set, the SF
+ *   cache is not touched at all. If --skip-stockfish is omitted, SF is still
+ *   populated via ensureAnalyzed.
+ *
  * Full run:
  *   dotenv -e .env.local -- bun scripts/eval-rating.ts \
  *     --input /path/to/lichess.pgn.zst \
@@ -90,6 +97,8 @@ function parseArgs(): {
 			: DEFAULT_CONFIG.hardCap,
 		smokeN,
 		skipStockfish: has("--skip-stockfish"),
+		// --no-direct-batch disables the direct batch path; default is enabled
+		directBatch: !has("--no-direct-batch"),
 	};
 
 	return { config, epsilonSweep, priorSweep };
