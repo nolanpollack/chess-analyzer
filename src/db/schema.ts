@@ -1,16 +1,35 @@
 import {
+	customType,
 	doublePrecision,
 	index,
 	integer,
 	jsonb,
 	pgEnum,
 	pgTable,
+	primaryKey,
 	real,
 	text,
 	timestamp,
 	unique,
 	uuid,
 } from "drizzle-orm/pg-core";
+
+// ── Custom types ───────────────────────────────────────────────────────
+
+// bytea column: Buffer in driver, Uint8Array in application code.
+// We store Float32Array probability blobs for Maia output.
+const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+	dataType() {
+		return "bytea";
+	},
+	toDriver(val: Uint8Array): Buffer {
+		return Buffer.from(val.buffer, val.byteOffset, val.byteLength);
+	},
+	fromDriver(val: Buffer): Uint8Array {
+		// Wrap without copy — Buffer IS a Uint8Array subclass, shares memory.
+		return new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
+	},
+});
 
 // ── Enums (column types only — dimension taxonomy lives in code) ───────
 
@@ -344,6 +363,57 @@ export type MoveAnalysis = {
 	classification: MoveClassification;
 	is_player_move: boolean;
 };
+
+// ── Maia position cache ────────────────────────────────────────────────
+
+export const maiaCache = pgTable(
+	"maia_cache",
+	{
+		fen: text().notNull(),
+		maiaVersion: text("maia_version").notNull(),
+		// Raw float32 array, shape (n_rating_buckets × n_legal_moves), row-major.
+		// Stored as bytea; converted to/from Float32Array in the access layer.
+		outputBlob: bytea("output_blob").notNull(),
+		// string[] of UCI moves — axis 1 of the probability array
+		moveIndex: jsonb("move_index").$type<string[]>().notNull(),
+		// number[] of rating bucket values — axis 0 of the probability array
+		ratingGrid: jsonb("rating_grid").$type<number[]>().notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [
+		primaryKey({ name: "maia_cache_pkey", columns: [t.fen, t.maiaVersion] }),
+	],
+);
+
+// ── Stockfish position cache ───────────────────────────────────────────
+
+export const stockfishCache = pgTable(
+	"stockfish_cache",
+	{
+		fen: text().notNull(),
+		stockfishVersion: text("stockfish_version").notNull(),
+		stockfishDepth: integer("stockfish_depth").notNull(),
+		evalCp: integer("eval_cp"),
+		evalMate: integer("eval_mate"),
+		// {move: string, evalCp: number|null, evalMate: number|null}[]
+		topMoves: jsonb("top_moves")
+			.$type<
+				Array<{
+					move: string;
+					evalCp: number | null;
+					evalMate: number | null;
+				}>
+			>()
+			.notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [
+		primaryKey({
+			name: "stockfish_cache_pkey",
+			columns: [t.fen, t.stockfishVersion, t.stockfishDepth],
+		}),
+	],
+);
 
 // ── LLM logs ───────────────────────────────────────────────────────────
 
