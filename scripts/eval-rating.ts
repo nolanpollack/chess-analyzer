@@ -134,7 +134,7 @@ const PRIOR_SWEEP_VALUES: PriorName[] = [
 ];
 
 async function main() {
-	const { config, epsilonSweep, priorSweep } = parseArgs();
+	const { config, epsilonSweep, priorSweep, weightSweep } = parseArgs();
 
 	const databaseUrl = process.env["DATABASE_URL"];
 	if (!databaseUrl) {
