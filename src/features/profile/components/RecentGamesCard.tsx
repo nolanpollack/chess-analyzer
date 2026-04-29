@@ -12,10 +12,24 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 	const gameIds = games.map((g) => g.id);
 	const { statusById } = useGameAnalysisStatuses(gameIds);
 
+	// A row is "analyzed" iff it has a complete analysis_jobs row. Anything
+	// else (missing row, queued, running, failed) counts as not-yet-done.
+	const analyzedCount = games.filter(
+		(g) => statusById.get(g.id)?.status === "complete",
+	).length;
+	const pendingCount = games.length - analyzedCount;
+
 	return (
 		<div className="overflow-hidden rounded-lg border border-divider bg-surface">
 			<div className="flex items-center justify-between border-b border-divider px-5 py-4">
-				<div className="text-sm font-medium text-fg">Recent games</div>
+				<div className="flex items-baseline gap-3">
+					<div className="text-sm font-medium text-fg">Recent games</div>
+					{games.length > 0 && pendingCount > 0 && (
+						<div className="text-xs text-fg-3" aria-live="polite">
+							Analyzing — {analyzedCount} of {games.length} complete
+						</div>
+					)}
+				</div>
 				<div className="flex gap-1.5">
 					<button
 						type="button"
@@ -68,13 +82,25 @@ export function RecentGamesCard({ username }: RecentGamesCardProps) {
 					) : (
 						games.map((game) => {
 							const status = statusById.get(game.id);
+							// Three cases:
+							// 1. Status present → use it directly.
+							// 2. No status row + game.acc null → analysis_jobs hasn't been
+							//    written yet (worker is queued or just started); synthesize
+							//    a pending shimmer so the row doesn't look "done".
+							// 3. No status row + game.acc set → legacy complete; render normally.
 							const analysis = status
 								? {
 										status: status.status,
 										movesAnalyzed: status.movesAnalyzed,
 										totalMoves: status.totalMoves ?? 0,
 									}
-								: undefined;
+								: game.acc === null
+									? {
+											status: "pending" as const,
+											movesAnalyzed: 0,
+											totalMoves: 0,
+										}
+									: undefined;
 							return (
 								<RecentGameRow
 									key={game.id}
