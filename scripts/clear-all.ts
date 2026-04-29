@@ -7,7 +7,6 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import {
 	analysisJobs,
-	dimensionScoreCache,
 	games,
 	moveExplanations,
 	moves,
@@ -33,9 +32,6 @@ console.log("  ✓ move_explanations");
 
 await db.delete(moveTags);
 console.log("  ✓ move_tags");
-
-await db.delete(dimensionScoreCache);
-console.log("  ✓ dimension_score_cache");
 
 await db.delete(moves);
 console.log("  ✓ moves");

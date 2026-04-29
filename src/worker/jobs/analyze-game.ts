@@ -13,11 +13,13 @@
  * before reinsertion. Generators live in src/lib/tagging/.
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import { ANALYSIS_CONFIG } from "#/config/analysis";
+import * as schema from "#/db/schema";
 import { analysisJobs, games, moves, moveTags } from "#/db/schema";
-import { env } from "#/env";
+
+type Db = NodePgDatabase<typeof schema>;
 import {
 	computeEvalDelta,
 	computeMoveAccuracy,
@@ -32,6 +34,7 @@ import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
 import type { AnalysisEngine } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
+import { getWorkerDb } from "../db";
 import { computeAndPersistMaiaRating } from "./maia-rating";
 
 export const ANALYZE_GAME_QUEUE = "analyze-game";
@@ -74,7 +77,7 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 	const { gameId } = data;
 	console.log(`[analyze-game] Starting analysis for game ${gameId}`);
 
-	const db = drizzle(env.DATABASE_URL);
+	const db = getWorkerDb();
 	const jobId = await claimOrCreateJob(db, gameId);
 
 	if (!jobId) {
@@ -203,7 +206,7 @@ function collectSidePositions(
  * latest job is already complete (idempotent skip).
  */
 async function claimOrCreateJob(
-	db: NodePgDatabase,
+	db: Db,
 	gameId: string,
 ): Promise<string | null> {
 	const existing = await db
@@ -252,7 +255,7 @@ async function claimOrCreateJob(
 	return created.id;
 }
 
-async function loadGame(db: NodePgDatabase, gameId: string): Promise<GameRow> {
+async function loadGame(db: Db, gameId: string): Promise<GameRow> {
 	const [game] = await db
 		.select({
 			pgn: games.pgn,
@@ -268,13 +271,13 @@ async function loadGame(db: NodePgDatabase, gameId: string): Promise<GameRow> {
 	return game;
 }
 
-async function loadGameRow(db: NodePgDatabase, gameId: string) {
+async function loadGameRow(db: Db, gameId: string) {
 	const [row] = await db.select().from(games).where(eq(games.id, gameId));
 	if (!row) throw new Error(`Game ${gameId} not found`);
 	return row;
 }
 
-async function deleteJobTags(db: NodePgDatabase, jobId: string): Promise<void> {
+async function deleteJobTags(db: Db, jobId: string): Promise<void> {
 	const moveIds = await db
 		.select({ id: moves.id })
 		.from(moves)
@@ -289,7 +292,7 @@ async function deleteJobTags(db: NodePgDatabase, jobId: string): Promise<void> {
 }
 
 async function runAndInsertTags(
-	db: NodePgDatabase,
+	db: Db,
 	allMoves: Move[],
 	game: typeof games.$inferSelect,
 ): Promise<void> {
@@ -308,7 +311,7 @@ async function runAndInsertTags(
 async function evaluateAllPositions(
 	engine: AnalysisEngine,
 	pgnMoves: PgnMove[],
-	db: NodePgDatabase,
+	db: Db,
 	jobId: string,
 ): Promise<Map<string, CachedPositionEval>> {
 	const evals = new Map<string, CachedPositionEval>();
@@ -456,7 +459,7 @@ function buildMoveRows(args: {
 }
 
 async function markFailed(
-	db: NodePgDatabase,
+	db: Db,
 	jobId: string,
 	err: unknown,
 ): Promise<void> {

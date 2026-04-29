@@ -8,6 +8,7 @@
  */
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import * as schema from "#/db/schema";
 import { analysisJobs } from "#/db/schema";
 import { ensureAnalyzed } from "#/lib/analysis-dispatcher";
 import type { PositionCache } from "#/lib/position-cache";
@@ -16,7 +17,7 @@ import {
 	PRODUCTION_MAIA_VERSIONS,
 } from "#/lib/scoring/maia-game-rating";
 
-type Db = NodePgDatabase;
+type Db = NodePgDatabase<typeof schema>;
 
 export type ComputeAndPersistMaiaRatingOpts = {
 	db: Db;
