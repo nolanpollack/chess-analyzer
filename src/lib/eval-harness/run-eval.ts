@@ -84,7 +84,6 @@ async function evaluateAllGames(
 				waitTimeoutMs: config.waitTimeoutMs,
 				skipStockfish: config.skipStockfish,
 				directBatch: config.directBatch,
-				positionWeight: config.positionWeight,
 			});
 			rows.push(...gameRows);
 			const ms = Date.now() - t0;
@@ -140,16 +139,14 @@ export async function runEval(
 }
 
 /**
- * Run eval across multiple epsilon × prior × positionWeight combinations on
- * the SAME sampled games. Streams analysis once, re-runs estimateRating for
- * each combo. Pass single-element arrays to fix any axis.
+ * Run eval across multiple epsilon/prior combinations on the SAME sampled games.
+ * Streams analysis once, re-runs estimateRating for each combo.
  */
 export async function runEvalSweep(
 	config: EvalConfig,
 	cache: PositionCache,
 	epsilons: number[],
 	priors: PriorName[],
-	positionWeights: number[] = [config.positionWeight],
 ): Promise<RunEvalResult> {
 	console.error(`[eval] Sampling games for sweep...`);
 	const sampledGames = await collectSampledGames(config);
@@ -161,29 +158,24 @@ export async function runEvalSweep(
 
 	for (const epsilon of epsilons) {
 		for (const prior of priors) {
-			for (const positionWeight of positionWeights) {
-				const priorLabel =
-					typeof prior === "string" ? prior : JSON.stringify(prior);
-				console.error(
-					`[eval] Sweep: epsilon=${epsilon} prior=${priorLabel} positionWeight=${positionWeight}`,
-				);
-				const rows = await evaluateAllGames(
-					sampledGames,
-					cache,
-					{ ...config, epsilon, prior, positionWeight },
-					epsilon,
-					prior,
-				);
+			console.error(
+				`[eval] Sweep: epsilon=${epsilon} prior=${typeof prior === "string" ? prior : JSON.stringify(prior)}`,
+			);
+			const rows = await evaluateAllGames(
+				sampledGames,
+				cache,
+				{ ...config, epsilon, prior },
+				epsilon,
+				prior,
+			);
 
-				if (baseRows.length === 0) baseRows = rows;
+			if (baseRows.length === 0) baseRows = rows;
 
-				sweepEntries.push({
-					epsilon,
-					prior: priorLabel,
-					positionWeight,
-					metrics: computeStratifiedMetrics(rows),
-				});
-			}
+			sweepEntries.push({
+				epsilon,
+				prior: typeof prior === "string" ? prior : JSON.stringify(prior),
+				metrics: computeStratifiedMetrics(rows),
+			});
 		}
 	}
 

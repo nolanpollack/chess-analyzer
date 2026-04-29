@@ -40,14 +40,6 @@ type EvaluateGameOptions = {
 	 * Default: true.
 	 */
 	directBatch?: boolean;
-	/**
-	 * Constant per-position weight α applied to every position's log-likelihood
-	 * before aggregation. α=1 is independence (current behavior). α<1 says
-	 * "treat my N positions as N·α effective independent observations" — used
-	 * to widen CIs and counter the iid-violation that makes the joint posterior
-	 * artificially peaky. Default 1.0.
-	 */
-	positionWeight?: number;
 };
 
 async function buildPositionsForSide(
@@ -223,15 +215,9 @@ export async function evaluateGame(
 		if (positions.length === 0) continue;
 
 		const prior = buildPrior(opts.prior, positions[0].maia.ratingGrid);
-		const positionWeight = opts.positionWeight ?? 1.0;
-		const weights =
-			positionWeight === 1.0
-				? undefined
-				: positions.map(() => positionWeight);
 		const estimate = estimateRating(positions, {
 			epsilon: opts.epsilon,
 			prior,
-			weights,
 		});
 
 		rows.push({
