@@ -4,6 +4,7 @@ import { bandFor } from "./rating-bands";
 export type MetricSet = {
 	mae: number;
 	mse: number;
+	rmse: number;
 	r2: number;
 	ciCoverage: number;
 	n: number;
@@ -23,7 +24,7 @@ export type StratifiedMetrics = {
 
 function computeMetricSet(rows: EvalRow[]): MetricSet {
 	if (rows.length === 0) {
-		return { mae: 0, mse: 0, r2: 0, ciCoverage: 0, n: 0 };
+		return { mae: 0, mse: 0, rmse: 0, r2: 0, ciCoverage: 0, n: 0 };
 	}
 
 	const n = rows.length;
@@ -44,10 +45,12 @@ function computeMetricSet(rows: EvalRow[]): MetricSet {
 	}
 
 	const r2 = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+	const mse = sumSe / n;
 
 	return {
 		mae: sumAe / n,
-		mse: sumSe / n,
+		mse,
+		rmse: Math.sqrt(mse),
 		r2,
 		ciCoverage: withinCi / n,
 		n,
