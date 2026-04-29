@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsernameRouteImport } from './routes/$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsernameIndexRouteImport } from './routes/$username/index'
+import { Route as PreviewProgressRouteImport } from './routes/_preview.progress'
 import { Route as UsernameGamesGameIdRouteImport } from './routes/$username/games/$gameId'
 
 const UsernameRoute = UsernameRouteImport.update({
@@ -29,6 +30,11 @@ const UsernameIndexRoute = UsernameIndexRouteImport.update({
   path: '/',
   getParentRoute: () => UsernameRoute,
 } as any)
+const PreviewProgressRoute = PreviewProgressRouteImport.update({
+  id: '/_preview/progress',
+  path: '/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsernameGamesGameIdRoute = UsernameGamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
@@ -38,11 +44,13 @@ const UsernameGamesGameIdRoute = UsernameGamesGameIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$username': typeof UsernameRouteWithChildren
+  '/progress': typeof PreviewProgressRoute
   '/$username/': typeof UsernameIndexRoute
   '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/progress': typeof PreviewProgressRoute
   '/$username': typeof UsernameIndexRoute
   '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
 }
@@ -50,18 +58,25 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$username': typeof UsernameRouteWithChildren
+  '/_preview/progress': typeof PreviewProgressRoute
   '/$username/': typeof UsernameIndexRoute
   '/$username/games/$gameId': typeof UsernameGamesGameIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$username' | '/$username/' | '/$username/games/$gameId'
+  fullPaths:
+    | '/'
+    | '/$username'
+    | '/progress'
+    | '/$username/'
+    | '/$username/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$username' | '/$username/games/$gameId'
+  to: '/' | '/progress' | '/$username' | '/$username/games/$gameId'
   id:
     | '__root__'
     | '/'
     | '/$username'
+    | '/_preview/progress'
     | '/$username/'
     | '/$username/games/$gameId'
   fileRoutesById: FileRoutesById
@@ -69,6 +84,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   UsernameRoute: typeof UsernameRouteWithChildren
+  PreviewProgressRoute: typeof PreviewProgressRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -93,6 +109,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/$username/'
       preLoaderRoute: typeof UsernameIndexRouteImport
       parentRoute: typeof UsernameRoute
+    }
+    '/_preview/progress': {
+      id: '/_preview/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof PreviewProgressRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/$username/games/$gameId': {
       id: '/$username/games/$gameId'
@@ -121,6 +144,7 @@ const UsernameRouteWithChildren = UsernameRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   UsernameRoute: UsernameRouteWithChildren,
+  PreviewProgressRoute: PreviewProgressRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
