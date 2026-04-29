@@ -53,6 +53,27 @@
 - Uniform prior was the original v1 default and produces 23%
   predictions pinned at the 2600 ceiling; do not revert.
 
+## Why we do NOT use per-position downweighting
+Per-position weighting (constant α<1 on each log-likelihood, or any
+within-game informativeness scheme) is **deliberately rejected** even
+though it would improve per-game CI calibration.
+
+**Reason:** the same aggregator runs on per-game AND per-tag slices.
+A tag-slice draws positions across many different games, so within-
+game correlation is not the dominant problem there — positions are
+arguably more independent in a tag-slice than in a single game. A
+constant α calibrated on game-level CIs would *over-widen* tag-slice
+CIs and silently degrade the headline product feature.
+
+If a future calibration pass shows per-game CIs are clearly off and
+per-tag CIs are clearly fine, a CONTEXT-AWARE weighting (different α
+for game vs tag callsites) could be considered, but only with
+explicit eval coverage on both. Constant α is wrong by construction.
+
+The aggregator's `weights` parameter on `EstimatorOptions` still
+exists (for future per-position-importance work like forced-move
+detection). The eval harness intentionally never sets it.
+
 ## Layer order (do not skip or reorder)
 The scoring engine in `src/features/ratings/server/queries.ts` runs strictly:
 1. SQL aggregate over `move_tags ⨝ moves` → raw accuracy + sample size
