@@ -32,7 +32,9 @@ export type EvalConfig = {
 
 export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
 	epsilon: 1e-6,
-	prior: "uniform",
+	// Tuned via prior sweep (see .claude/rules/ratings.md). Best overall MAE on
+	// the natural Lichess distribution; modal-range optimised, tails degraded.
+	prior: { gaussian: { mean: 1500, std: 400 } },
 	targetPrimary: 5000,
 	targetPerBand: 100,
 	hardCap: 50_000,

@@ -1,5 +1,58 @@
 # Dimensional Ratings
 
+> **Pipeline status:** Phases 1-3 (accuracy / complexity-weighted / LightGBM)
+> are documented below for historical context but are scheduled for deletion
+> once the new Maia-2 pipeline (described first) is wired into production
+> (Phase 7) and the UI (Phase 8). When the cleanup phase lands, prune this
+> file aggressively.
+
+## Maia-2 rating pipeline (current v1 design)
+- Position cache: `maia_cache(fen, maia_version)` and
+  `stockfish_cache(fen, sf_version, depth)` in Postgres. Maia outputs are
+  full per-rating-bucket move-probability distributions stored as a
+  `bytea` `Float32Array`. Access layer: `src/lib/position-cache/`.
+- Maia-2 inference sidecar: Python uvicorn at `services/maia-inference/`,
+  `POST /infer` (single FEN) and `POST /infer-batch` (K FENs in one
+  forward pass). Rapid model variant; rating grid every 50 Elo from
+  600 to 2600 (41 buckets). 11 unique coarse ELO buckets are batched
+  via tensor stacking. See `.claude/rules/architecture.md` for the
+  service contract.
+- Aggregator: `src/lib/rating-aggregator/` — pure TS, consumes Maia
+  output only. ε-flooring (default 1e-6) → log-likelihood across
+  positions → log-sum-exp normalisation against a prior → posterior
+  mean as point estimate, 5/95 percentiles as CI. Stockfish output
+  is **not** consumed; SF cache populates for future feature work.
+- Dispatcher: `src/lib/analysis-dispatcher/` — `ensureAnalyzed(fens,
+  versions, cache, opts)` enqueues missing cache rows via pg-boss
+  singleton-keyed jobs, optionally polls until satisfied. The eval
+  harness uses `directBatch: true` (default) which calls /infer-batch
+  directly, bypassing the queue.
+- Eval harness: `src/lib/eval-harness/` + `scripts/eval-rating.ts`.
+  Streams Lichess monthly PGN.zst (local file or http URL), two-pass
+  samples, computes stratified MAE/RMSE/R²/CI-coverage + cache-hit
+  metric. `--prior-sweep` and `--epsilon-sweep` flags for tuning.
+
+## Prior choice: Gaussian(μ=1500, σ=400)
+- Tuned via the Phase-6 eval harness `--prior-sweep` mode against
+  Lichess Mar-2026 data (N=500 games / 1000 sides).
+- Headline: MAE 210, RMSE 267, R² 0.50, CI coverage 82%.
+- **Tail caveat (known limitation, not a bug):** the prior is
+  optimised for the natural rating distribution, so the modal range
+  (1200-2000) is excellent but tails are degraded:
+  - <1000 players: MAE ~268 (modest upward bias)
+  - 2200+ players: MAE ~330+ (strong downward shrinkage)
+  - High-rated user complaints should trigger a prior re-tune, not
+    a code fix. The prior is a config value (`EvalConfig.prior` and
+    the production aggregator's `EstimatorOptions.prior`).
+- Wider σ flattens band performance but loses ~14 Elo headline:
+  G(1500, 600) MAE 224, modal 200-260 with no spike. Considered
+  for a "fairness across users" mode if shipping to high-rated
+  players seriously; not the v1 default.
+- Asymmetric center (G(1600, 400)) does not justify the cost —
+  helps 1600-2000 modestly but hurts <1400.
+- Uniform prior was the original v1 default and produces 23%
+  predictions pinned at the 2600 ceiling; do not revert.
+
 ## Layer order (do not skip or reorder)
 The scoring engine in `src/features/ratings/server/queries.ts` runs strictly:
 1. SQL aggregate over `move_tags ⨝ moves` → raw accuracy + sample size
