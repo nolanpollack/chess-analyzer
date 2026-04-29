@@ -118,6 +118,10 @@ function openHttpStream(url: string): ProcStream {
 	curl.stderr.on("data", (d: Buffer) => {
 		process.stderr.write(`curl: ${d}`);
 	});
+	// Swallow EPIPE etc once the consumer goes away — these are expected
+	// when we kill the proc mid-stream after hitting the sample target.
+	curl.on("error", () => {});
+	curl.stdout?.on("error", () => {});
 
 	if (!isZstd) {
 		return {
@@ -130,11 +134,30 @@ function openHttpStream(url: string): ProcStream {
 	zstd.stderr.on("data", (d: Buffer) => {
 		process.stderr.write(`zstdcat: ${d}`);
 	});
-	if (curl.stdout && zstd.stdin) curl.stdout.pipe(zstd.stdin);
+	zstd.on("error", () => {});
+	zstd.stdin?.on("error", () => {});
+	zstd.stdout?.on("error", () => {});
+	if (curl.stdout && zstd.stdin) {
+		// `end: false` so we close zstd.stdin manually in cleanup; otherwise the
+		// default end-on-source-end races with the kill and produces EPIPE.
+		curl.stdout.pipe(zstd.stdin, { end: false });
+	}
 
 	return {
 		readable: zstd.stdout as Readable,
-		cleanup: () => killProcs(curl, zstd),
+		cleanup: () => {
+			// Order matters: stop the producer first, then close the pipe sink,
+			// then kill zstd. Any in-flight write that races loses to a destroyed
+			// stream and we've muted the error handlers, so EPIPE is silent.
+			try {
+				curl.stdout?.unpipe(zstd.stdin ?? undefined);
+				curl.stdout?.destroy();
+			} catch {}
+			try {
+				zstd.stdin?.end();
+			} catch {}
+			killProcs(curl, zstd);
+		},
 	};
 }
 
