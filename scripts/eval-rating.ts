@@ -36,6 +36,13 @@
  *   dotenv -e .env.local -- bun scripts/eval-rating.ts \
  *     --input /path/to/lichess.pgn.zst --prior-sweep
  *
+ * Position-weight sweep (downweight per-position log-likelihood α to widen
+ * CIs and counter the iid-violation; tune until CI coverage ≈ 90%):
+ *   dotenv -e .env.local -- bun scripts/eval-rating.ts \
+ *     --input /path/to/lichess.pgn.zst --weight-sweep
+ *
+ *   Single value: --position-weight 0.5
+ *
  * Output is written to bench/eval/<timestamp>/ by default:
  *   results.csv  — per-game-side predictions
  *   summary.json — aggregated metrics + sweep results
@@ -55,6 +62,7 @@ function parseArgs(): {
 	config: EvalConfig;
 	epsilonSweep: boolean;
 	priorSweep: boolean;
+	weightSweep: boolean;
 } {
 	const args = process.argv.slice(2);
 	const get = (flag: string) => {
@@ -74,6 +82,7 @@ function parseArgs(): {
 
 	const epsilonSweep = has("--epsilon-sweep");
 	const priorSweep = has("--prior-sweep");
+	const weightSweep = has("--weight-sweep");
 
 	const smokeArg = get("--smoke");
 	const smokeN = smokeArg ? parseInt(smokeArg, 10) : null;
@@ -99,12 +108,17 @@ function parseArgs(): {
 		skipStockfish: has("--skip-stockfish"),
 		// --no-direct-batch disables the direct batch path; default is enabled
 		directBatch: !has("--no-direct-batch"),
+		positionWeight: get("--position-weight")
+			? parseFloat(get("--position-weight")!)
+			: DEFAULT_CONFIG.positionWeight,
 	};
 
-	return { config, epsilonSweep, priorSweep };
+	return { config, epsilonSweep, priorSweep, weightSweep };
 }
 
 const EPSILON_SWEEP_VALUES = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7];
+
+const WEIGHT_SWEEP_VALUES = [1.0, 0.85, 0.7, 0.5, 0.35, 0.2];
 
 const PRIOR_SWEEP_VALUES: PriorName[] = [
 	"uniform",
@@ -133,15 +147,19 @@ async function main() {
 	const cache = createPositionCache(db);
 
 	try {
-		if (epsilonSweep || priorSweep) {
+		if (epsilonSweep || priorSweep || weightSweep) {
 			const epsilons = epsilonSweep ? EPSILON_SWEEP_VALUES : [config.epsilon];
 			const priors = priorSweep ? PRIOR_SWEEP_VALUES : [config.prior];
+			const weights = weightSweep
+				? WEIGHT_SWEEP_VALUES
+				: [config.positionWeight];
 
 			const { rows, report } = await runEvalSweep(
 				config,
 				cache,
 				epsilons,
 				priors,
+				weights,
 			);
 			await writeCsv(config.outDir, rows);
 			await writeSummary(config.outDir, report);

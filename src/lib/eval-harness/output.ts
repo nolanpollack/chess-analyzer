@@ -7,6 +7,7 @@ import type { StratifiedMetrics } from "./metrics";
 export type SweepEntry = {
 	epsilon?: number;
 	prior?: string;
+	positionWeight?: number;
 	metrics: StratifiedMetrics;
 };
 

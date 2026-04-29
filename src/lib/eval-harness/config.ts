@@ -28,6 +28,13 @@ export type EvalConfig = {
 	 * queue path (production flow). Default true.
 	 */
 	directBatch: boolean;
+	/**
+	 * Constant per-position weight α; see EvaluateGameOptions.positionWeight.
+	 * α=1.0 (default) = independence assumption. α<1 widens CIs to counter
+	 * within-game correlation. Tune via --weight-sweep until CI coverage
+	 * lands near 90%.
+	 */
+	positionWeight: number;
 };
 
 export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
@@ -47,4 +54,5 @@ export const DEFAULT_CONFIG: Omit<EvalConfig, "input" | "outDir"> = {
 	waitTimeoutMs: 600_000,
 	skipStockfish: false,
 	directBatch: true,
+	positionWeight: 1.0,
 };
