@@ -1,0 +1,5 @@
+.venv/
+maia2_models/
+__pycache__/
+*.py[cod]
+.pytest_cache/

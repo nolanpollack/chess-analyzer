@@ -10,6 +10,17 @@
 - Chess logic: chess.js (PGN/FEN), react-chessboard (display)
 - Runtime: Bun
 
+## Maia-2 inference sidecar (Phase 2A)
+- Service location: `services/maia-inference/` (Python, uv-managed)
+- Start: `uv run uvicorn src.main:app --port 8765` from `services/maia-inference/`
+- Exposes `POST /infer {fen}` → `{maiaVersion, ratingGrid, moveIndex, probabilities}`
+  where `probabilities` is shape (41, L) — 41 ELO buckets 600..2600@50, L legal moves.
+- Exposes `GET /health` for readiness.
+- Weights auto-downloaded from Google Drive on first run into `maia2_models/` (gitignored).
+- Maia-2 internally uses 11 coarse ELO buckets; the service deduplicates forward passes
+  and broadcasts, then renormalizes rows to sum to 1.0.
+- TS worker calls this service via fetch — never import Python code from TS.
+
 ## Worker
 - Worker entry point: src/worker/index.ts
 - Job handlers: src/worker/jobs/{job-name}.ts (one file per job type)
