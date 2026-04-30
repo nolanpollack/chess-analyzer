@@ -127,7 +127,7 @@ function OpeningSearch({
 	}, [draft, value, onChange]);
 
 	return (
-		<div className="inline-flex min-w-[220px] items-center gap-2 rounded-md border border-divider bg-surface px-2.5 py-1.5">
+		<div className="inline-flex min-w-55 items-center gap-2 rounded-md border border-divider bg-surface px-2.5 py-1.5">
 			<Search className="size-3.5 text-fg-3" />
 			<input
 				value={draft}
@@ -158,7 +158,7 @@ function ChipGroup({
 }) {
 	return (
 		<div className="inline-flex items-center gap-0 rounded-md border border-divider bg-surface p-0.5">
-			<span className="px-2 text-2xs font-medium uppercase tracking-[0.04em] text-fg-3">
+			<span className="px-2 text-2xs font-medium uppercase tracking-label-narrow text-fg-3">
 				{label}
 			</span>
 			{children}
@@ -187,7 +187,7 @@ function Chip({
 		>
 			{leadingSwatchClass && (
 				<span
-					className={`size-2 rounded-[2px] border border-border-strong ${leadingSwatchClass}`}
+					className={`size-2 rounded-2xs border border-border-strong ${leadingSwatchClass}`}
 				/>
 			)}
 			{leadingDotClass && (

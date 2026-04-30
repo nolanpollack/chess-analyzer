@@ -25,7 +25,7 @@ export type GameAnalysisStatus = {
 	/** True once the player-side accuracy column is populated. */
 	accuracyReady: boolean;
 	/** True once the player-side Maia rating column is populated. */
-	gameScoreReady: boolean;
+	gameRatingReady: boolean;
 };
 
 export const getRecentGameAnalysisStatuses = createServerFn({ method: "GET" })
@@ -60,7 +60,7 @@ export const getRecentGameAnalysisStatuses = createServerFn({ method: "GET" })
 					j.playerColor === "white"
 						? j.accuracyWhite != null
 						: j.accuracyBlack != null,
-				gameScoreReady:
+				gameRatingReady:
 					j.playerColor === "white"
 						? j.maiaPredictedWhite != null
 						: j.maiaPredictedBlack != null,

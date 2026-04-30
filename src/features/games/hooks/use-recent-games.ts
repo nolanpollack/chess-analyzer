@@ -36,7 +36,7 @@ function toSummary(game: Game): GameSummary {
 		oppElo: game.opponentRating,
 		result,
 		color: game.playerColor,
-		score: game.gameScore,
+		rating: game.gameRating,
 		acc: accuracy,
 		time: game.timeControl,
 		opening: game.openingName ?? "—",

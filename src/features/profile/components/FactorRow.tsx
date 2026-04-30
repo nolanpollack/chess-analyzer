@@ -1,4 +1,5 @@
 import type { Factor } from "#/features/profile/types";
+import { ConfidenceIndicator } from "./ConfidenceIndicator";
 
 type FactorRowProps = {
 	factor: Factor;
@@ -24,29 +25,30 @@ export function FactorRow({ factor, baseline }: FactorRowProps) {
 				? "bg-tint-blunder"
 				: "bg-surface-2";
 
+	const barRoundingClass = isNeg ? "rounded-l-full" : "rounded-r-full";
+
 	return (
-		<div className="grid cursor-pointer items-center gap-4 rounded-sm px-3 py-2.5 transition-colors duration-100 hover:bg-surface-2 grid-cols-[160px_1fr_60px_70px]">
-			{/* Label */}
+		<div
+			className="grid cursor-pointer items-center gap-4 rounded-sm px-3 py-2.5 transition-colors duration-100 hover:bg-surface-2"
+			style={{ gridTemplateColumns: "150px 1fr 56px 56px" }}
+		>
 			<div className="flex items-center gap-2">
-				<span className="text-[13.5px] font-[450] text-fg-1">
+				<span className="text-sm-minus text-fg-1" style={{ fontWeight: 450 }}>
 					{factor.label}
 				</span>
-				{factor.confidence === "medium" && (
-					<span
-						className="h-1.5 w-1.5 rounded-full bg-fg-4"
-						title="Medium confidence"
-					/>
-				)}
+				<ConfidenceIndicator
+					confidence={factor.confidence}
+					nPositions={factor.nPositions}
+				/>
 			</div>
 
-			{/* Gap bar */}
 			<div className="relative flex h-6 items-center">
 				<div className="absolute inset-0 flex items-center">
 					<div className="h-px flex-1 bg-divider" />
 				</div>
-				<div className="absolute left-1/2 top-1 bottom-1 w-px bg-border-strong" />
+				<div className="absolute top-1 bottom-1 left-1/2 w-px bg-border-strong" />
 				<div
-					className="absolute top-2 bottom-2 rounded-full opacity-75"
+					className={`absolute h-1 opacity-90 ${barRoundingClass}`}
 					style={{
 						left: isNeg ? `${50 - gapPct * 50}%` : "50%",
 						width: `${gapPct * 50}%`,
@@ -55,15 +57,13 @@ export function FactorRow({ factor, baseline }: FactorRowProps) {
 				/>
 			</div>
 
-			{/* Value */}
 			<div className="mono-nums text-right font-mono text-ui text-fg-1">
 				{factor.value}
 			</div>
 
-			{/* Delta */}
 			<div className="text-right">
 				<span
-					className={`mono-nums inline-flex items-center rounded-lg px-1.5 py-0.5 font-mono text-2xs font-medium ${deltaColorClass} ${deltaBgClass}`}
+					className={`mono-nums inline-flex items-center rounded-sm px-1.5 py-0.5 font-mono text-2xs font-medium ${deltaColorClass} ${deltaBgClass}`}
 				>
 					{factor.delta > 0 ? `+${factor.delta}` : factor.delta}
 				</span>

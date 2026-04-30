@@ -11,19 +11,16 @@ type FactorBreakdownCardProps = {
 	username: string;
 	/** When true, append a pulsing "updating" hint to the subtitle. */
 	isAnalyzing?: boolean;
-	/** Total positions analyzed across the player's games. Drives subtitle copy. */
-	positionsAnalyzed?: number;
 };
 
 export function FactorBreakdownCard({
 	username,
 	isAnalyzing = false,
-	positionsAnalyzed = 0,
 }: FactorBreakdownCardProps) {
 	const { data: summary } = usePlayerSummary(username);
 	const playerId = summary?.playerId ?? null;
-	const playerElo = summary?.eloEstimate ?? null;
-	const baseline = playerElo ?? 1500;
+	const playerRating = summary?.playerRating ?? null;
+	const baseline = playerRating ?? 1500;
 
 	const queries = useQueries({
 		queries: DIMENSION_TYPES.map((dimensionType: DimensionType) => ({
@@ -52,21 +49,19 @@ export function FactorBreakdownCard({
 	const allFactors: Factor[] = queries.flatMap((q) => q.data ?? []);
 	const factors = isLoading ? null : allFactors.length > 0 ? allFactors : null;
 
+	const { weaknesses, strengths } = splitByDelta(factors ?? []);
+
 	return (
-		<div className="rounded-[10px] border border-divider bg-surface p-5">
+		<div className="rounded-lg border border-divider bg-surface p-5">
 			<div className="mb-4 flex items-start justify-between">
 				<div>
 					<div className="text-ui font-medium text-fg-2">
 						Performance by factor
 					</div>
-					<div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-fg-3">
+					<div className="mt-0.5 flex items-center gap-2 text-xs-minus text-fg-3">
 						<span>
-							{factors !== null
-								? positionsAnalyzed > 0
-									? `Based on ${positionsAnalyzed.toLocaleString()} position${positionsAnalyzed === 1 ? "" : "s"}.`
-									: playerElo !== null
-										? `Each score shown relative to your overall rating of ${playerElo}.`
-										: "Weakest first."
+							{factors !== null && playerRating !== null
+								? `Each rating shown relative to your overall rating of ${playerRating}`
 								: "Elo-scale ratings across key skill areas"}
 						</span>
 						{isAnalyzing && (
@@ -77,11 +72,6 @@ export function FactorBreakdownCard({
 						)}
 					</div>
 				</div>
-				{factors !== null && playerElo !== null && (
-					<span className="font-mono text-2xs text-fg-3">
-						baseline {playerElo}
-					</span>
-				)}
 			</div>
 			{factors === null ? (
 				<div className="flex min-h-20 items-center justify-center gap-3 py-4">
@@ -103,13 +93,61 @@ export function FactorBreakdownCard({
 				</div>
 			) : (
 				<div className="grid grid-cols-2 gap-x-8">
-					{[...factors]
-						.sort((a, b) => a.value - baseline - (b.value - baseline))
-						.map((factor) => (
-							<FactorRow key={factor.id} factor={factor} baseline={baseline} />
-						))}
+					<FactorColumn
+						title="Weaknesses"
+						factors={weaknesses}
+						baseline={baseline}
+					/>
+					<FactorColumn
+						title="Strengths"
+						factors={strengths}
+						baseline={baseline}
+					/>
 				</div>
 			)}
 		</div>
 	);
+}
+
+function FactorColumn({
+	title,
+	factors,
+	baseline,
+}: {
+	title: string;
+	factors: Factor[];
+	baseline: number;
+}) {
+	return (
+		<div>
+			<div className="mb-2 px-3 text-2xs font-medium uppercase tracking-wider text-fg-3">
+				{title}
+			</div>
+			{factors.length === 0 ? (
+				<div className="px-3 py-2 text-xs text-fg-4">None yet.</div>
+			) : (
+				factors.map((factor) => (
+					<FactorRow key={factor.id} factor={factor} baseline={baseline} />
+				))
+			)}
+		</div>
+	);
+}
+
+const MAX_PER_COLUMN = 10;
+
+function splitByDelta(factors: Factor[]): {
+	weaknesses: Factor[];
+	strengths: Factor[];
+} {
+	const confident = factors.filter((f) => f.confidence !== "low");
+	const weaknesses = confident
+		.filter((f) => f.delta < 0)
+		.sort((a, b) => a.delta - b.delta)
+		.slice(0, MAX_PER_COLUMN);
+	const strengths = confident
+		.filter((f) => f.delta > 0)
+		.sort((a, b) => b.delta - a.delta)
+		.slice(0, MAX_PER_COLUMN);
+	return { weaknesses, strengths };
 }

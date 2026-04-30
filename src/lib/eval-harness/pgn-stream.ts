@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as readline from "node:readline";
 import type { Readable } from "node:stream";

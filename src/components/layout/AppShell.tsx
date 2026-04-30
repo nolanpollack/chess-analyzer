@@ -7,9 +7,17 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
 	return (
-		<div className="grid h-dvh grid-cols-[240px_1fr] overflow-hidden">
+		<div
+			className="grid h-dvh overflow-hidden"
+			style={{ gridTemplateColumns: "240px 1fr" }}
+		>
 			<Sidebar />
-			<main className="relative overflow-y-auto">{children}</main>
+			<main
+				className="relative overflow-y-auto"
+				style={{ scrollbarGutter: "stable" }}
+			>
+				{children}
+			</main>
 		</div>
 	);
 }

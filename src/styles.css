@@ -223,10 +223,42 @@
   --color-ring: var(--ring);
 
   /* Extended type scale — fills gaps between Tailwind defaults */
-  --text-2xs: 0.6875rem;    /* 11px — chips, badges, section labels */
-  --text-ui: 0.8125rem;     /* 13px — primary body, buttons, nav */
+  --text-3xs: 0.625rem;       /* 10px  — eval bar label */
+  --text-2xs: 0.6875rem;      /* 11px  — chips, badges, section labels */
+  --text-2xs-plus: 0.65625rem;/* 10.5px — mono annotations, version labels */
+  --text-xs-minus: 0.71875rem;/* 11.5px — secondary labels, deltas */
+  --text-xs-plus: 0.78125rem; /* 12.5px — table data, move notation */
+  --text-sm-minus: 0.84375rem;/* 13.5px — body copy, description text */
+  --text-ui: 0.8125rem;       /* 13px  — primary body, buttons, nav */
+  --text-metric-md: 2rem;     /* 32px  — metric value medium size */
+  --text-stat: 1.375rem;      /* 22px  — stats panel numbers */
+  --text-page-title: 1.75rem; /* 28px  — page heading (h1) */
+  --text-display: 4rem;       /* 64px  — hero Elo number */
+
+  /* Tracking tokens */
+  --tracking-label: 0.06em;         /* section labels (uppercase) */
+  --tracking-label-wide: 0.08em;    /* wider section labels */
+  --tracking-label-narrow: 0.04em;  /* filter bar labels */
+  --tracking-tight-1: -0.01em;      /* subtle tightening */
+  --tracking-tight-2: -0.02em;      /* logo / sidebar heading */
+  --tracking-tight-3: -0.025em;     /* page titles */
+  --tracking-metric: -0.03em;       /* medium metric values */
+  --tracking-display: -0.04em;      /* large metric values */
+
+  /* Leading tokens */
+  --leading-snug-2: 1.1;    /* stats panel numbers */
+  --leading-relaxed-2: 1.55; /* body copy / explanations */
+
+  /* Icon size tokens — named spacing values for icon dimensions */
+  --spacing-icon-xs: 0.6875rem;  /* 11px — small icons (arrows in delta badges) */
+  --spacing-icon-sm: 0.8125rem;  /* 13px — medium icons (search, sparkles, etc.) */
+
+  /* Duration tokens */
+  --duration-120: 120ms; /* fast UI transitions */
 
   /* Radius */
+  --radius-2xs: 2px;
+  --radius-xs: 4px;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

@@ -51,7 +51,7 @@ export function AnalysisStatusOverlay({
 			: null;
 
 	return (
-		<div className="rounded-[10px] border border-divider bg-surface px-6 py-8 text-center">
+		<div className="rounded-lg border border-divider bg-surface px-6 py-8 text-center">
 			<Sparkles className="mx-auto h-5 w-5 text-fg-3" />
 			<h2 className="mt-3 text-base font-medium text-fg-1">
 				{status === "pending"
@@ -88,7 +88,7 @@ export function AnalysisStatusOverlay({
 					type="button"
 					onClick={() => trigger.mutate()}
 					disabled={trigger.isPending}
-					className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-[6px] border border-divider bg-surface-2 px-4 py-2 text-ui font-medium text-fg-1 transition-colors duration-[100ms] hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
+					className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-sm border border-divider bg-surface-2 px-4 py-2 text-ui font-medium text-fg-1 transition-colors duration-100 hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
 				>
 					{trigger.isPending
 						? "Queuing…"

@@ -16,7 +16,7 @@ export function Segmented<T extends string>({
 }: SegmentedProps<T>) {
 	return (
 		<div
-			className="inline-flex gap-0.5 rounded-[6px] p-0.5"
+			className="inline-flex gap-0.5 rounded-sm p-0.5"
 			style={{ background: "var(--surface-2)" }}
 		>
 			{options.map((opt) => (
@@ -25,7 +25,7 @@ export function Segmented<T extends string>({
 					type="button"
 					onClick={() => onChange(opt.value)}
 					className={[
-						"rounded-[4px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-[120ms]",
+						"rounded-xs px-2.5 py-1 text-xs-minus font-medium transition-all duration-120",
 						value === opt.value
 							? "bg-surface text-fg shadow-sm"
 							: "text-fg-2 hover:text-fg",

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export function MetricLabel({ children }: { children: ReactNode }) {
 	return (
-		<div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-fg-3">
+		<div className="text-xs-minus font-medium uppercase tracking-label text-fg-3">
 			{children}
 		</div>
 	);
@@ -12,9 +12,9 @@ export function MetricLabel({ children }: { children: ReactNode }) {
 type MetricValueSize = "lg" | "md" | "sm";
 
 const VALUE_SIZE_CLASSES: Record<MetricValueSize, string> = {
-	lg: "text-5xl tracking-[-0.04em]",
-	md: "text-[32px] tracking-[-0.03em]",
-	sm: "text-2xl tracking-[-0.02em]",
+	lg: "text-5xl tracking-display",
+	md: "text-metric-md tracking-metric",
+	sm: "text-2xl tracking-tight-2",
 };
 
 export function MetricValue({
@@ -54,12 +54,12 @@ export function MetricDelta({
 
 	return (
 		<span
-			className={`inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 font-mono text-xs font-medium ${DELTA_CLASSES[direction]}`}
+			className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 font-mono text-xs font-medium ${DELTA_CLASSES[direction]}`}
 			style={{ fontFeatureSettings: "'zero', 'ss02'" }}
 		>
-			{direction === "up" && <ArrowUp className="h-[11px] w-[11px]" />}
-			{direction === "down" && <ArrowDown className="h-[11px] w-[11px]" />}
-			{direction === "flat" && <Minus className="h-[11px] w-[11px]" />}
+			{direction === "up" && <ArrowUp className="h-icon-xs w-icon-xs" />}
+			{direction === "down" && <ArrowDown className="h-icon-xs w-icon-xs" />}
+			{direction === "flat" && <Minus className="h-icon-xs w-icon-xs" />}
 			{value > 0 ? `+${value}` : value}
 			{label && <span className="text-fg-3">{label}</span>}
 		</span>

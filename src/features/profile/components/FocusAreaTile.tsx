@@ -18,15 +18,15 @@ export function FocusAreaTile({ area, index, isLast }: FocusAreaTileProps) {
 		>
 			<div className="mb-2.5 flex items-center gap-2">
 				<span className="font-mono text-2xs text-fg-4">0{index + 1}</span>
-				<span className="ml-auto inline-flex items-center gap-1 rounded-[4px] bg-tint-blunder px-1.5 py-0.5 font-mono text-2xs font-medium text-blunder">
+				<span className="ml-auto inline-flex items-center gap-1 rounded-xs bg-tint-blunder px-1.5 py-0.5 font-mono text-2xs font-medium text-blunder">
 					<ArrowDown className="size-2.5" />
 					{area.gap} vs overall
 				</span>
 			</div>
-			<div className="mb-2 text-base font-medium leading-tight tracking-[-0.01em] text-fg">
+			<div className="mb-2 text-base font-medium leading-tight tracking-tight-1 text-fg">
 				{area.title}
 			</div>
-			<p className="mb-3.5 text-[12.5px] leading-[1.55] text-fg-2">
+			<p className="mb-3.5 text-xs-plus leading-relaxed-2 text-fg-2">
 				{area.detail}
 			</p>
 			<div className="flex flex-wrap items-center gap-1.5">

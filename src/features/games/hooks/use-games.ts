@@ -16,7 +16,7 @@ export type GamesQueryFilters = {
 };
 
 export type GamesSort = {
-	key: "date" | "opponent" | "opening" | "accuracy" | "score";
+	key: "date" | "opponent" | "opening" | "accuracy" | "rating";
 	dir: "asc" | "desc";
 };
 
@@ -68,7 +68,7 @@ function toSummary(game: Game): GameSummary {
 		oppElo: game.opponentRating,
 		result,
 		color: game.playerColor,
-		score: game.gameScore,
+		rating: game.gameRating,
 		acc: game.overallAccuracy,
 		time: game.timeControl,
 		opening: game.openingName ?? "—",

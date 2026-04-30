@@ -44,9 +44,9 @@ export function MoveListCard({ moves, cursor, onSelect }: MoveListCardProps) {
 	const inaccuracies = countPlayerClass(moves, "inaccuracy");
 
 	return (
-		<div className="flex min-h-0 flex-col rounded-[10px] border border-divider bg-surface">
+		<div className="flex min-h-0 flex-col rounded-lg border border-divider bg-surface">
 			<div className="flex flex-wrap items-center gap-2 border-b border-divider px-5 py-3.5">
-				<div className="text-2xs uppercase tracking-[0.08em] text-fg-3">
+				<div className="text-2xs uppercase tracking-label-wide text-fg-3">
 					Moves
 				</div>
 				<div className="ml-auto flex flex-wrap gap-1.5">
@@ -55,12 +55,12 @@ export function MoveListCard({ moves, cursor, onSelect }: MoveListCardProps) {
 					<ClassChip cls="inaccuracy" count={inaccuracies} />
 				</div>
 			</div>
-			<div className="max-h-[420px] overflow-y-auto px-3 py-2">
+			<div className="max-h-105 overflow-y-auto px-3 py-2">
 				<table className="w-full">
 					<tbody>
 						{pairs.map((p) => (
 							<tr key={p.moveNumber}>
-								<td className="w-[34px] py-0.5 pl-2 pr-2 mono-nums font-mono text-[11.5px] text-fg-4">
+								<td className="w-8.5 py-0.5 pl-2 pr-2 mono-nums font-mono text-xs-minus text-fg-4">
 									{p.moveNumber}.
 								</td>
 								<td className="w-1/2 py-0.5 pr-1">

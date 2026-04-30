@@ -138,7 +138,7 @@ async function fetchImportedRatings(
 
 const DELTA_LOOKBACK_DAYS = 30;
 
-function computeEloDelta30d(
+function computeRatingDelta30d(
 	games: PerGameRating[],
 	now: Date,
 	current: number,
@@ -184,22 +184,25 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 
 			const now = new Date();
 			const aggregate = aggregateRating(perGameRatings, { now });
-			const eloEstimate = aggregate ? Math.round(aggregate.rating) : null;
-			const eloDelta30d =
+			const playerRating = aggregate ? Math.round(aggregate.rating) : null;
+			const playerRatingDelta30d =
 				aggregate !== null
-					? computeEloDelta30d(perGameRatings, now, aggregate.rating)
+					? computeRatingDelta30d(perGameRatings, now, aggregate.rating)
 					: null;
 
 			return {
 				summary: {
 					playerId: player.id,
+					/** Most recent platform-supplied rating from the game stream. */
 					currentRating: gameRows[0]?.playerRating ?? null,
 					gameCount: gameRows.length,
 					analyzedGameCount: completedJobs.length,
-					/** Number of games actually feeding the Elo estimate. */
-					eloSampleSize: aggregate?.totalGames ?? 0,
-					eloEstimate,
-					eloDelta30d,
+					/** Computed player-level rating (Maia-aggregated, Elo scale). */
+					playerRating,
+					/** Number of games feeding the player rating. */
+					playerRatingSampleSize: aggregate?.totalGames ?? 0,
+					/** Player rating delta over the past 30 days. */
+					playerRatingDelta30d,
 					importedRatings,
 				},
 			};

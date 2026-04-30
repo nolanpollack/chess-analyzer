@@ -59,7 +59,7 @@ export const getGame = createServerFn({ method: "GET" })
 			accuracyBlack: game.accuracyBlack,
 			analysisStatus: null as UiAnalysisStatus | null,
 			overallAccuracy: null as number | null,
-			gameScore: null as number | null,
+			gameRating: null as number | null,
 		};
 	});
 
@@ -78,7 +78,7 @@ const sortKeySchema = z.enum([
 	"opponent",
 	"opening",
 	"accuracy",
-	"score",
+	"rating",
 ]);
 
 const listGamesInput = gamesFilterSchema.extend({
@@ -173,7 +173,7 @@ function orderByForSort(
 			];
 		case "accuracy":
 			return [dir(sql`${playerAccuracyExpr} NULLS LAST`), desc(games.playedAt)];
-		case "score":
+		case "rating":
 			return [dir(sql`${playerScoreExpr} NULLS LAST`), desc(games.playedAt)];
 		default:
 			return [dir(games.playedAt)];
@@ -242,7 +242,7 @@ export const listGames = createServerFn({ method: "GET" })
 			accuracyBlack: g.accuracyBlack,
 			analysisStatus: toUiStatus(g.jobStatus ?? null),
 			overallAccuracy: g.overallAccuracy,
-			gameScore:
+			gameRating:
 				g.maiaPlayerRating != null ? Math.round(g.maiaPlayerRating) : null,
 		}));
 
@@ -265,7 +265,7 @@ export const getGamesStats = createServerFn({ method: "GET" })
 				draws: 0,
 				losses: 0,
 				avgAccuracy: null as number | null,
-				avgGameScore: null as number | null,
+				avgGameRating: null as number | null,
 				blunderCount: 0,
 			};
 		}
@@ -284,7 +284,7 @@ export const getGamesStats = createServerFn({ method: "GET" })
 					draws: sql<number>`count(*) FILTER (WHERE ${inArray(games.resultDetail, drawDetails)})`,
 					losses: sql<number>`count(*) FILTER (WHERE ${inArray(games.resultDetail, lossDetails)})`,
 					avgAccuracy: sql<number | null>`avg(${playerAccuracyExpr})::float8`,
-					avgGameScore: sql<number | null>`avg(${playerScoreExpr})::float8`,
+					avgGameRating: sql<number | null>`avg(${playerScoreExpr})::float8`,
 				})
 				.from(games)
 				.leftJoin(latestJobSubquery, eq(latestJobSubquery.gameId, games.id))
@@ -309,8 +309,8 @@ export const getGamesStats = createServerFn({ method: "GET" })
 			draws: Number(a.draws),
 			losses: Number(a.losses),
 			avgAccuracy: a.avgAccuracy != null ? Number(a.avgAccuracy) : null,
-			avgGameScore:
-				a.avgGameScore != null ? Math.round(Number(a.avgGameScore)) : null,
+			avgGameRating:
+				a.avgGameRating != null ? Math.round(Number(a.avgGameRating)) : null,
 			blunderCount: Number(blunderRow[0].blunderCount),
 		};
 	});

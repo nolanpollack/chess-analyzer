@@ -3,6 +3,8 @@ import type { GameSummary } from "#/features/games/types";
 
 export type GameColumnMeta = {
 	align?: "left" | "right";
+	/** Optional explainer surfaced on column-header hover. */
+	tooltip?: string;
 };
 
 /**
@@ -39,13 +41,19 @@ export const GAMES_COLUMNS: ColumnDef<GameSummary>[] = [
 		id: "accuracy",
 		header: "Accuracy",
 		enableSorting: true,
-		meta: { align: "right" },
+		meta: {
+			align: "right",
+			tooltip: "How precisely you played, move by move.",
+		},
 	},
 	{
-		id: "score",
-		header: "Game score",
+		id: "rating",
+		header: "Game rating",
 		enableSorting: true,
-		meta: { align: "right" },
+		meta: {
+			align: "right",
+			tooltip: "An estimate of how well you played overall.",
+		},
 	},
 	{
 		id: "date",

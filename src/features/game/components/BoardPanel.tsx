@@ -74,7 +74,7 @@ export function BoardPanel({
 
 	return (
 		<div>
-			<div className="aspect-square w-full overflow-hidden rounded-[6px] border border-divider">
+			<div className="aspect-square w-full overflow-hidden rounded-sm border border-divider">
 				<Chessboard
 					options={{
 						position,
@@ -87,14 +87,14 @@ export function BoardPanel({
 				/>
 			</div>
 
-			<div className="mt-3 flex items-center gap-2 rounded-[8px] border border-divider bg-surface p-2">
+			<div className="mt-3 flex items-center gap-2 rounded-md border border-divider bg-surface p-2">
 				<ControlButton label="First move" onClick={onFirst}>
 					<ChevronsLeft className="h-3.5 w-3.5" />
 				</ControlButton>
 				<ControlButton label="Previous move" onClick={onPrev}>
 					<ChevronLeft className="h-3.5 w-3.5" />
 				</ControlButton>
-				<div className="flex-1 text-center mono-nums font-mono text-[12.5px] text-fg-2">
+				<div className="flex-1 text-center mono-nums font-mono text-xs-plus text-fg-2">
 					{cur
 						? `${cur.moveNumber}${cur.side === "white" ? "." : "..."} ${cur.san}`
 						: "—"}
@@ -131,7 +131,7 @@ function ControlButton({
 			type="button"
 			aria-label={label}
 			onClick={onClick}
-			className="cursor-pointer rounded-[4px] border-none bg-transparent p-1.5 text-fg-2 transition-colors duration-[100ms] hover:bg-surface-2 hover:text-fg-1"
+			className="cursor-pointer rounded-xs border-none bg-transparent p-1.5 text-fg-2 transition-colors duration-100 hover:bg-surface-2 hover:text-fg-1"
 		>
 			{children}
 		</button>

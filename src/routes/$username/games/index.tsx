@@ -16,6 +16,7 @@ import {
 } from "#/features/games/hooks/use-games";
 import { useProfileProgress } from "#/features/players/hooks/use-profile-progress";
 import { SyncStatusButton } from "#/features/profile/components/SyncStatusButton";
+import { usePlayerSummary } from "#/features/profile/hooks/use-player-summary";
 
 export const Route = createFileRoute("/$username/games/")({
 	component: GamesPage,
@@ -26,6 +27,8 @@ const PAGE_SIZE = 50;
 function GamesPage() {
 	const { username } = Route.useParams();
 	const progress = useProfileProgress(username);
+	const { data: summary } = usePlayerSummary(username);
+	const playerRating = summary?.playerRating ?? null;
 	const [filters, setFilters] = useState<GamesQueryFilters>({});
 	const [sort, setSort] = useState<GamesSort>({ key: "date", dir: "desc" });
 	const [page, setPage] = useState(1);
@@ -69,7 +72,7 @@ function GamesPage() {
 					movesAnalyzed: status.movesAnalyzed,
 					totalMoves: status.totalMoves ?? 0,
 					accuracyReady: status.accuracyReady,
-					gameScoreReady: status.gameScoreReady,
+					gameRatingReady: status.gameRatingReady,
 				});
 			} else if (raw && raw.overallAccuracy === null) {
 				map.set(summary.id, {
@@ -77,7 +80,7 @@ function GamesPage() {
 					movesAnalyzed: 0,
 					totalMoves: 0,
 					accuracyReady: false,
-					gameScoreReady: false,
+					gameRatingReady: false,
 				});
 			}
 		}
@@ -87,7 +90,10 @@ function GamesPage() {
 	return (
 		<>
 			<Topbar
-				crumbs={[{ label: "Profile" }, { label: "Games" }]}
+				crumbs={[
+					{ label: "Profile", to: { to: "/$username", params: { username } } },
+					{ label: "Games" },
+				]}
 				actions={<SyncStatusButton username={username} progress={progress} />}
 			/>
 			<PageContainer className="space-y-6">
@@ -95,7 +101,7 @@ function GamesPage() {
 					<h1 className="text-2xl font-semibold tracking-tight text-fg">
 						Games
 					</h1>
-					<p className="mt-2 max-w-2xl text-[13px] text-fg-3">
+					<p className="mt-2 max-w-2xl text-ui text-fg-3">
 						{totalCount.toLocaleString()} games imported from your connected
 						accounts. Filter, sort, and click any game to analyze.
 					</p>
@@ -119,6 +125,7 @@ function GamesPage() {
 							onSortChange={updateSort}
 							analysisById={analysisById}
 							isLoading={isLoading && items.length === 0}
+							playerRating={playerRating}
 							emptyState={
 								<EmptyState
 									hasActiveFilters={hasActiveFilters}
@@ -158,7 +165,7 @@ function EmptyState({
 			</div>
 			{hasActiveFilters && (
 				<>
-					<p className="max-w-sm text-center text-[13px] text-fg-3">
+					<p className="max-w-sm text-center text-ui text-fg-3">
 						Try removing a filter or broadening the search.
 					</p>
 					<button

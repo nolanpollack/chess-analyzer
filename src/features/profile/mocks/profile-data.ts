@@ -12,6 +12,7 @@ export const mockFactors: Factor[] = [
 		delta: -14,
 		trend: [1410, 1405, 1398, 1392, 1388, 1385, 1380],
 		group: "phase",
+		nPositions: 100,
 	},
 	{
 		id: "tactics",
@@ -21,6 +22,7 @@ export const mockFactors: Factor[] = [
 		delta: 32,
 		trend: [1660, 1668, 1672, 1680, 1690, 1700, 1712],
 		group: "skill",
+		nPositions: 100,
 	},
 	{
 		id: "knights",
@@ -30,6 +32,7 @@ export const mockFactors: Factor[] = [
 		delta: -8,
 		trend: [1470, 1465, 1458, 1455, 1452, 1450, 1448],
 		group: "piece",
+		nPositions: 100,
 	},
 	{
 		id: "opening",
@@ -39,6 +42,7 @@ export const mockFactors: Factor[] = [
 		delta: 4,
 		trend: [1660, 1665, 1670, 1672, 1675, 1678, 1680],
 		group: "phase",
+		nPositions: 100,
 	},
 	{
 		id: "middlegame",
@@ -48,6 +52,7 @@ export const mockFactors: Factor[] = [
 		delta: 12,
 		trend: [1590, 1598, 1605, 1612, 1618, 1620, 1625],
 		group: "phase",
+		nPositions: 100,
 	},
 	{
 		id: "positional",
@@ -57,6 +62,7 @@ export const mockFactors: Factor[] = [
 		delta: 6,
 		trend: [1570, 1575, 1578, 1582, 1585, 1586, 1588],
 		group: "skill",
+		nPositions: 100,
 	},
 	{
 		id: "time",
@@ -66,6 +72,7 @@ export const mockFactors: Factor[] = [
 		delta: -18,
 		trend: [1540, 1530, 1520, 1510, 1505, 1498, 1492],
 		group: "skill",
+		nPositions: 100,
 	},
 	{
 		id: "bishops",
@@ -75,6 +82,7 @@ export const mockFactors: Factor[] = [
 		delta: 10,
 		trend: [1670, 1678, 1685, 1688, 1690, 1692, 1694],
 		group: "piece",
+		nPositions: 100,
 	},
 	{
 		id: "rooks",
@@ -84,6 +92,7 @@ export const mockFactors: Factor[] = [
 		delta: 2,
 		trend: [1600, 1605, 1608, 1610, 1611, 1612, 1612],
 		group: "piece",
+		nPositions: 100,
 	},
 	{
 		id: "queens",
@@ -93,6 +102,7 @@ export const mockFactors: Factor[] = [
 		delta: 8,
 		trend: [1640, 1645, 1650, 1654, 1656, 1658, 1660],
 		group: "piece",
+		nPositions: 100,
 	},
 	{
 		id: "pawns",
@@ -102,6 +112,7 @@ export const mockFactors: Factor[] = [
 		delta: -4,
 		trend: [1560, 1562, 1560, 1558, 1557, 1556, 1555],
 		group: "skill",
+		nPositions: 100,
 	},
 	{
 		id: "king",
@@ -111,6 +122,7 @@ export const mockFactors: Factor[] = [
 		delta: 6,
 		trend: [1600, 1605, 1610, 1615, 1618, 1619, 1620],
 		group: "skill",
+		nPositions: 100,
 	},
 ];
 

@@ -19,9 +19,9 @@ export function FactorBreakdownCard({
 	const agencyFactors = factors.filter((f) => f.group === "agency");
 
 	return (
-		<div className="rounded-[10px] border border-divider bg-surface">
+		<div className="rounded-lg border border-divider bg-surface">
 			<div className="border-b border-divider px-5 py-3.5">
-				<div className="text-2xs uppercase tracking-[0.08em] text-fg-3">
+				<div className="text-2xs uppercase tracking-label-wide text-fg-3">
 					Factor breakdown
 				</div>
 				<div className="mt-1 text-ui text-fg-2">
@@ -63,7 +63,7 @@ function FactorGroup({
 }) {
 	return (
 		<div>
-			<div className="mb-2 text-[10.5px] uppercase tracking-[0.08em] text-fg-4">
+			<div className="mb-2 text-2xs-plus uppercase tracking-label-wide text-fg-4">
 				{title}
 			</div>
 			<div className="flex flex-col gap-2.5">
@@ -83,9 +83,9 @@ function FactorRow({ factor }: { factor: GameFactor }) {
 	const positive = factor.delta >= 0;
 	return (
 		<div className="flex items-center gap-3">
-			<div className="w-[92px] shrink-0 text-ui text-fg-1">
+			<div className="w-23 shrink-0 text-ui text-fg-1">
 				{factor.label}
-				<span className="ml-1 mono-nums font-mono text-[10.5px] text-fg-4">
+				<span className="ml-1 mono-nums font-mono text-2xs-plus text-fg-4">
 					{factor.moveCount}
 				</span>
 			</div>
@@ -95,11 +95,11 @@ function FactorRow({ factor }: { factor: GameFactor }) {
 					style={{ width: `${pct}%` }}
 				/>
 			</div>
-			<div className="w-[54px] text-right mono-nums font-mono text-[12.5px] font-medium text-fg-1">
+			<div className="w-13.5 text-right mono-nums font-mono text-xs-plus font-medium text-fg-1">
 				{factor.value}
 			</div>
 			<div
-				className={`w-[46px] text-right mono-nums font-mono text-2xs ${
+				className={`w-11.5 text-right mono-nums font-mono text-2xs ${
 					positive ? "text-data-6" : "text-blunder"
 				}`}
 			>

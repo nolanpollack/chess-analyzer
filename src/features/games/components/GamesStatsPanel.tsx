@@ -15,19 +15,17 @@ export function GamesStatsPanel({
 }: GamesStatsPanelProps) {
 	const { data: stats, isLoading } = useGamesStats({ username, filters });
 	const { data: summary } = usePlayerSummary(username);
-	const overallElo = summary?.eloEstimate ?? null;
+	const playerRating = summary?.playerRating ?? null;
 
 	if (isLoading && !stats) {
-		return (
-			<div className="h-[88px] rounded-lg border border-divider bg-surface" />
-		);
+		return <div className="h-22 rounded-lg border border-divider bg-surface" />;
 	}
 	if (!stats || stats.totalCount === 0) return null;
 
 	const winPct = Math.round((stats.wins / stats.totalCount) * 100);
 	const vsOverall =
-		overallElo != null && stats.avgGameScore != null
-			? stats.avgGameScore - overallElo
+		playerRating != null && stats.avgGameRating != null
+			? stats.avgGameRating - playerRating
 			: null;
 	const blundersPerGame = (stats.blunderCount / stats.totalCount).toFixed(2);
 
@@ -60,7 +58,7 @@ export function GamesStatsPanel({
 			/>
 			<StatCell
 				label="Avg game score"
-				value={stats.avgGameScore ?? "—"}
+				value={stats.avgGameRating ?? "—"}
 				sub={
 					vsOverall != null ? (
 						<span className={vsOverall < 0 ? "text-blunder" : "text-data-6"}>
@@ -95,10 +93,10 @@ function StatCell({
 }) {
 	return (
 		<div className={`px-5 py-4 ${last ? "" : "border-r border-divider"}`}>
-			<div className="mb-1.5 text-2xs uppercase tracking-[0.06em] text-fg-3">
+			<div className="mb-1.5 text-2xs uppercase tracking-label text-fg-3">
 				{label}
 			</div>
-			<div className="mono-nums font-mono text-[22px] font-medium leading-[1.1] text-fg">
+			<div className="mono-nums font-mono text-stat font-medium leading-snug-2 text-fg">
 				{value}
 			</div>
 			<div className="mt-1 text-2xs text-fg-3">{sub}</div>

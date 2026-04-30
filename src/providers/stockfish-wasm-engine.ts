@@ -82,7 +82,9 @@ function parseInfoLine(line: string): ParsedInfo | null {
 	return { depth, multipv, scoreCp, scoreMate, pv };
 }
 
-export function createStockfishWasmEngine(opts?: { multipv?: number }): AnalysisEngine {
+export function createStockfishWasmEngine(opts?: {
+	multipv?: number;
+}): AnalysisEngine {
 	const MULTIPV = opts?.multipv ?? DEFAULT_MULTIPV;
 	let process: ChildProcess | null = null;
 	let outputBuffer = "";

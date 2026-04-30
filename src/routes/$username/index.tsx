@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageContainer } from "#/components/layout/PageContainer";
 import { Topbar } from "#/components/layout/Topbar";
 import { useProfileProgress } from "#/features/players/hooks/use-profile-progress";
-import { EloEstimateCard } from "#/features/profile/components/EloEstimateCard";
 import { FactorBreakdownCard } from "#/features/profile/components/FactorBreakdownCard";
 import { FocusAreasCard } from "#/features/profile/components/FocusAreasCard";
+import { PlayerRatingCard } from "#/features/profile/components/PlayerRatingCard";
 import { ProfilePageHeader } from "#/features/profile/components/ProfilePageHeader";
 import { RatingOverTimeCard } from "#/features/profile/components/RatingOverTimeCard";
 import { RecentGamesCard } from "#/features/profile/components/RecentGamesCard";
@@ -33,16 +33,15 @@ function ProfilePage() {
 			/>
 			<PageContainer className="space-y-4">
 				<ProfilePageHeader username={username} />
-				<div className="grid grid-cols-[1fr_1.3fr] gap-4">
-					<EloEstimateCard username={username} isAnalyzing={isAnalyzing} />
+				<div
+					className="grid gap-4"
+					style={{ gridTemplateColumns: "1fr 1.3fr" }}
+				>
+					<PlayerRatingCard username={username} isAnalyzing={isAnalyzing} />
 					<RatingOverTimeCard username={username} />
 				</div>
 				<FocusAreasCard username={username} />
-				<FactorBreakdownCard
-					username={username}
-					isAnalyzing={isAnalyzing}
-					positionsAnalyzed={progress?.positionsAnalyzed ?? 0}
-				/>
+				<FactorBreakdownCard username={username} isAnalyzing={isAnalyzing} />
 				<RecentGamesCard username={username} />
 			</PageContainer>
 		</>

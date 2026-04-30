@@ -73,11 +73,31 @@ a corresponding Tailwind utility (`text-fg`, `bg-surface-2`, `border-divider`, e
 If a `var(--x)` reference has no Tailwind utility, add it to `styles.css` before using it inline.
 Never hardcode color values, hex codes, or rgb() literals in component files.
 
-Inline `style` props are only acceptable for:
-- Dynamically computed values (JS expressions: widths, positions, conditional values)
+## No arbitrary value syntax in Tailwind classes
+Do not use Tailwind's arbitrary-value brackets (`text-[12px]`, `min-h-[52px]`, `bg-[#fff]`,
+`grid-cols-[60px_1fr_auto]`, etc.) in `className`. They bypass the design system and create
+one-off values that are hard to keep consistent.
+
+When you reach for an arbitrary value, choose one of:
+1. **Use the closest standard utility** if the spec is flexible — e.g. `min-h-13` (52px),
+   `w-72` (288px), `h-0.5` (2px), `backdrop-blur-md` (12px). Tailwind v4 generates spacing
+   utilities on the fly from `--spacing` so non-default integers like `min-h-13` work.
+2. **Add a `@theme inline` token** in `src/styles.css` if the value is reused or semantic
+   (e.g. a topbar height, a popover width). Then use the generated utility.
+3. **Inline `style={{ ... }}` only for genuinely dynamic values** — JS expressions whose
+   value isn't known at author time (computed widths, conditional positions,
+   `gridTemplateColumns` whose tracks are data-driven, fontFeatureSettings, gradients,
+   shadows). A static layout dimension is not dynamic.
+
+Existing arbitrary-value usages (`text-[64px]`, `text-[12.5px]`, `rounded-[10px]`, etc.)
+predate this rule and are migrated incrementally as files are touched. Don't introduce
+new ones.
+
+Inline `style` props are still acceptable for:
+- Dynamically computed values (JS expressions)
 - `fontFeatureSettings` — use the `.mono-nums` utility class instead where possible
-- `fontSize` with non-standard values — use Tailwind arbitrary `text-[64px]`
-- `linear-gradient` / CSS functions that can't be expressed as static tokens (use `.bg-avatar-gradient` utility or add a token)
+- `linear-gradient` / CSS functions that can't be expressed as static tokens
+  (use `.bg-avatar-gradient` utility or add a token)
 - Shadows: `var(--shadow-sm/md/lg)` — still inline until a utility is needed
 
 ## ThemeToggle location

@@ -33,7 +33,7 @@ export function ClassChip({ cls, count }: ClassChipProps) {
 	const active = count > 0;
 	return (
 		<span
-			className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 text-[10.5px] font-medium ${
+			className={`inline-flex items-center gap-1 rounded-xs border px-2 py-0.5 text-2xs-plus font-medium ${
 				active ? ACTIVE[cls] : "border-divider bg-surface-2 text-fg-3"
 			}`}
 		>

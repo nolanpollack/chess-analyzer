@@ -46,6 +46,7 @@ export function maiaTagRatingToFactor(
 		delta: Math.round(rating.predicted - baseline),
 		trend: [],
 		group: dimensionType,
+		nPositions: rating.nPositions,
 	};
 }
 

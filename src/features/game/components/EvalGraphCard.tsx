@@ -40,12 +40,12 @@ export function EvalGraphCard({
 			: null;
 
 	return (
-		<div className="mt-4 rounded-[8px] border border-divider bg-surface px-3.5 py-3">
+		<div className="mt-4 rounded-md border border-divider bg-surface px-3.5 py-3">
 			<div className="mb-1.5 flex items-center justify-between">
-				<span className="text-[11.5px] uppercase tracking-[0.06em] text-fg-3">
+				<span className="text-xs-minus uppercase tracking-label text-fg-3">
 					Evaluation over time
 				</span>
-				<span className="mono-nums font-mono text-[10.5px] text-fg-4">
+				<span className="mono-nums font-mono text-2xs-plus text-fg-4">
 					white advantage ↑
 				</span>
 			</div>

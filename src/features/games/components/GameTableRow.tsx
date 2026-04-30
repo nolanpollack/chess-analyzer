@@ -1,8 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import type { GameSummary } from "#/features/games/types";
+import { GameRatingCell } from "./GameRatingCell";
 import { GameResultPill } from "./GameResultPill";
-import { GameScoreCell } from "./GameScoreCell";
 
 export type AnalysisProgress = {
 	status: "pending" | "in-progress" | "complete" | "failed";
@@ -11,7 +11,7 @@ export type AnalysisProgress = {
 	/** True once the player-side accuracy column is populated. */
 	accuracyReady: boolean;
 	/** True once the player-side Maia rating column is populated. */
-	gameScoreReady: boolean;
+	gameRatingReady: boolean;
 };
 
 type GameTableRowProps = {
@@ -19,9 +19,16 @@ type GameTableRowProps = {
 	username: string;
 	/** Optional analysis progress; when omitted, renders as today (assumes complete). */
 	analysis?: AnalysisProgress;
+	/** Player's overall rating — drives the diverging Game-rating bar. */
+	playerRating?: number | null;
 };
 
-export function GameTableRow({ game, username, analysis }: GameTableRowProps) {
+export function GameTableRow({
+	game,
+	username,
+	analysis,
+	playerRating = null,
+}: GameTableRowProps) {
 	const navigate = useNavigate();
 	return (
 		<tr
@@ -39,7 +46,7 @@ export function GameTableRow({ game, username, analysis }: GameTableRowProps) {
 			<td className="px-3 py-3.5">
 				<div className="flex items-center gap-2">
 					<span
-						className={`h-2 w-2 shrink-0 rounded-[2px] border border-border-strong ${game.color === "white" ? "bg-surface-3" : "bg-fg-1"}`}
+						className={`h-2 w-2 shrink-0 rounded-2xs border border-border-strong ${game.color === "white" ? "bg-surface-3" : "bg-fg-1"}`}
 					/>
 					<span className="text-ui font-medium text-fg-1">{game.opp}</span>
 					<span className="mono-nums font-mono text-xs text-fg-3">
@@ -57,7 +64,11 @@ export function GameTableRow({ game, username, analysis }: GameTableRowProps) {
 				<AccuracyCell game={game} analysis={analysis} />
 			</td>
 			<td className="px-3 py-3.5 text-right">
-				<GameScoreOrLoading game={game} analysis={analysis} />
+				<GameRatingOrLoading
+					game={game}
+					analysis={analysis}
+					playerRating={playerRating}
+				/>
 			</td>
 			<td className="py-3.5 pl-3 pr-5 text-right text-xs text-fg-3">
 				{game.when}
@@ -94,15 +105,17 @@ function AccuracyCell({
 	return <AccuracyProgress progress={analysis} />;
 }
 
-function GameScoreOrLoading({
+function GameRatingOrLoading({
 	game,
 	analysis,
+	playerRating,
 }: {
 	game: GameSummary;
 	analysis?: AnalysisProgress;
+	playerRating: number | null;
 }) {
-	if (!analysis || (analysis.gameScoreReady && analysis.status !== "failed")) {
-		return <GameScoreCell score={game.score} />;
+	if (!analysis || (analysis.gameRatingReady && analysis.status !== "failed")) {
+		return <GameRatingCell rating={game.rating} baseline={playerRating} />;
 	}
 	if (analysis.status === "failed") {
 		return (
@@ -115,7 +128,7 @@ function GameScoreOrLoading({
 			</span>
 		);
 	}
-	// Game score is one batched call per game — there's no fine-grained
+	// Game rating is one batched call per game — there's no fine-grained
 	// progress to show, so we render an indeterminate shimmer or a quiet em-dash
 	// depending on whether analysis has started for this game at all.
 	const queued = analysis.status === "pending";

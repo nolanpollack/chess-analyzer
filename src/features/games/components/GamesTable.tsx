@@ -5,6 +5,11 @@ import {
 	useReactTable,
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "#/components/ui/tooltip";
 import type { GamesSort } from "#/features/games/hooks/use-games";
 import type { GameSummary } from "#/features/games/types";
 import { type AnalysisProgress, GameTableRow } from "./GameTableRow";
@@ -20,10 +25,12 @@ type GamesTableProps = {
 	analysisById?: Map<string, AnalysisProgress>;
 	isLoading?: boolean;
 	emptyState?: React.ReactNode;
+	/** Player's overall rating — drives the diverging Game-rating bar. */
+	playerRating?: number | null;
 };
 
 const HEADER_CLASS =
-	"border-b border-divider bg-surface py-2.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-fg-3";
+	"border-b border-divider bg-surface py-2.5 text-xs-minus font-medium uppercase tracking-label text-fg-3";
 
 export function GamesTable({
 	data,
@@ -34,6 +41,7 @@ export function GamesTable({
 	analysisById,
 	isLoading,
 	emptyState,
+	playerRating = null,
 }: GamesTableProps) {
 	const table = useReactTable({
 		data,
@@ -59,6 +67,25 @@ export function GamesTable({
 							: isLast
 								? "pl-3 pr-5"
 								: "px-3";
+						const labelNode = flexRender(
+							header.column.columnDef.header,
+							header.getContext(),
+						);
+						const labelWithTooltip = meta.tooltip ? (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="cursor-help">{labelNode}</span>
+								</TooltipTrigger>
+								<TooltipContent
+									side="top"
+									className="max-w-65 normal-case tracking-normal"
+								>
+									{meta.tooltip}
+								</TooltipContent>
+							</Tooltip>
+						) : (
+							labelNode
+						);
 						return (
 							<th
 								key={header.id}
@@ -70,24 +97,16 @@ export function GamesTable({
 										onClick={() =>
 											onSortChange?.(toggleSort(sort, header.column.id))
 										}
-										className={`inline-flex items-center gap-1 ${align === "right" ? "flex-row-reverse" : ""} cursor-pointer select-none uppercase tracking-[0.06em] text-fg-3 hover:text-fg-1`}
+										className={`inline-flex items-center gap-1 ${align === "right" ? "flex-row-reverse" : ""} cursor-pointer select-none uppercase tracking-label text-fg-3 hover:text-fg-1`}
 									>
-										<span>
-											{flexRender(
-												header.column.columnDef.header,
-												header.getContext(),
-											)}
-										</span>
+										{labelWithTooltip}
 										<SortIndicator
 											active={isActive}
 											dir={isActive ? sort.dir : null}
 										/>
 									</button>
 								) : (
-									flexRender(
-										header.column.columnDef.header,
-										header.getContext(),
-									)
+									labelWithTooltip
 								)}
 							</th>
 						);
@@ -119,6 +138,7 @@ export function GamesTable({
 							game={game}
 							username={username}
 							analysis={analysisById?.get(game.id)}
+							playerRating={playerRating}
 						/>
 					))
 				)}

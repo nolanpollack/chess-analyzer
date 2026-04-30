@@ -93,7 +93,7 @@ function getLabel({
 		// Headline = the slowest stage, since that's what gates "fully analyzed".
 		const slowest = Math.min(
 			progress.accuracy,
-			progress.gameScore,
+			progress.gameRating,
 			progress.patterns,
 		);
 		return `Analyzing ${slowest} of ${progress.imported}`;
@@ -121,7 +121,7 @@ function ProgressStrip({ progress }: { progress: ProfileProgress }) {
 					Math.round(
 						(Math.min(
 							progress.accuracy,
-							progress.gameScore,
+							progress.gameRating,
 							progress.patterns,
 						) /
 							progress.imported) *
@@ -136,7 +136,7 @@ function ProgressStrip({ progress }: { progress: ProfileProgress }) {
 	return (
 		<span
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-x-0 bottom-0 block h-[2px] bg-surface-3"
+			className="pointer-events-none absolute inset-x-0 bottom-0 block h-0.5 bg-surface-3"
 		>
 			{showIndeterminate ? (
 				<span
@@ -160,8 +160,8 @@ function ProgressPopover({ progress }: { progress: ProfileProgress }) {
 			description: "How precisely you played",
 		},
 		{
-			label: "Game score",
-			done: progress.gameScore,
+			label: "Game rating",
+			done: progress.gameRating,
 			description: "How well you played overall",
 		},
 		{
@@ -173,9 +173,9 @@ function ProgressPopover({ progress }: { progress: ProfileProgress }) {
 	return (
 		<div
 			role="tooltip"
-			className="w-[280px] rounded-md border border-divider bg-surface-2 p-4 shadow-md"
+			className="w-72 rounded-md border border-divider bg-surface-2 p-4 shadow-md"
 		>
-			<div className="mb-3 text-2xs uppercase tracking-[0.06em] text-fg-3">
+			<div className="mb-3 text-2xs uppercase tracking-label text-fg-3">
 				Analysis progress
 			</div>
 			<div className="divide-y divide-divider">
@@ -215,7 +215,7 @@ function StageRow({
 					{done} / {total}
 				</div>
 			</div>
-			<div className="mt-2 h-[2px] w-full overflow-hidden rounded-full bg-surface-3">
+			<div className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-surface-3">
 				<span
 					className={`block h-full transition-all ${caughtUp ? "bg-fg-4" : "bg-accent-brand"}`}
 					style={{ width: `${pct}%` }}

@@ -16,7 +16,7 @@ type GameHeaderGame = {
 type GamePageHeaderProps = {
 	game: GameHeaderGame;
 	moveCount: number;
-	gameScore: number | null;
+	gameRating: number | null;
 	overallElo: number | null;
 	accuracy: number | null;
 };
@@ -32,7 +32,7 @@ const RESULT_LABEL = { win: "WIN", loss: "LOSS", draw: "DRAW" } as const;
 export function GamePageHeader({
 	game,
 	moveCount,
-	gameScore,
+	gameRating,
 	overallElo,
 	accuracy,
 }: GamePageHeaderProps) {
@@ -44,7 +44,7 @@ export function GamePageHeader({
 			<div className="min-w-0 flex-[1_1_420px]">
 				<div className="mb-2 flex flex-wrap items-center gap-2.5">
 					<span
-						className={`rounded-[4px] px-2 py-0.5 font-mono text-2xs font-semibold ${RESULT_STYLE[category]}`}
+						className={`rounded-xs px-2 py-0.5 font-mono text-2xs font-semibold ${RESULT_STYLE[category]}`}
 					>
 						{RESULT_LABEL[category]}
 					</span>
@@ -54,7 +54,7 @@ export function GamePageHeader({
 						{moveCount} moves
 					</span>
 				</div>
-				<h1 className="text-2xl font-semibold tracking-[-0.025em] text-fg">
+				<h1 className="text-2xl font-semibold tracking-tight-3 text-fg">
 					{game.playerUsername}{" "}
 					<span className="font-normal text-fg-3">vs</span>{" "}
 					{game.opponentUsername}{" "}
@@ -62,7 +62,7 @@ export function GamePageHeader({
 						· {game.opponentRating}
 					</span>
 				</h1>
-				<p className="mt-2 max-w-[640px] text-[13.5px] text-fg-2">
+				<p className="mt-2 max-w-160 text-sm-minus text-fg-2">
 					You played {game.playerColor} ·{" "}
 					{category === "win"
 						? "a winning result"
@@ -74,9 +74,9 @@ export function GamePageHeader({
 			</div>
 			<div className="flex gap-7">
 				<div>
-					<MetricLabel>Game score</MetricLabel>
+					<MetricLabel>Game rating</MetricLabel>
 					<div className="mt-1">
-						<MetricValue size="md">{gameScore ?? "—"}</MetricValue>
+						<MetricValue size="md">{gameRating ?? "—"}</MetricValue>
 					</div>
 					{overallElo !== null && (
 						<div className="mt-1 mono-nums font-mono text-2xs text-fg-3">

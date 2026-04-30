@@ -64,7 +64,7 @@ export default function ThemeToggle() {
 			type="button"
 			onClick={toggleMode}
 			title={label}
-			className="grid h-7 w-7 cursor-pointer place-items-center rounded-[6px] text-fg-3 transition-all duration-[120ms] hover:bg-surface-2 hover:text-fg"
+			className="grid h-7 w-7 cursor-pointer place-items-center rounded-sm text-fg-3 transition-all duration-120 hover:bg-surface-2 hover:text-fg"
 		>
 			{isDark ? (
 				<Sun className="h-3.5 w-3.5" />

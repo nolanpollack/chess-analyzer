@@ -30,7 +30,7 @@ export function ExplanationCard({
 
 	return (
 		<div
-			className={`overflow-hidden rounded-[10px] border bg-surface ${
+			className={`overflow-hidden rounded-lg border bg-surface ${
 				badMove ? "border-border-strong" : "border-divider"
 			}`}
 		>
@@ -68,7 +68,7 @@ export function ExplanationCard({
 						error={generate.error ? String(generate.error.message) : null}
 					/>
 				) : (
-					<p className="text-[13.5px] leading-[1.55] text-fg-2">
+					<p className="text-sm-minus leading-relaxed-2 text-fg-2">
 						{move.is_player_move
 							? "This matches engine top choices. Use ← → to walk the game."
 							: "Opponent's move. Use ← → to continue."}
@@ -94,27 +94,27 @@ function ExplanationBody({
 }) {
 	return (
 		<>
-			<div className="mb-2 text-2xs uppercase tracking-[0.08em] text-fg-3">
+			<div className="mb-2 text-2xs uppercase tracking-label-wide text-fg-3">
 				Analysis
 			</div>
-			<p className="mb-4 text-sm leading-[1.6] text-fg-1">{explanation}</p>
+			<p className="mb-4 text-sm leading-relaxed text-fg-1">{explanation}</p>
 
 			{principle && (
-				<div className="mb-4 rounded-[6px] border border-divider bg-surface-2 px-3 py-2 text-[12.5px] text-fg-2">
+				<div className="mb-4 rounded-sm border border-divider bg-surface-2 px-3 py-2 text-xs-plus text-fg-2">
 					<span className="font-medium text-fg-1">Principle:</span> {principle}
 				</div>
 			)}
 
 			{showBest && (
 				<div className="mb-4">
-					<div className="mb-2 text-2xs uppercase tracking-[0.08em] text-fg-3">
+					<div className="mb-2 text-2xs uppercase tracking-label-wide text-fg-3">
 						Best move
 					</div>
-					<div className="flex items-center gap-2.5 rounded-[6px] border border-data-6/30 bg-tint-data-6 px-3 py-2.5">
-						<span className="text-[10px] font-medium uppercase tracking-[0.06em] text-data-6">
+					<div className="flex items-center gap-2.5 rounded-sm border border-data-6/30 bg-tint-data-6 px-3 py-2.5">
+						<span className="text-3xs font-medium uppercase tracking-label text-data-6">
 							Top engine
 						</span>
-						<span className="mono-nums font-mono text-[13.5px] font-medium text-fg">
+						<span className="mono-nums font-mono text-sm-minus font-medium text-fg">
 							{bestMoveSan}
 						</span>
 					</div>
@@ -129,7 +129,7 @@ function ExplanationBody({
 function ConceptTags({ concepts }: { concepts: string[] }) {
 	return (
 		<div>
-			<div className="mb-2 text-2xs uppercase tracking-[0.08em] text-fg-3">
+			<div className="mb-2 text-2xs uppercase tracking-label-wide text-fg-3">
 				Concepts
 			</div>
 			<div className="flex flex-wrap gap-1.5">
@@ -153,7 +153,7 @@ function ExplainPrompt({
 }) {
 	return (
 		<div>
-			<p className="mb-3 text-[13.5px] leading-[1.55] text-fg-2">
+			<p className="mb-3 text-sm-minus leading-relaxed-2 text-fg-2">
 				Get a plain-language explanation for this move, covering what went wrong
 				and the principles it touches.
 			</p>
@@ -161,9 +161,9 @@ function ExplainPrompt({
 				type="button"
 				onClick={onClick}
 				disabled={loading}
-				className="inline-flex cursor-pointer items-center gap-2 rounded-[6px] border border-divider bg-surface-2 px-3 py-2 text-ui font-medium text-fg-1 transition-colors duration-[100ms] hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
+				className="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-divider bg-surface-2 px-3 py-2 text-ui font-medium text-fg-1 transition-colors duration-100 hover:bg-surface-3 disabled:cursor-wait disabled:opacity-70"
 			>
-				<Sparkles className="h-[13px] w-[13px]" />
+				<Sparkles className="h-icon-sm w-icon-sm" />
 				{loading ? "Thinking…" : "Explain this move"}
 			</button>
 			{error && <p className="mt-2 text-xs text-blunder">{error}</p>}
@@ -176,7 +176,7 @@ function EvalChangePill({ from, to }: { from: number; to: number }) {
 	const big = Math.abs(delta) > 0.3;
 	return (
 		<span
-			className={`inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 ${
+			className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 ${
 				big ? "bg-tint-blunder text-blunder" : "bg-surface-2 text-fg-2"
 			}`}
 		>

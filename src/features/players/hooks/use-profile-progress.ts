@@ -15,7 +15,7 @@ export type ProfileProgress = {
 	 */
 	totalGamesToImport: number;
 	accuracy: number;
-	gameScore: number;
+	gameRating: number;
 	patterns: number;
 	positionsAnalyzed: number;
 };
@@ -41,7 +41,7 @@ export function useProfileProgress(username: string): ProfileProgress | null {
 			const backlog =
 				data.gamesImported > 0 &&
 				(data.accuracyComplete < data.gamesImported ||
-					data.gameScoreComplete < data.gamesImported ||
+					data.gameRatingComplete < data.gamesImported ||
 					data.patternsComplete < data.gamesImported);
 			return isSyncing || backlog ? 3000 : false;
 		},
@@ -52,12 +52,12 @@ export function useProfileProgress(username: string): ProfileProgress | null {
 	const data = query.data;
 	const imported = data?.gamesImported ?? 0;
 	const accuracy = data?.accuracyComplete ?? 0;
-	const gameScore = data?.gameScoreComplete ?? 0;
+	const gameRating = data?.gameRatingComplete ?? 0;
 	const patterns = data?.patternsComplete ?? 0;
 
 	const hasBacklog =
 		imported > 0 &&
-		(accuracy < imported || gameScore < imported || patterns < imported);
+		(accuracy < imported || gameRating < imported || patterns < imported);
 
 	const state: ProfileProgress["state"] = isSyncing
 		? "syncing"
@@ -72,7 +72,7 @@ export function useProfileProgress(username: string): ProfileProgress | null {
 		imported,
 		totalGamesToImport: data?.totalGamesToImport ?? 0,
 		accuracy,
-		gameScore,
+		gameRating,
 		patterns,
 		positionsAnalyzed: data?.positionsAnalyzed ?? 0,
 	};

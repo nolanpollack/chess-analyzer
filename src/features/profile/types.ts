@@ -17,6 +17,7 @@ export type Factor = {
 	delta: number;
 	trend: number[];
 	group: FactorGroup;
+	nPositions: number;
 };
 
 export type FocusArea = {

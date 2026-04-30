@@ -20,7 +20,7 @@ const TABLE_HEADERS = [
 	"Opening",
 	"Time",
 	"Accuracy",
-	"Game score",
+	"Game rating",
 	"Played",
 ];
 
@@ -37,7 +37,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			oppElo: 1840,
 			result: "W",
 			color: "white",
-			score: 1620,
+			rating: 1620,
 			acc: 92.4,
 			when: "2h ago",
 		}),
@@ -49,7 +49,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			oppElo: 1510,
 			result: "L",
 			color: "black",
-			score: null,
+			rating: null,
 			acc: null,
 			when: "12m ago",
 		}),
@@ -58,7 +58,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			movesAnalyzed: 0,
 			totalMoves: 64,
 			accuracyReady: false,
-			gameScoreReady: false,
+			gameRatingReady: false,
 		},
 	},
 	{
@@ -68,7 +68,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			oppElo: 1605,
 			result: "W",
 			color: "white",
-			score: null,
+			rating: null,
 			acc: null,
 			when: "8m ago",
 		}),
@@ -77,7 +77,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			movesAnalyzed: 12,
 			totalMoves: 80,
 			accuracyReady: false,
-			gameScoreReady: false,
+			gameRatingReady: false,
 		},
 	},
 	{
@@ -87,7 +87,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			oppElo: 1720,
 			result: "D",
 			color: "black",
-			score: null,
+			rating: null,
 			acc: 78.1,
 			when: "4m ago",
 		}),
@@ -96,7 +96,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			movesAnalyzed: 64,
 			totalMoves: 64,
 			accuracyReady: true,
-			gameScoreReady: false,
+			gameRatingReady: false,
 		},
 	},
 	{
@@ -106,7 +106,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			oppElo: 1480,
 			result: "L",
 			color: "white",
-			score: null,
+			rating: null,
 			acc: null,
 			when: "yesterday",
 		}),
@@ -115,7 +115,7 @@ const ROW_FIXTURES: RowFixture[] = [
 			movesAnalyzed: 12,
 			totalMoves: 64,
 			accuracyReady: false,
-			gameScoreReady: false,
+			gameRatingReady: false,
 		},
 	},
 ];
@@ -141,8 +141,8 @@ function ProgressPreviewPage() {
 					<header className="space-y-1">
 						<h2 className="text-lg font-medium">Game analysis progress</h2>
 						<p className="text-sm text-fg-3">
-							Per-cell loading on the Accuracy and Game score columns — em-dash
-							for queued, indeterminate shimmer for game-score, a determinate
+							Per-cell loading on the Accuracy and Game rating columns — em-dash
+							for queued, indeterminate shimmer for game-rating, a determinate
 							bar for accuracy as moves complete.
 						</p>
 					</header>
@@ -180,7 +180,7 @@ function MockGamesTable({ rows }: { rows: RowFixture[] }) {
 						{TABLE_HEADERS.map((header, i) => (
 							<th
 								key={header}
-								className={`border-b border-divider py-2.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-fg-3 ${
+								className={`border-b border-divider py-2.5 text-xs-minus font-medium uppercase tracking-label text-fg-3 ${
 									i === 0
 										? "pl-5 pr-3 text-left"
 										: i === 6
@@ -262,7 +262,7 @@ function makeGame(
 		oppElo: overrides.oppElo ?? 1500,
 		result: overrides.result ?? "W",
 		color: overrides.color ?? "white",
-		score: overrides.score ?? null,
+		rating: overrides.rating ?? null,
 		acc: overrides.acc ?? null,
 		time: overrides.time ?? "10+0",
 		opening: overrides.opening ?? "Italian Game",
@@ -280,7 +280,7 @@ function progressFixture(state: SyncState): ProfileProgress {
 				imported: 50,
 				totalGamesToImport: 50,
 				accuracy: 50,
-				gameScore: 50,
+				gameRating: 50,
 				patterns: 50,
 				positionsAnalyzed: 2400,
 			};
@@ -292,7 +292,7 @@ function progressFixture(state: SyncState): ProfileProgress {
 				imported: 12,
 				totalGamesToImport: 84,
 				accuracy: 0,
-				gameScore: 0,
+				gameRating: 0,
 				patterns: 0,
 				positionsAnalyzed: 0,
 			};
@@ -304,7 +304,7 @@ function progressFixture(state: SyncState): ProfileProgress {
 				imported: 42,
 				totalGamesToImport: 0,
 				accuracy: 38,
-				gameScore: 21,
+				gameRating: 21,
 				patterns: 12,
 				positionsAnalyzed: 1900,
 			};
@@ -316,7 +316,7 @@ function progressFixture(state: SyncState): ProfileProgress {
 				imported: 200,
 				totalGamesToImport: 0,
 				accuracy: 80,
-				gameScore: 30,
+				gameRating: 30,
 				patterns: 28,
 				positionsAnalyzed: 4200,
 			};

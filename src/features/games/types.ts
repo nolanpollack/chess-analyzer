@@ -27,7 +27,7 @@ export type GameSummary = {
 	oppElo: number | null;
 	result: GameResultLetter;
 	color: PlayerColor;
-	score: number | null;
+	rating: number | null;
 	acc: number | null;
 	time: string;
 	opening: string;

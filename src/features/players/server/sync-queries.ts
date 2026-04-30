@@ -21,7 +21,7 @@ export type SyncProgressData = {
 	gamesAnalyzed: number;
 	/** Per-stage user-facing counts. */
 	accuracyComplete: number;
-	gameScoreComplete: number;
+	gameRatingComplete: number;
 	patternsComplete: number;
 	/** Total moves analyzed across completed games — drives factor card subtitle. */
 	positionsAnalyzed: number;
@@ -62,7 +62,7 @@ export const getPlayerSyncProgress = createServerFn({ method: "GET" })
 			]);
 
 			let accuracyComplete = 0;
-			let gameScoreComplete = 0;
+			let gameRatingComplete = 0;
 			let patternsComplete = 0;
 			let positionsAnalyzed = 0;
 
@@ -71,16 +71,16 @@ export const getPlayerSyncProgress = createServerFn({ method: "GET" })
 					r.playerColor === "white"
 						? r.accuracyWhite != null
 						: r.accuracyBlack != null;
-				const gameScoreDone =
+				const gameRatingDone =
 					r.playerColor === "white"
 						? r.maiaPredictedWhite != null
 						: r.maiaPredictedBlack != null;
 
 				if (accuracyDone) accuracyComplete++;
-				if (gameScoreDone) gameScoreComplete++;
+				if (gameRatingDone) gameRatingComplete++;
 				// "Patterns" surfaces to the user as the final stage — counted only
 				// when both accuracy AND game score have landed for this game.
-				if (accuracyDone && gameScoreDone && r.status === "complete") {
+				if (accuracyDone && gameRatingDone && r.status === "complete") {
 					patternsComplete++;
 				}
 				// Player-side position count — drives "Based on N positions" on the
@@ -89,7 +89,7 @@ export const getPlayerSyncProgress = createServerFn({ method: "GET" })
 					r.playerColor === "white"
 						? r.maiaNPositionsWhite
 						: r.maiaNPositionsBlack;
-				if (gameScoreDone && playerNPositions != null) {
+				if (gameRatingDone && playerNPositions != null) {
 					positionsAnalyzed += playerNPositions;
 				}
 			}
@@ -100,7 +100,7 @@ export const getPlayerSyncProgress = createServerFn({ method: "GET" })
 					totalGamesToImport: 0, // unknown at query time
 					gamesAnalyzed: accuracyComplete,
 					accuracyComplete,
-					gameScoreComplete,
+					gameRatingComplete,
 					patternsComplete,
 					positionsAnalyzed,
 				} satisfies SyncProgressData,

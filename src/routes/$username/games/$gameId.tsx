@@ -1,5 +1,5 @@
 import { useQueries } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { PageContainer } from "#/components/layout/PageContainer";
 import { Topbar } from "#/components/layout/Topbar";
@@ -26,7 +26,6 @@ export const Route = createFileRoute("/$username/games/$gameId")({
 
 function GameDetailPage() {
 	const { username, gameId } = Route.useParams();
-	const navigate = useNavigate();
 	const { data, isLoading } = useGameDetail(gameId);
 
 	const game = data?.game ?? null;
@@ -47,11 +46,12 @@ function GameDetailPage() {
 		<>
 			<Topbar
 				crumbs={[
+					{ label: "Profile", to: { to: "/$username", params: { username } } },
 					{
-						label: username,
-						onClick: () => navigate({ to: "/$username", params: { username } }),
+						label: "Games",
+						to: { to: "/$username/games", params: { username } },
 					},
-					{ label: "Game" },
+					{ label: game ? `vs ${game.opponentUsername}` : "Game" },
 				]}
 			/>
 			<PageContainer>
@@ -118,7 +118,7 @@ function GameDetailBody({
 	const sideMaia =
 		playerColor === "white" ? maiaRating?.white : maiaRating?.black;
 	const overallElo = sideMaia ? Math.round(sideMaia.predicted) : null;
-	const gameScore = overallElo;
+	const gameRating = overallElo;
 
 	// Per-dimension Maia tag ratings — one query per dimension, scoped to this game
 	const dimensionQueries = useQueries({
@@ -167,12 +167,15 @@ function GameDetailBody({
 					timeControl: game.timeControl,
 				}}
 				moveCount={moves.length}
-				gameScore={gameScore}
+				gameRating={gameRating}
 				overallElo={overallElo}
 				accuracy={null}
 			/>
 
-			<div className="mb-4 grid grid-cols-[56px_minmax(0,1fr)_minmax(0,360px)] gap-4">
+			<div
+				className="mb-4 grid gap-4"
+				style={{ gridTemplateColumns: "56px minmax(0,1fr) minmax(0,360px)" }}
+			>
 				<EvalBar evalCp={cur?.eval_after ?? 0} flipped={flipped} />
 				<div>
 					<BoardPanel
