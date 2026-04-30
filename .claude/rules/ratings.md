@@ -117,15 +117,19 @@ MVP supports a single window: `"trailing_20"` (most recent 20 games by
   `eloDelta30d` (current minus an aggregate computed at `now - 30d`).
 
 ## Rating-over-time trend
-- `aggregateRatingTrend` reuses `aggregateRating` once per snapshot date with
-  `now = snapshot` and games filtered to `playedAt ≤ snapshot`. Pure function.
-- Server fn: `getRatingTrend({ playerId, range })` where `range ∈ "1m"|"3m"|"6m"|"1y"|"all"`.
-  Snapshot dates are the actual game dates inside the window, decimated to at most
-  `MAX_TREND_POINTS = 60` so the chart only moves where data changes.
-- Returned points have integer ratings (`Math.round`). UI hover shows the date
-  (formatted from the original ISO string) and the rounded rating.
+- Server fn `getRatingTrend({ playerId, range })` (`range ∈ "1m"|"3m"|"6m"|"1y"|"all"`)
+  emits **one point per UTC calendar day** from the first in-window game through
+  today. The aggregator is invoked only on game-days; no-game days carry forward
+  the previous day's rounded rating (no recency-decay drift on idle days).
+- Returns `{ points, firstGameDate, lastGameDate }`; the card uses the date
+  range for its subtitle. `RatingTrendPoint` has integer `rating` (`Math.round`).
+- Snap density is one per day; X-axis tick labels are decoupled — the card
+  computes a separate `ticks` array and decides month-vs-date format per range
+  (months only for 6m/1y/all when the data spans ≥3 distinct months, else dates).
 - Hook: inline `useQuery` in `RatingOverTimeCard`. The card has no white/black toggle;
   the player's side is selected at the per-game level upstream in `fetchPerGameRatings`.
+- `aggregateRatingTrend` (in `src/lib/rating-aggregator/recency.ts`) is no longer
+  used in production but is retained for tests / future callers.
 
 ## Position-level recency in the MLE aggregator
 - `estimateRating` (`src/lib/rating-aggregator/index.ts`) accepts optional `now` and

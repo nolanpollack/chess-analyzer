@@ -1,11 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { analysisJobs, games, players } from "#/db/schema";
+import {
+	analysisJobs,
+	games,
+	type Platform,
+	players,
+	type TimeControlClass,
+} from "#/db/schema";
 import {
 	aggregateRating,
-	aggregateRatingTrend,
 	type PerGameRating,
 } from "#/lib/rating-aggregator/recency";
 
@@ -55,6 +60,82 @@ async function fetchPerGameRatings(playerId: string): Promise<PerGameRating[]> {
 	return out;
 }
 
+// ── Imported ratings (per platform × time-control class) ───────────────
+
+export type ImportedFormat = {
+	timeControlClass: TimeControlClass;
+	rating: number;
+	games: number;
+};
+
+export type ImportedSource = {
+	platform: Platform;
+	totalGames: number;
+	formats: ImportedFormat[];
+};
+
+const TIME_CONTROL_ORDER: TimeControlClass[] = [
+	"bullet",
+	"blitz",
+	"rapid",
+	"classical",
+	"daily",
+];
+
+async function fetchImportedRatings(
+	playerId: string,
+): Promise<ImportedSource[]> {
+	const [latestRows, countRows] = await Promise.all([
+		db
+			.selectDistinctOn([games.platform, games.timeControlClass], {
+				platform: games.platform,
+				timeControlClass: games.timeControlClass,
+				rating: games.playerRating,
+			})
+			.from(games)
+			.where(eq(games.playerId, playerId))
+			.orderBy(games.platform, games.timeControlClass, desc(games.playedAt)),
+		db
+			.select({
+				platform: games.platform,
+				timeControlClass: games.timeControlClass,
+				gameCount: count(),
+			})
+			.from(games)
+			.where(eq(games.playerId, playerId))
+			.groupBy(games.platform, games.timeControlClass),
+	]);
+
+	const countByKey = new Map<string, number>();
+	for (const r of countRows) {
+		countByKey.set(`${r.platform}:${r.timeControlClass}`, r.gameCount);
+	}
+
+	const formatsByPlatform = new Map<Platform, ImportedFormat[]>();
+	for (const r of latestRows) {
+		const list = formatsByPlatform.get(r.platform) ?? [];
+		list.push({
+			timeControlClass: r.timeControlClass,
+			rating: r.rating,
+			games: countByKey.get(`${r.platform}:${r.timeControlClass}`) ?? 0,
+		});
+		formatsByPlatform.set(r.platform, list);
+	}
+
+	const sources: ImportedSource[] = [];
+	for (const [platform, formats] of formatsByPlatform) {
+		formats.sort(
+			(a, b) =>
+				TIME_CONTROL_ORDER.indexOf(a.timeControlClass) -
+				TIME_CONTROL_ORDER.indexOf(b.timeControlClass),
+		);
+		const totalGames = formats.reduce((s, f) => s + f.games, 0);
+		sources.push({ platform, totalGames, formats });
+	}
+	sources.sort((a, b) => a.platform.localeCompare(b.platform));
+	return sources;
+}
+
 const DELTA_LOOKBACK_DAYS = 30;
 
 function computeEloDelta30d(
@@ -85,19 +166,21 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 				return { error: "Player not found" };
 			}
 
-			const [gameRows, completedJobs, perGameRatings] = await Promise.all([
-				db
-					.select({ playerRating: games.playerRating })
-					.from(games)
-					.where(eq(games.playerId, player.id))
-					.orderBy(desc(games.playedAt)),
-				db
-					.select({ id: analysisJobs.id })
-					.from(analysisJobs)
-					.innerJoin(games, eq(games.id, analysisJobs.gameId))
-					.where(eq(games.playerId, player.id)),
-				fetchPerGameRatings(player.id),
-			]);
+			const [gameRows, completedJobs, perGameRatings, importedRatings] =
+				await Promise.all([
+					db
+						.select({ playerRating: games.playerRating })
+						.from(games)
+						.where(eq(games.playerId, player.id))
+						.orderBy(desc(games.playedAt)),
+					db
+						.select({ id: analysisJobs.id })
+						.from(analysisJobs)
+						.innerJoin(games, eq(games.id, analysisJobs.gameId))
+						.where(eq(games.playerId, player.id)),
+					fetchPerGameRatings(player.id),
+					fetchImportedRatings(player.id),
+				]);
 
 			const now = new Date();
 			const aggregate = aggregateRating(perGameRatings, { now });
@@ -117,6 +200,7 @@ export const getPlayerSummary = createServerFn({ method: "GET" })
 					eloSampleSize: aggregate?.totalGames ?? 0,
 					eloEstimate,
 					eloDelta30d,
+					importedRatings,
 				},
 			};
 		} catch (err) {
@@ -138,31 +222,87 @@ const RANGE_DAYS: Record<TrendRange, number | null> = {
 	all: null,
 };
 
-const MAX_TREND_POINTS = 60;
+const MS_PER_DAY = 86_400_000;
 
-/**
- * Snapshot dates: every game date inside the window, decimated to at most
- * MAX_TREND_POINTS. We snapshot at game dates (not regular calendar ticks)
- * so the curve only moves where data actually changes.
- */
-function pickSnapshotDates(games: PerGameRating[], windowStart: Date): Date[] {
-	const eligible = games
-		.filter((g) => g.playedAt.getTime() >= windowStart.getTime())
-		.map((g) => g.playedAt)
-		.sort((a, b) => a.getTime() - b.getTime());
-	if (eligible.length <= MAX_TREND_POINTS) return eligible;
-	const stride = (eligible.length - 1) / (MAX_TREND_POINTS - 1);
-	const out: Date[] = [];
-	for (let i = 0; i < MAX_TREND_POINTS; i++) {
-		out.push(eligible[Math.round(i * stride)]);
-	}
-	return out;
+function utcMidnight(d: Date): Date {
+	return new Date(
+		Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+	);
+}
+
+function utcDayKey(d: Date): string {
+	return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
 export type RatingTrendPoint = {
 	date: string;
 	rating: number;
 };
+
+export type RatingTrendResult = {
+	points: RatingTrendPoint[];
+	firstGameDate: string | null;
+	lastGameDate: string | null;
+};
+
+/**
+ * One point per calendar day from the first in-window game through today.
+ * Aggregator runs only on days that had ≥1 game; other days carry forward
+ * the previous day's rating.
+ */
+function buildDailyTrend(
+	perGameRatings: PerGameRating[],
+	windowStart: Date,
+	now: Date,
+): RatingTrendResult {
+	const inWindow = perGameRatings
+		.filter((g) => g.playedAt.getTime() >= windowStart.getTime())
+		.sort((a, b) => a.playedAt.getTime() - b.playedAt.getTime());
+	if (inWindow.length === 0) {
+		return { points: [], firstGameDate: null, lastGameDate: null };
+	}
+
+	const firstGame = inWindow[0]?.playedAt;
+	const lastGame = inWindow[inWindow.length - 1]?.playedAt;
+	if (!firstGame || !lastGame) {
+		return { points: [], firstGameDate: null, lastGameDate: null };
+	}
+	const gameDays = new Set(inWindow.map((g) => utcDayKey(g.playedAt)));
+
+	const displayStart = utcMidnight(firstGame);
+	const displayEnd = utcMidnight(now);
+
+	const points: RatingTrendPoint[] = [];
+	let lastRating: number | null = null;
+
+	for (
+		let t = displayStart.getTime();
+		t <= displayEnd.getTime();
+		t += MS_PER_DAY
+	) {
+		const day = new Date(t);
+		const endOfDay = new Date(t + MS_PER_DAY - 1);
+		const key = utcDayKey(day);
+
+		if (gameDays.has(key)) {
+			const eligible = perGameRatings.filter(
+				(g) => g.playedAt.getTime() <= endOfDay.getTime(),
+			);
+			const aggregate = aggregateRating(eligible, { now: endOfDay });
+			if (aggregate !== null) lastRating = Math.round(aggregate.rating);
+		}
+
+		if (lastRating !== null) {
+			points.push({ date: day.toISOString(), rating: lastRating });
+		}
+	}
+
+	return {
+		points,
+		firstGameDate: firstGame.toISOString(),
+		lastGameDate: lastGame.toISOString(),
+	};
+}
 
 export const getRatingTrend = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -171,7 +311,7 @@ export const getRatingTrend = createServerFn({ method: "GET" })
 			range: trendRangeSchema.default("6m"),
 		}),
 	)
-	.handler(async ({ data }) => {
+	.handler(async ({ data }): Promise<RatingTrendResult | { error: string }> => {
 		try {
 			const perGameRatings = await fetchPerGameRatings(data.playerId);
 			const days = RANGE_DAYS[data.range];
@@ -179,16 +319,9 @@ export const getRatingTrend = createServerFn({ method: "GET" })
 			const windowStart =
 				days === null
 					? new Date(0)
-					: new Date(now.getTime() - days * 86_400_000);
+					: new Date(now.getTime() - days * MS_PER_DAY);
 
-			const snapshots = pickSnapshotDates(perGameRatings, windowStart);
-			const trend = aggregateRatingTrend(perGameRatings, snapshots, { now });
-
-			const points: RatingTrendPoint[] = trend.map((p) => ({
-				date: p.date.toISOString(),
-				rating: Math.round(p.aggregate.rating),
-			}));
-			return { points };
+			return buildDailyTrend(perGameRatings, windowStart, now);
 		} catch (err) {
 			console.error("[getRatingTrend] Error:", err);
 			return { error: "Failed to load rating trend" };
