@@ -28,7 +28,7 @@ export function useGameAnalysisStatuses(gameIds: string[]): {
 			const anyActive = statuses.some(
 				(s) => s.status === "pending" || s.status === "in-progress",
 			);
-			return anyActive ? 3000 : false;
+			return anyActive ? 1000 : false;
 		},
 	});
 

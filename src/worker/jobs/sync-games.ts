@@ -40,35 +40,20 @@ async function handleSyncGames(data: SyncGamesPayload) {
 	const db = drizzle(env.DATABASE_URL);
 
 	try {
-		// 1. Determine `since` from player's lastSyncedAt
-		const [player] = await db
-			.select({ lastSyncedAt: players.lastSyncedAt })
-			.from(players)
-			.where(eq(players.id, playerId));
-
-		if (!player) {
-			throw new Error(`Player ${playerId} not found in database`);
-		}
-
-		const since = player.lastSyncedAt ?? undefined;
-
-		// 2. Fetch games from the provider
+		// 1. Fetch games from the provider
 		const provider = platform === "chess.com" ? createChessComProvider() : null;
 
 		if (!provider) {
 			throw new Error(`Unsupported platform: ${platform}`);
 		}
 
-		const rawGames = await provider.fetchRecentGames(username, {
-			since,
-			maxMonths: since ? undefined : 3,
-		});
+		const rawGames = await provider.fetchRecentGames(username, { maxMonths: 3 });
 
 		console.log(
 			`[sync-games] Fetched ${rawGames.length} games for ${username}`,
 		);
 
-		// 3. Upsert games and update lastSyncedAt atomically
+		// 2. Upsert games and update lastSyncedAt atomically
 		let inserted = 0;
 		const newGames: { id: string; playedAt: Date }[] = [];
 		await db.transaction(async (tx) => {
@@ -85,7 +70,7 @@ async function handleSyncGames(data: SyncGamesPayload) {
 				.where(eq(players.id, playerId));
 		});
 
-		// 4. Enqueue analysis newest-first so the user sees their most recent
+		// 3. Enqueue analysis newest-first so the user sees their most recent
 		// games light up on the dashboard before older ones backfill.
 		if (newGames.length > 0) {
 			newGames.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime());

@@ -77,24 +77,8 @@ async function fetchWithRetry(url: string): Promise<Response> {
 
 function filterArchiveUrls(
 	archives: string[],
-	options?: FetchGamesOptions,
+	maxMonths: number,
 ): string[] {
-	const maxMonths = options?.maxMonths ?? 3;
-	const since = options?.since;
-
-	if (since) {
-		// Filter to archives that could contain games after `since`
-		const sinceYear = since.getUTCFullYear();
-		const sinceMonth = since.getUTCMonth() + 1; // 1-indexed, UTC
-		return archives.filter((url) => {
-			const parts = url.split("/");
-			const year = Number(parts[parts.length - 2]);
-			const month = Number(parts[parts.length - 1]);
-			return year > sinceYear || (year === sinceYear && month >= sinceMonth);
-		});
-	}
-
-	// Take the last N months of archives
 	return archives.slice(-maxMonths);
 }
 
@@ -150,7 +134,10 @@ export function createChessComProvider(): GameProvider {
 
 			const archivesData =
 				(await archivesRes.json()) as ChessComArchivesResponse;
-			const archiveUrls = filterArchiveUrls(archivesData.archives, options);
+			const archiveUrls = filterArchiveUrls(
+				archivesData.archives,
+				options?.maxMonths ?? 3,
+			);
 
 			// 2. Fetch each month sequentially (chess.com rate limits parallel)
 			const allGames: RawGame[] = [];
@@ -158,6 +145,11 @@ export function createChessComProvider(): GameProvider {
 
 			for (const url of archiveUrls) {
 				const monthRes = await fetchWithRetry(url);
+
+				if (monthRes.status === 404) {
+					// chess.com lists archive URLs before data is available; skip gracefully
+					continue;
+				}
 
 				if (!monthRes.ok) {
 					throw new Error(
@@ -170,14 +162,6 @@ export function createChessComProvider(): GameProvider {
 				for (const game of monthData.games) {
 					// Filter: only standard chess, only rated
 					if (game.rules !== "chess" || !game.rated) {
-						continue;
-					}
-
-					// Filter by `since` date if provided
-					if (
-						options?.since &&
-						new Date(game.end_time * 1000) <= options.since
-					) {
 						continue;
 					}
 

@@ -37,13 +37,13 @@ export function useProfileProgress(username: string): ProfileProgress | null {
 		},
 		refetchInterval: (q) => {
 			const data = q.state.data;
-			if (!data) return isSyncing ? 3000 : false;
+			if (!data) return isSyncing ? 1000 : false;
 			const backlog =
 				data.gamesImported > 0 &&
 				(data.accuracyComplete < data.gamesImported ||
 					data.gameRatingComplete < data.gamesImported ||
 					data.patternsComplete < data.gamesImported);
-			return isSyncing || backlog ? 3000 : false;
+			return isSyncing || backlog ? 1000 : false;
 		},
 	});
 

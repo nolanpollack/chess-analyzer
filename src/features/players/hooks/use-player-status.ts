@@ -12,7 +12,7 @@ export function useStatusQuery(username: string) {
 		queryFn: () => getPlayerStatus({ data: { username } }),
 		refetchInterval: (query) => {
 			const data = query.state.data;
-			if (data && "found" in data && data.found && data.isSyncing) return 3000;
+			if (data && "found" in data && data.found && data.isSyncing) return 1000;
 			return false;
 		},
 	});

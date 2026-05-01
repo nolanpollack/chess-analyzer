@@ -31,7 +31,7 @@ export function useGameDetail(gameId: string) {
 			return result;
 		},
 		enabled: !!detail.data && isPending && !!detail.data.game,
-		refetchInterval: 3000,
+		refetchInterval: 1000,
 	});
 
 	return detail;

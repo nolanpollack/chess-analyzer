@@ -27,7 +27,7 @@ export function AnalysisStatusOverlay({
 			return result;
 		},
 		enabled: status === "pending",
-		refetchInterval: 3000,
+		refetchInterval: 1000,
 	});
 
 	const trigger = useMutation({
