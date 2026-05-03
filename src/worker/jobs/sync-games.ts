@@ -47,7 +47,9 @@ async function handleSyncGames(data: SyncGamesPayload) {
 			throw new Error(`Unsupported platform: ${platform}`);
 		}
 
-		const rawGames = await provider.fetchRecentGames(username, { maxMonths: 3 });
+		const rawGames = await provider.fetchRecentGames(username, {
+			maxMonths: 3,
+		});
 
 		console.log(
 			`[sync-games] Fetched ${rawGames.length} games for ${username}`,

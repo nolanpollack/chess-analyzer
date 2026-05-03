@@ -14,6 +14,7 @@ import { usePlayerSummary } from "#/features/profile/hooks/use-player-summary";
 
 type RecentGamesCardProps = {
 	username: string;
+	isActive?: boolean;
 };
 
 type ColumnHeader = {
@@ -40,8 +41,8 @@ const HEADERS: ColumnHeader[] = [
 	{ label: "Played", align: "right" },
 ];
 
-export function RecentGamesCard({ username }: RecentGamesCardProps) {
-	const { data: games = [], isLoading } = useRecentGames(username);
+export function RecentGamesCard({ username, isActive }: RecentGamesCardProps) {
+	const { data: games = [], isLoading } = useRecentGames(username, 8, isActive);
 	const { data: summary } = usePlayerSummary(username);
 	const playerRating = summary?.playerRating ?? null;
 	const gameIds = games.map((g) => g.id);

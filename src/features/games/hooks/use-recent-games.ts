@@ -8,7 +8,11 @@ import type {
 import { classifyResult } from "#/lib/chess-utils";
 import { formatRelativeTime } from "#/lib/date";
 
-export function useRecentGames(username: string, pageSize = 8) {
+export function useRecentGames(
+	username: string,
+	pageSize = 8,
+	isActive = false,
+) {
 	return useQuery({
 		queryKey: ["games", "recent", username, pageSize],
 		queryFn: async () => {
@@ -17,6 +21,7 @@ export function useRecentGames(username: string, pageSize = 8) {
 			});
 			return result.items.map(toSummary);
 		},
+		refetchInterval: isActive ? 1000 : false,
 	});
 }
 

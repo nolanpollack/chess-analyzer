@@ -94,7 +94,6 @@ function getLabel({
 	return "Never synced";
 }
 
-
 function ProgressPopover({ progress }: { progress: ProfileProgress }) {
 	const rows = [
 		{ label: "Accuracy", done: progress.accuracy },

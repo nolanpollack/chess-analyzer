@@ -1,9 +1,10 @@
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Sparkles } from "lucide-react";
 import { MoveBadge } from "#/components/ui/move-badge";
 import { Tag } from "#/components/ui/tag";
 import { getConceptById } from "#/config/concepts";
 import { useMoveExplanation } from "#/features/explanations/hooks/use-move-explanation";
 import type { FlatMove } from "#/features/game/types";
+import { formatEval, isMateScore } from "#/lib/chess-utils";
 
 type ExplanationCardProps = {
 	move: FlatMove;
@@ -46,8 +47,9 @@ export function ExplanationCard({
 				</span>
 				<div className="ml-auto">
 					<EvalChangePill
-						from={move.eval_before / 100}
-						to={move.eval_after / 100}
+						evalBefore={move.eval_before}
+						evalAfter={move.eval_after}
+						side={move.side}
 					/>
 				</div>
 			</div>
@@ -171,24 +173,46 @@ function ExplainPrompt({
 	);
 }
 
-function EvalChangePill({ from, to }: { from: number; to: number }) {
-	const delta = to - from;
-	const big = Math.abs(delta) > 0.3;
+function EvalChangePill({
+	evalBefore,
+	evalAfter,
+	side,
+}: {
+	evalBefore: number;
+	evalAfter: number;
+	side: "white" | "black";
+}) {
+	// Flip to player's perspective: positive = improved for this player
+	const sign = side === "white" ? 1 : -1;
+	const playerBefore = sign * evalBefore;
+	const playerAfter = sign * evalAfter;
+	const delta = playerAfter - playerBefore;
+	const isUp = delta >= 0;
+	const absDeltaCp = Math.abs(delta);
+
+	// Determine display label: show mate notation when the result is a mate score
+	const playerAfterAbs = Math.abs(playerAfter);
+	let label: string;
+	if (isMateScore(playerAfterAbs)) {
+		label = formatEval(playerAfterAbs);
+	} else {
+		const pawns = absDeltaCp / 100;
+		if (pawns.toFixed(1) === "0.0") return null;
+		label = pawns.toFixed(1);
+	}
+
 	return (
 		<span
-			className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 ${
-				big ? "bg-tint-blunder text-blunder" : "bg-surface-2 text-fg-2"
+			className={`inline-flex items-center gap-0.5 rounded-xs px-1.5 py-0.5 ${
+				isUp ? "bg-surface-2 text-fg-2" : "bg-tint-blunder text-blunder"
 			}`}
 		>
-			<span className="mono-nums font-mono text-2xs">
-				{from > 0 ? "+" : ""}
-				{from.toFixed(1)}
-			</span>
-			<ArrowRight className="h-2.5 w-2.5" />
-			<span className="mono-nums font-mono text-2xs font-medium">
-				{to > 0 ? "+" : ""}
-				{to.toFixed(1)}
-			</span>
+			{isUp ? (
+				<ArrowUp className="h-2.5 w-2.5" />
+			) : (
+				<ArrowDown className="h-2.5 w-2.5" />
+			)}
+			<span className="mono-nums font-mono text-2xs font-medium">{label}</span>
 		</span>
 	);
 }

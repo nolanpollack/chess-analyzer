@@ -119,3 +119,23 @@ export function parseOpeningFromPgn(pgn: string): {
 		extractPgnHeader(pgn, "Opening") ?? (eco ? lookupOpeningName(eco) : null);
 	return { eco, name };
 }
+
+const MATE_THRESHOLD_CP = 90000;
+
+/** Returns true when the centipawn value represents a forced-mate score. */
+export function isMateScore(evalCp: number): boolean {
+	return Math.abs(evalCp) >= MATE_THRESHOLD_CP;
+}
+
+/**
+ * Formats a centipawn eval for display.
+ * Mate scores become "M{N}" (e.g. "M3"). Normal evals become pawn values
+ * with one decimal place (e.g. "1.5"). No sign prefix.
+ */
+export function formatEval(evalCp: number): string {
+	if (isMateScore(evalCp)) {
+		const mateIn = 100000 - Math.abs(evalCp);
+		return `M${mateIn}`;
+	}
+	return Math.abs(evalCp / 100).toFixed(1);
+}

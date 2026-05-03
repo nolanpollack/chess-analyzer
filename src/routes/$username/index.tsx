@@ -19,6 +19,8 @@ function ProfilePage() {
 	const { username } = Route.useParams();
 	const progress = useProfileProgress(username);
 	const isAnalyzing = progress?.state === "analyzing";
+	const isActive =
+		progress?.state === "syncing" || progress?.state === "analyzing";
 
 	return (
 		<>
@@ -42,7 +44,7 @@ function ProfilePage() {
 				</div>
 				<FocusAreasCard username={username} />
 				<FactorBreakdownCard username={username} isAnalyzing={isAnalyzing} />
-				<RecentGamesCard username={username} />
+				<RecentGamesCard username={username} isActive={isActive} />
 			</PageContainer>
 		</>
 	);

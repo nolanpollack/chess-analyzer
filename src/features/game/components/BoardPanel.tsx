@@ -5,6 +5,7 @@ import {
 	ChevronsRight,
 	FlipVertical2,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Chessboard } from "react-chessboard";
 import type { FlatMove } from "#/features/game/types";
 
@@ -28,11 +29,8 @@ function uciToSquares(uci: string | undefined) {
 
 function shouldShowBestArrow(move: FlatMove) {
 	if (!move.is_player_move) return false;
-	return (
-		move.classification === "inaccuracy" ||
-		move.classification === "mistake" ||
-		move.classification === "blunder"
-	);
+	// Hide the arrow when the player already found the best move
+	return move.classification !== "brilliant" && move.classification !== "best";
 }
 
 export function BoardPanel({
@@ -47,6 +45,13 @@ export function BoardPanel({
 }: BoardPanelProps) {
 	const cur = moves[cursor];
 	const position = cur?.fen_after ?? moves[0]?.fen_before ?? STARTING_FEN;
+
+	// Disable animation when navigating backward to avoid capture piece glitch
+	const prevCursorRef = useRef(cursor);
+	const isBackward = cursor < prevCursorRef.current;
+	useEffect(() => {
+		prevCursorRef.current = cursor;
+	});
 
 	const lastMoveSquares = uciToSquares(cur?.uci);
 	const bestMoveSquares =
@@ -82,7 +87,7 @@ export function BoardPanel({
 						arrows,
 						squareStyles,
 						allowDragging: false,
-						animationDurationInMs: 120,
+						animationDurationInMs: isBackward ? 0 : 120,
 					}}
 				/>
 			</div>

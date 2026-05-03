@@ -1,5 +1,10 @@
 import { MetricLabel, MetricValue } from "#/components/ui/metric";
 import { Tag } from "#/components/ui/tag";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "#/components/ui/tooltip";
 import { classifyResult } from "#/lib/chess-utils";
 
 type GameHeaderGame = {
@@ -74,18 +79,36 @@ export function GamePageHeader({
 			</div>
 			<div className="flex gap-7">
 				<div>
-					<MetricLabel>Game rating</MetricLabel>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<span className="cursor-help">
+								<MetricLabel>Game rating</MetricLabel>
+							</span>
+						</TooltipTrigger>
+						<TooltipContent side="top" className="max-w-65">
+							An estimate of how well you played overall.
+						</TooltipContent>
+					</Tooltip>
 					<div className="mt-1">
 						<MetricValue size="md">{gameRating ?? "—"}</MetricValue>
 					</div>
-					{overallElo !== null && (
+					{overallElo !== null && gameRating !== null && (
 						<div className="mt-1 mono-nums font-mono text-2xs text-fg-3">
 							vs {overallElo} overall
 						</div>
 					)}
 				</div>
 				<div>
-					<MetricLabel>Accuracy</MetricLabel>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<span className="cursor-help">
+								<MetricLabel>Accuracy</MetricLabel>
+							</span>
+						</TooltipTrigger>
+						<TooltipContent side="top" className="max-w-65">
+							How precisely you played, move by move.
+						</TooltipContent>
+					</Tooltip>
 					<div className="mt-1">
 						<MetricValue size="md">
 							{accuracy !== null ? (

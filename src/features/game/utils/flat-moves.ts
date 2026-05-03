@@ -6,7 +6,7 @@ export function flattenMoves(moves: MoveAnalysis[]): FlatMove[] {
 	return sorted.map((m, i) => ({
 		...m,
 		index: i,
-		moveNumber: Math.floor(m.ply / 2) + 1,
-		side: m.ply % 2 === 0 ? "white" : "black",
+		moveNumber: Math.ceil(m.ply / 2),
+		side: m.ply % 2 === 1 ? "white" : "black",
 	}));
 }

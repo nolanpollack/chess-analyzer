@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
-export function useMoveNavigation(totalMoves: number, initialIndex = 0) {
+export function useMoveNavigation(
+	totalMoves: number,
+	initialIndex = 0,
+	initialFlipped = false,
+) {
 	const [cursor, setCursor] = useState(initialIndex);
-	const [flipped, setFlipped] = useState(false);
+	const [flipped, setFlipped] = useState(initialFlipped);
 
 	const prev = useCallback(() => setCursor((c) => Math.max(0, c - 1)), []);
 	const next = useCallback(

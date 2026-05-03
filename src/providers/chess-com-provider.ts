@@ -75,10 +75,7 @@ async function fetchWithRetry(url: string): Promise<Response> {
 
 // ── Archive URL Filtering ──────────────────────────────────────────────
 
-function filterArchiveUrls(
-	archives: string[],
-	maxMonths: number,
-): string[] {
+function filterArchiveUrls(archives: string[], maxMonths: number): string[] {
 	return archives.slice(-maxMonths);
 }
 

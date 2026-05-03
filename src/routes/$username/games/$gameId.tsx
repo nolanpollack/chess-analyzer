@@ -14,8 +14,8 @@ import { MoveListCard } from "#/features/game/components/MoveListCard";
 import { useGameDetail } from "#/features/game/hooks/use-game-detail";
 import { useMoveNavigation } from "#/features/game/hooks/use-move-navigation";
 import type { GameFactor } from "#/features/game/types";
-import { findCriticalMoveIndex } from "#/features/game/utils/critical-move";
 import { flattenMoves } from "#/features/game/utils/flat-moves";
+import { usePlayerSummary } from "#/features/profile/hooks/use-player-summary";
 import { useMaiaGameRating } from "#/features/ratings/hooks/use-maia-game-rating";
 import { getMaiaTagRatings } from "#/features/ratings/server/maia-queries";
 import { maiaTagRatingsToGameFactors } from "#/features/ratings/utils/to-maia-game-factor";
@@ -36,11 +36,8 @@ function GameDetailPage() {
 		() => (analysisComplete ? flattenMoves(analysis.moves) : []),
 		[analysisComplete, analysis],
 	);
-	const criticalIndex = useMemo(
-		() => (moves.length ? findCriticalMoveIndex(moves) : -1),
-		[moves],
-	);
-	const initialCursor = criticalIndex >= 0 ? criticalIndex : 0;
+	// Start at the last move so the user sees the completed game state
+	const initialCursor = Math.max(0, moves.length - 1);
 
 	return (
 		<>
@@ -74,8 +71,12 @@ function GameDetailPage() {
 						game={game}
 						analysisId={analysis.id}
 						moves={moves}
-						criticalIndex={criticalIndex}
 						initialCursor={initialCursor}
+						accuracy={
+							game.playerColor === "white"
+								? analysis.accuracyWhite
+								: analysis.accuracyBlack
+						}
 					/>
 				)}
 			</PageContainer>
@@ -91,8 +92,8 @@ type GameDetailBodyProps = {
 	>;
 	analysisId: string;
 	moves: ReturnType<typeof flattenMoves>;
-	criticalIndex: number;
 	initialCursor: number;
+	accuracy: number | null;
 };
 
 const GAME_DIMENSION_TYPES = ["phase", "piece", "agency"] as const;
@@ -104,21 +105,24 @@ function GameDetailBody({
 	game,
 	analysisId,
 	moves,
-	criticalIndex,
 	initialCursor,
+	accuracy,
 }: GameDetailBodyProps) {
+	const playerColor = game.playerColor;
 	const { cursor, setCursor, flipped, prev, next, first, last, toggleFlip } =
-		useMoveNavigation(moves.length, initialCursor);
+		useMoveNavigation(moves.length, initialCursor, playerColor === "black");
 
 	const cur = moves[cursor];
 
 	// Headline Maia rating for this game
 	const { data: maiaRating } = useMaiaGameRating(analysisId);
-	const playerColor = game.playerColor;
 	const sideMaia =
 		playerColor === "white" ? maiaRating?.white : maiaRating?.black;
-	const overallElo = sideMaia ? Math.round(sideMaia.predicted) : null;
-	const gameRating = overallElo;
+	const gameRating = sideMaia ? Math.round(sideMaia.predicted) : null;
+
+	// Player's overall historical rating for comparison
+	const { data: playerSummary } = usePlayerSummary(username);
+	const overallElo = playerSummary?.playerRating ?? null;
 
 	// Per-dimension Maia tag ratings — one query per dimension, scoped to this game
 	const dimensionQueries = useQueries({
@@ -169,7 +173,7 @@ function GameDetailBody({
 				moveCount={moves.length}
 				gameRating={gameRating}
 				overallElo={overallElo}
-				accuracy={null}
+				accuracy={accuracy}
 			/>
 
 			<div
@@ -191,7 +195,6 @@ function GameDetailBody({
 					<EvalGraphCard
 						moves={moves}
 						cursor={cursor}
-						criticalIndex={criticalIndex}
 						onScrub={setCursor}
 					/>
 				</div>

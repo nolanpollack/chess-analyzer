@@ -10,20 +10,18 @@ type MoveCellProps = {
 const SYMBOL: Partial<Record<MoveClassification, string>> = {
 	brilliant: "!!",
 	great: "!",
-	excellent: "!",
-	inaccuracy: "?!",
 	mistake: "?",
 	blunder: "??",
-	miss: "□",
+	miss: "✕",
 };
 
 const TEXT: Record<MoveClassification, string> = {
 	brilliant: "text-brilliant",
 	great: "text-brilliant",
-	best: "text-fg-1",
-	excellent: "text-best",
-	good: "text-fg-1",
-	inaccuracy: "text-inaccuracy",
+	best: "text-fg-2",
+	excellent: "text-fg-2",
+	good: "text-fg-2",
+	inaccuracy: "text-fg-2",
 	mistake: "text-mistake",
 	blunder: "text-blunder",
 	miss: "text-mistake",
