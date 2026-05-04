@@ -3,14 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { PageContainer } from "#/components/layout/PageContainer";
 import { Topbar } from "#/components/layout/Topbar";
-import { ExplanationCard } from "#/features/explanations/components/ExplanationCard";
 import { AnalysisStatusOverlay } from "#/features/game/components/AnalysisStatusOverlay";
 import { BoardPanel } from "#/features/game/components/BoardPanel";
 import { EvalBar } from "#/features/game/components/EvalBar";
 import { EvalGraphCard } from "#/features/game/components/EvalGraphCard";
 import { FactorBreakdownCard } from "#/features/game/components/FactorBreakdownCard";
 import { GamePageHeader } from "#/features/game/components/GamePageHeader";
-import { MoveListCard } from "#/features/game/components/MoveListCard";
+import { UnifiedAnalysisCard } from "#/features/game/components/UnifiedAnalysisCard";
 import { useGameDetail } from "#/features/game/hooks/use-game-detail";
 import { useMoveNavigation } from "#/features/game/hooks/use-move-navigation";
 import type { GameFactor } from "#/features/game/types";
@@ -192,15 +191,18 @@ function GameDetailBody({
 						onLast={last}
 						onFlip={toggleFlip}
 					/>
-					<EvalGraphCard
-						moves={moves}
-						cursor={cursor}
-						onScrub={setCursor}
-					/>
+					<EvalGraphCard moves={moves} cursor={cursor} onScrub={setCursor} />
 				</div>
 				<div className="flex flex-col gap-4">
-					{cur && <ExplanationCard move={cur} gameAnalysisId={analysisId} />}
-					<MoveListCard moves={moves} cursor={cursor} onSelect={setCursor} />
+					{cur && (
+						<UnifiedAnalysisCard
+							move={cur}
+							moves={moves}
+							cursor={cursor}
+							onSelect={setCursor}
+							gameAnalysisId={analysisId}
+						/>
+					)}
 				</div>
 			</div>
 

@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Move analysis — design explorations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --surface: #ffffff;
+    --surface-2: #f5f3ef;
+    --surface-3: #eeebe5;
+    --border-token: rgba(23, 20, 15, 0.08);
+    --border-strong-token: rgba(23, 20, 15, 0.14);
+    --divider-token: rgba(23, 20, 15, 0.06);
+    --fg: #17140f;
+    --fg-1: #2a251d;
+    --fg-2: #5c554a;
+    --fg-3: #8a8276;
+    --fg-4: #b3ac9f;
+    --data-6: oklch(62% 0.12 140);
+    --brilliant: oklch(62% 0.16 190);
+    --best: oklch(62% 0.12 145);
+    --good: oklch(62% 0.10 120);
+    --inaccuracy: oklch(70% 0.14 75);
+    --mistake: oklch(65% 0.16 40);
+    --blunder: oklch(60% 0.18 25);
+    --accent: oklch(58% 0.14 250);
+    --tint-blunder: color-mix(in srgb, var(--blunder) 12%, transparent);
+    --tint-data-6: color-mix(in srgb, var(--data-6) 12%, transparent);
+    --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.04), 0 1px 1px rgba(23, 20, 15, 0.02);
+    --radius: 0.625rem;
+  }
+  .dark {
+    --bg: #0e0d0b;
+    --surface: #161412;
+    --surface-2: #1c1a17;
+    --surface-3: #24211d;
+    --border-token: rgba(255, 250, 240, 0.08);
+    --border-strong-token: rgba(255, 250, 240, 0.14);
+    --divider-token: rgba(255, 250, 240, 0.05);
+    --fg: #f6f3ed;
+    --fg-1: #e5e0d6;
+    --fg-2: #a8a195;
+    --fg-3: #7a7468;
+    --fg-4: #4e4a43;
+    --data-6: oklch(72% 0.12 140);
+    --brilliant: oklch(72% 0.16 190);
+    --best: oklch(70% 0.12 145);
+    --good: oklch(68% 0.10 120);
+    --inaccuracy: oklch(78% 0.14 75);
+    --mistake: oklch(72% 0.16 40);
+    --blunder: oklch(68% 0.18 25);
+    --accent: oklch(72% 0.14 250);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'zero', 'ss02'; }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 40px 32px 80px; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 24px; margin-bottom: 32px;
+    border-bottom: 1px solid var(--divider-token);
+  }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+  h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .section { margin-bottom: 56px; }
+  .section-intro { color: var(--fg-2); font-size: 13.5px; margin-bottom: 20px; max-width: 760px; }
+  .label-eyebrow {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-3); font-weight: 500;
+  }
+
+  .theme-toggle {
+    background: var(--surface); border: 1px solid var(--border-token);
+    color: var(--fg-1); padding: 6px 12px; border-radius: 6px;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+
+  /* Decisions callout */
+  .decisions {
+    background: var(--surface);
+    border: 1px solid var(--divider-token);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 40px;
+  }
+  .decisions h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-3); font-weight: 600; margin: 0 0 10px;
+  }
+  .decisions ul { margin: 0; padding-left: 18px; color: var(--fg-1); font-size: 13px; }
+  .decisions li { margin-bottom: 4px; }
+  .decisions li code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--fg-2); }
+
+  /* === MoveBadge === */
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .badge.lg { width: 28px; height: 28px; font-size: 12px; }
+  .badge.brilliant { background: color-mix(in srgb, var(--brilliant) 14%, transparent); color: var(--brilliant); }
+  .badge.best { background: color-mix(in srgb, var(--best) 14%, transparent); color: var(--best); }
+  .badge.good { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .badge.inaccuracy { background: color-mix(in srgb, var(--inaccuracy) 16%, transparent); color: var(--inaccuracy); }
+  .badge.mistake { background: color-mix(in srgb, var(--mistake) 16%, transparent); color: var(--mistake); }
+  .badge.blunder { background: color-mix(in srgb, var(--blunder) 16%, transparent); color: var(--blunder); }
+
+  /* === Eval delta (rounded-xs) === */
+  .eval-delta {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 2px 6px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+  }
+  .eval-delta.up { background: var(--surface-2); color: var(--fg-2); }
+  .eval-delta.down { background: var(--tint-blunder); color: var(--blunder); }
+  .eval-delta svg { width: 10px; height: 10px; }
+
+  /* Before→after evaluation pair (header, played move only) */
+  .eval-arrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+    color: var(--fg-3);
+  }
+  .eval-arrow .from { color: var(--fg-3); }
+  .eval-arrow .to { color: var(--fg-2); }
+  .eval-arrow.bad .to { color: var(--blunder); }
+  .eval-arrow .arrow { color: var(--fg-4); font-size: 10px; }
+
+  /* === Tags: underlined link · dot-separated === */
+  .tag-link {
+    font-size: 12px; color: var(--fg-2); cursor: pointer;
+    text-decoration: underline; text-decoration-color: var(--border-token);
+    text-underline-offset: 3px; text-decoration-thickness: 1px;
+    transition: color 120ms, text-decoration-color 120ms;
+  }
+  .tag-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+  .tag-link + .tag-link::before { content: '·'; margin: 0 8px; color: var(--fg-4); text-decoration: none; display: inline-block; }
+  /* Smaller tag variant for use on alternatives */
+  .tag-link.sm { font-size: 11px; }
+  .tag-link.sm + .tag-link.sm::before { margin: 0 6px; }
+
+  .tag-row { display: flex; flex-wrap: wrap; align-items: center; }
+
+  /* === Best move stack === */
+  .best-row {
+    display: grid; grid-template-columns: auto 1fr auto;
+    column-gap: 12px; row-gap: 4px; align-items: start;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--data-6) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--data-6) 28%, transparent);
+    border-radius: 6px;
+  }
+  .best-row.alt {
+    background: var(--surface-2);
+    border: 1px solid var(--divider-token);
+  }
+  .best-row .san { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: var(--data-6); min-width: 52px; padding-top: 1px; }
+  .best-row.alt .san { color: var(--fg-1); }
+  .best-row .desc { font-size: 12.5px; color: var(--fg-2); line-height: 1.5; }
+  .best-row .eval-num { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--fg-3); padding-top: 1px; }
+  .best-row .alt-tags {
+    grid-column: 2 / 3;
+    margin-top: 2px;
+  }
+  .best-row .expand-row {
+    grid-column: 1 / 4;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--divider-token);
+    display: none;
+  }
+  .best-row.expanded .expand-row { display: block; }
+  .best-row.expanded .chevron { transform: rotate(90deg); }
+
+  .best-row.clickable {
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms;
+  }
+  .best-row.clickable:hover { border-color: color-mix(in srgb, var(--data-6) 45%, transparent); }
+  .best-row.alt.clickable:hover { border-color: var(--border-strong-token); }
+
+  .chevron {
+    width: 10px; height: 10px; color: var(--fg-4);
+    transition: transform 120ms;
+    flex-shrink: 0;
+  }
+  .alt-count-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; color: var(--fg-3);
+    padding: 1px 6px; border-radius: 3px;
+    background: var(--surface-2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .view-line-link {
+    font-size: 11.5px; color: var(--accent); cursor: pointer;
+    text-decoration: underline; text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .view-line-link:hover { text-decoration-color: var(--accent); }
+
+  .best-stack { display: flex; flex-direction: column; gap: 6px; }
+
+  /* Variant B: collapsed alt row with chevron */
+  .best-row.collapsed-b {
+    grid-template-columns: auto 1fr auto auto;
+  }
+  .best-row.collapsed-b .chevron-cell {
+    display: flex; align-items: center; padding-left: 4px;
+  }
+
+  /* Variant C: count chip */
+  .best-row.collapsed-c {
+    grid-template-columns: auto 1fr auto auto;
+    column-gap: 10px;
+  }
+
+  /* === Unified analysis card === */
+  .demo-grid {
+    display: grid; grid-template-columns: 1fr 380px; gap: 24px;
+    align-items: start;
+  }
+  .board-mock {
+    background: var(--surface);
+    border: 1px solid var(--divider-token);
+    border-radius: var(--radius);
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--fg-4); font-size: 13px;
+    background-image:
+      linear-gradient(45deg, var(--surface-2) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--surface-2) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--surface-2) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--surface-2) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+
+  .unified-card {
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--divider-token);
+    border-radius: var(--radius);
+    overflow: hidden;
+    height: 760px;
+  }
+  .unified-card.flagged { border-color: var(--border-strong-token); }
+
+  /* Analysis section: grows naturally — NO scroll */
+  .analysis-section {
+    display: flex; flex-direction: column;
+    border-bottom: 1px solid var(--divider-token);
+    flex-shrink: 0;
+  }
+  .analysis-header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 18px;
+  }
+  .analysis-header.flagged { background: color-mix(in srgb, var(--blunder) 5%, var(--surface)); }
+  .analysis-header .move-text {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg);
+  }
+  .analysis-header .right-group {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+
+  .analysis-body { padding: 16px 18px 18px; }
+  .analysis-body p {
+    margin: 0 0 14px;
+    font-size: 13.5px; line-height: 1.55; color: var(--fg-1); text-wrap: pretty;
+  }
+  .analysis-body p:last-child { margin-bottom: 0; }
+  .analysis-section-title {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-3); font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .analysis-section-title .count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-4); text-transform: none; letter-spacing: 0; }
+  .analysis-block { margin-top: 14px; }
+  .analysis-block:first-child { margin-top: 0; }
+
+  /* Moves sub-header + list */
+  .moves-subheader {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 10px 14px;
+    border-bottom: 1px solid var(--divider-token);
+    flex-shrink: 0;
+  }
+  .moves-subheader .left { display: flex; align-items: center; gap: 10px; }
+  .class-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; padding: 2px 7px; border-radius: 4px;
+    background: var(--surface-2); color: var(--fg-2);
+  }
+  .class-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .class-chip.b .dot { background: var(--blunder); }
+  .class-chip.m .dot { background: var(--mistake); }
+  .class-chip.i .dot { background: var(--inaccuracy); }
+  .class-chip .num { font-family: 'JetBrains Mono', monospace; font-weight: 500; color: var(--fg-1); }
+
+  /* Moves list — flex fill, min-height, scroll */
+  .moves-list {
+    flex: 1; min-height: 280px; overflow-y: auto; padding: 6px;
+  }
+  .move-row {
+    display: grid; grid-template-columns: 30px 1fr 1fr; gap: 4px;
+    padding: 3px 6px; align-items: center;
+  }
+  .move-row .num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-4); }
+  .move-cell {
+    padding: 4px 8px; border-radius: 4px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    color: var(--fg-1); display: flex; align-items: center; gap: 6px;
+    transition: background 120ms;
+  }
+  .move-cell:hover { background: var(--surface-2); }
+  .move-cell.active { background: var(--surface-3); color: var(--fg); }
+  .move-cell .glyph { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; }
+  .move-cell.blunder .glyph { color: var(--blunder); }
+  .move-cell.mistake .glyph { color: var(--mistake); }
+  .move-cell.inaccuracy .glyph { color: var(--inaccuracy); }
+  .move-cell.brilliant .glyph { color: var(--brilliant); }
+
+  .full-demo-stack { display: flex; flex-direction: column; gap: 32px; }
+  .full-demo-stack > .label-eyebrow { display: block; }
+
+  .empty-state-msg {
+    color: var(--fg-3); font-size: 12.5px;
+    padding: 0 18px 16px;
+  }
+
+  .layout-note {
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 32px;
+    font-size: 13px; color: var(--fg-1); line-height: 1.55;
+  }
+  .layout-note strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <div>
+      <h1>Move analysis — unified card</h1>
+      <div style="color: var(--fg-3); font-size: 13px; margin-top: 4px;">Round 2 · all decisions applied. Toggle theme top-right.</div>
+    </div>
+    <button class="theme-toggle" id="themeToggle">Toggle theme</button>
+  </div>
+
+  <div class="decisions">
+    <h3>Decisions locked in</h3>
+    <ul>
+      <li>Tag style: <strong>underlined link, dot-separated</strong></li>
+      <li>Best-move-without-description: <strong>Variant A</strong> (move + eyebrow, no description text yet — will revisit when we have generated descriptions)</li>
+      <li>Eval display: header shows <code>−1.2 → +1.2</code> on the left of the delta pill, <strong>only on player moves</strong>; opponent header shows delta only</li>
+      <li>Best-move section appears only when classification is <strong>good</strong> or worse (delta from best ≥ ~25cp). Excellent/best player moves don't show a best-move panel.</li>
+      <li>Alternatives: up to 3 total (best + 2 alts) when within ~30cp of best</li>
+      <li>Description always rendered (longer for player move, shorter for alts) — no "Why this isn't the move" eyebrow, no "Why your move failed" toggle</li>
+      <li>Tags on alternatives: <strong>yes</strong>, smaller and quieter than the player-move tags</li>
+      <li>Layout: card has fixed total height; analysis section grows freely (no scroll); moves list flexes to fill the rest with <code>min-height: 280px</code> and is scrollable</li>
+    </ul>
+  </div>
+
+  <div class="layout-note">
+    <strong>Layout tradeoff.</strong> No-scroll analysis + non-shifting moves + no awkward whitespace are mutually exclusive. The chosen tradeoff: card is fixed height, analysis grows naturally without scroll, moves list flexes underneath with a min-height. The <em>bottom edge</em> of the moves list is anchored to the card; the top edge moves a bit when analysis grows or shrinks, but there's never empty space above it. In the rare case where analysis content is huge and moves would shrink below 280px, the analysis pushes the card slightly taller — we accept this. If you want the moves list strictly fixed-height instead (card grows above), we can flip it.
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- Alt tag handling — comparison -->
+  <!-- =============================================================== -->
+  <div class="section">
+    <h2>Alternative-row tag handling</h2>
+    <div class="section-intro">Alts can carry several tags. Showing them all inline (Variant A) is informative but heavy. Variants B and C hide tags by default and reveal them on click — Variant B uses a chevron, Variant C a count chip. Click a row to expand. Recommendation: <strong>B</strong> — chevron is a familiar "more here" affordance and gives us a natural home for "view best line" / calculations later.</div>
+
+    <div style="display:grid; gap:20px; max-width: 720px;">
+
+      <div>
+        <span class="label-eyebrow" style="display:block; margin-bottom:8px;">Variant A · always-visible inline tags (current default)</span>
+        <div class="best-stack">
+          <div class="best-row">
+            <span class="san">Bf6</span>
+            <span class="desc">Defends g7 and keeps the center locked.</span>
+            <span class="eval-num">+0.4</span>
+            <div class="alt-tags">
+              <span class="tag-link sm">king-safety</span>
+              <span class="tag-link sm">structure</span>
+              <span class="tag-link sm">bishops</span>
+            </div>
+          </div>
+          <div class="best-row alt">
+            <span class="san">Nh5</span>
+            <span class="desc">Trades the threatening bishop, simplifies into a holdable middlegame.</span>
+            <span class="eval-num">+0.2</span>
+            <div class="alt-tags">
+              <span class="tag-link sm">simplification</span>
+              <span class="tag-link sm">knights</span>
+              <span class="tag-link sm">middlegame</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <span class="label-eyebrow" style="display:block; margin-bottom:8px;">Variant B · chevron, click to expand (recommended)</span>
+        <div class="best-stack" data-variant="B">
+          <div class="best-row clickable collapsed-b">
+            <span class="san">Bf6</span>
+            <span class="desc">Defends g7 and keeps the center locked.</span>
+            <span class="eval-num">+0.4</span>
+            <span class="chevron-cell"><svg class="chevron" viewBox="0 0 10 10" fill="currentColor"><path d="M3 2 L7 5 L3 8 Z"/></svg></span>
+            <div class="expand-row">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div class="tag-row">
+                  <span class="tag-link sm">king-safety</span>
+                  <span class="tag-link sm">structure</span>
+                  <span class="tag-link sm">bishops</span>
+                </div>
+                <span class="view-line-link">View best line →</span>
+              </div>
+            </div>
+          </div>
+          <div class="best-row alt clickable collapsed-b">
+            <span class="san">Nh5</span>
+            <span class="desc">Trades the threatening bishop, simplifies into a holdable middlegame.</span>
+            <span class="eval-num">+0.2</span>
+            <span class="chevron-cell"><svg class="chevron" viewBox="0 0 10 10" fill="currentColor"><path d="M3 2 L7 5 L3 8 Z"/></svg></span>
+            <div class="expand-row">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div class="tag-row">
+                  <span class="tag-link sm">simplification</span>
+                  <span class="tag-link sm">knights</span>
+                  <span class="tag-link sm">middlegame</span>
+                </div>
+                <span class="view-line-link">View best line →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <span class="label-eyebrow" style="display:block; margin-bottom:8px;">Variant C · count chip, click to expand</span>
+        <div class="best-stack" data-variant="C">
+          <div class="best-row clickable collapsed-c">
+            <span class="san">Bf6</span>
+            <span class="desc">Defends g7 and keeps the center locked.</span>
+            <span class="eval-num">+0.4</span>
+            <span class="alt-count-chip">3 tags</span>
+            <div class="expand-row">
+              <div class="tag-row">
+                <span class="tag-link sm">king-safety</span>
+                <span class="tag-link sm">structure</span>
+                <span class="tag-link sm">bishops</span>
+              </div>
+            </div>
+          </div>
+          <div class="best-row alt clickable collapsed-c">
+            <span class="san">Nh5</span>
+            <span class="desc">Trades the threatening bishop, simplifies into a holdable middlegame.</span>
+            <span class="eval-num">+0.2</span>
+            <span class="alt-count-chip">3 tags</span>
+            <div class="expand-row">
+              <div class="tag-row">
+                <span class="tag-link sm">simplification</span>
+                <span class="tag-link sm">knights</span>
+                <span class="tag-link sm">middlegame</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =============================================================== -->
+  <!-- Unified card — multiple states -->
+  <!-- =============================================================== -->
+  <div class="full-demo-stack">
+
+    <!-- STATE 1: Player blunder -->
+    <span class="label-eyebrow">State 1 · Player blunder · description, best move + 2 alts, tags</span>
+    <div class="demo-grid">
+      <div class="board-mock">board</div>
+      <div class="unified-card flagged">
+        <div class="analysis-section">
+          <div class="analysis-header flagged">
+            <span class="badge lg blunder">??</span>
+            <span class="move-text">29... exd5</span>
+            <div class="right-group">
+              <span class="eval-arrow bad"><span class="from mono">+1.2</span><span class="arrow">→</span><span class="to mono">−1.2</span></span>
+              <span class="eval-delta down"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 9 L1 4 L4 4 L4 1 L6 1 L6 4 L9 4 Z"/></svg><span class="mono">2.4</span></span>
+            </div>
+          </div>
+          <div class="analysis-body">
+            <p>Taking on d5 opens the e-file and lets White's queen swing to g3 with a winning attack on h7. The pawn was already defended; you didn't need to grab it, and the resulting structure leaves your king badly exposed.</p>
+
+            <div class="analysis-block">
+              <div class="analysis-section-title">Best move <span class="count">3 options</span></div>
+              <div class="best-stack">
+                <div class="best-row">
+                  <span class="san">Bf6</span>
+                  <span class="desc">Defends g7 and keeps the center locked.</span>
+                  <span class="eval-num">+0.4</span>
+                  <div class="alt-tags">
+                    <span class="tag-link sm">king-safety</span>
+                    <span class="tag-link sm">structure</span>
+                    <span class="tag-link sm">bishops</span>
+                  </div>
+                </div>
+                <div class="best-row alt">
+                  <span class="san">Nh5</span>
+                  <span class="desc">Trades the threatening bishop, simplifies into a holdable middlegame.</span>
+                  <span class="eval-num">+0.2</span>
+                  <div class="alt-tags">
+                    <span class="tag-link sm">simplification</span>
+                    <span class="tag-link sm">knights</span>
+                    <span class="tag-link sm">middlegame</span>
+                  </div>
+                </div>
+                <div class="best-row alt">
+                  <span class="san">Re8</span>
+                  <span class="desc">Defends along the rank; slightly worse but principled.</span>
+                  <span class="eval-num">+0.1</span>
+                  <div class="alt-tags">
+                    <span class="tag-link sm">prophylaxis</span>
+                    <span class="tag-link sm">rooks</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="analysis-block">
+              <div class="analysis-section-title">Tags</div>
+              <div class="tag-row">
+                <span class="tag-link">king-safety</span>
+                <span class="tag-link">tactics</span>
+                <span class="tag-link">middlegame</span>
+                <span class="tag-link">queens</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="moves-subheader">
+          <div class="left">
+            <span class="label-eyebrow">Moves</span>
+            <span class="mono" style="font-size:10.5px; color: var(--fg-4);">62 plies</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <span class="class-chip b"><span class="dot"></span><span class="num">2</span></span>
+            <span class="class-chip m"><span class="dot"></span><span class="num">1</span></span>
+            <span class="class-chip i"><span class="dot"></span><span class="num">4</span></span>
+          </div>
+        </div>
+        <div class="moves-list" id="movesList1"></div>
+      </div>
+    </div>
+
+    <!-- STATE 2: Player "good" but not best — best move shown -->
+    <span class="label-eyebrow">State 2 · Player "good" move · best move shown (single, no alts close enough)</span>
+    <div class="demo-grid">
+      <div class="board-mock">board</div>
+      <div class="unified-card">
+        <div class="analysis-section">
+          <div class="analysis-header">
+            <span class="badge lg good">○</span>
+            <span class="move-text">17. Rad1</span>
+            <div class="right-group">
+              <span class="eval-arrow"><span class="from mono">+0.8</span><span class="arrow">→</span><span class="to mono">+0.5</span></span>
+              <span class="eval-delta up"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 1 L9 6 L6 6 L6 9 L4 9 L4 6 L1 6 Z"/></svg><span class="mono">0.3</span></span>
+            </div>
+          </div>
+          <div class="analysis-body">
+            <p>Centralizing the rook is sensible, but the f-rook was the right one — keeping the a-rook on its starting square preserves queenside flexibility for a later <span class="mono">a4</span> push.</p>
+
+            <div class="analysis-block">
+              <div class="analysis-section-title">Best move</div>
+              <div class="best-row">
+                <span class="san">Rfd1</span>
+                <span class="desc">Same idea, but keeps the a-rook flexible for a queenside expansion.</span>
+                <span class="eval-num">+0.8</span>
+                <div class="alt-tags">
+                  <span class="tag-link sm">rooks</span>
+                  <span class="tag-link sm">flexibility</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="analysis-block">
+              <div class="analysis-section-title">Tags</div>
+              <div class="tag-row">
+                <span class="tag-link">rooks</span>
+                <span class="tag-link">middlegame</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="moves-subheader">
+          <div class="left">
+            <span class="label-eyebrow">Moves</span>
+            <span class="mono" style="font-size:10.5px; color: var(--fg-4);">62 plies</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <span class="class-chip b"><span class="dot"></span><span class="num">2</span></span>
+            <span class="class-chip m"><span class="dot"></span><span class="num">1</span></span>
+            <span class="class-chip i"><span class="dot"></span><span class="num">4</span></span>
+          </div>
+        </div>
+        <div class="moves-list" id="movesList2"></div>
+      </div>
+    </div>
+
+    <!-- STATE 3: Player best/excellent — no best-move panel -->
+    <span class="label-eyebrow">State 3 · Player played the best move · no best-move panel, just description + tags</span>
+    <div class="demo-grid">
+      <div class="board-mock">board</div>
+      <div class="unified-card">
+        <div class="analysis-section">
+          <div class="analysis-header">
+            <span class="badge lg best">★</span>
+            <span class="move-text">14. Bg5</span>
+            <div class="right-group">
+              <span class="eval-arrow"><span class="from mono">+0.1</span><span class="arrow">→</span><span class="to mono">+0.4</span></span>
+              <span class="eval-delta up"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 1 L9 6 L6 6 L6 9 L4 9 L4 6 L1 6 Z"/></svg><span class="mono">0.3</span></span>
+            </div>
+          </div>
+          <div class="analysis-body">
+            <p>Pinning the f6 knight is the most precise way to apply pressure here — Black has to commit to either <span class="mono">h6</span> (weakening) or <span class="mono">Be7</span> (passive). You're effectively forcing a concession.</p>
+
+            <div class="analysis-block">
+              <div class="analysis-section-title">Tags</div>
+              <div class="tag-row">
+                <span class="tag-link">development</span>
+                <span class="tag-link">opening</span>
+                <span class="tag-link">bishops</span>
+                <span class="tag-link">pin</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="moves-subheader">
+          <div class="left">
+            <span class="label-eyebrow">Moves</span>
+            <span class="mono" style="font-size:10.5px; color: var(--fg-4);">62 plies</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <span class="class-chip b"><span class="dot"></span><span class="num">2</span></span>
+            <span class="class-chip m"><span class="dot"></span><span class="num">1</span></span>
+            <span class="class-chip i"><span class="dot"></span><span class="num">4</span></span>
+          </div>
+        </div>
+        <div class="moves-list" id="movesList3"></div>
+      </div>
+    </div>
+
+    <!-- STATE 4: Opponent move — header only -->
+    <span class="label-eyebrow">State 4 · Opponent move · header + delta only (no before→after arrow, no description, no tags)</span>
+    <div class="demo-grid">
+      <div class="board-mock">board</div>
+      <div class="unified-card">
+        <div class="analysis-section">
+          <div class="analysis-header">
+            <span class="badge lg good">○</span>
+            <span class="move-text">15... Nbd7</span>
+            <div class="right-group">
+              <span class="eval-delta up"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 1 L9 6 L6 6 L6 9 L4 9 L4 6 L1 6 Z"/></svg><span class="mono">0.1</span></span>
+            </div>
+          </div>
+          <div class="empty-state-msg">Opponent move. Use <span class="mono">←</span> <span class="mono">→</span> to walk the game.</div>
+        </div>
+
+        <div class="moves-subheader">
+          <div class="left">
+            <span class="label-eyebrow">Moves</span>
+            <span class="mono" style="font-size:10.5px; color: var(--fg-4);">62 plies</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <span class="class-chip b"><span class="dot"></span><span class="num">2</span></span>
+            <span class="class-chip m"><span class="dot"></span><span class="num">1</span></span>
+            <span class="class-chip i"><span class="dot"></span><span class="num">4</span></span>
+          </div>
+        </div>
+        <div class="moves-list" id="movesList4"></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const root = document.documentElement;
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    root.classList.toggle('dark');
+  });
+
+  const sampleMoves = [
+    ['e4', 'c5'], ['Nf3', 'd6'], ['d4', 'cxd4'], ['Nxd4', 'Nf6'],
+    ['Nc3', 'a6'], ['Be2', 'e5'], ['Nb3', 'Be7'], ['O-O', 'O-O'],
+    ['Be3', 'Be6'], ['Nd5', 'Nbd7'], ['Qd3', 'Bxd5'], ['exd5', 'Rc8'],
+    ['c4', 'Nb6'], ['Bg5', 'h6'], ['Bh4', 'Re8'], ['Bxf6', 'Bxf6'],
+    ['Rad1', 'Bg5'], ['f3', 'Qd7'], ['Qd2', 'Qf5'], ['Bd3', 'Qg6'],
+    ['Kh1', 'Re7'], ['Rg1', 'Rce8'], ['Rde1', 'Bf4'], ['Qf2', 'Qh5'],
+    ['g3', 'Bg5'], ['Qg2', 'Qf5'], ['Bb1', 'Qc8'], ['c5', 'dxc5'],
+    ['Nxc5', 'exd5'], ['Nxa6', 'Qxa6'],
+  ];
+  const classes = { 12: { b: 'inaccuracy' }, 28: { b: 'blunder' }, 25: { w: 'mistake' }, 17: { w: 'good' } };
+
+  function renderMoves(containerId, activeN, activeSide) {
+    const list = document.getElementById(containerId);
+    if (!list) return;
+    list.innerHTML = '';
+    sampleMoves.forEach((pair, i) => {
+      const n = i + 1;
+      const wCls = classes[n]?.w || '';
+      const bCls = classes[n]?.b || '';
+      const glyph = (cls) => {
+        if (cls === 'blunder') return '??';
+        if (cls === 'mistake') return '?';
+        if (cls === 'inaccuracy') return '?!';
+        if (cls === 'brilliant') return '!!';
+        return '';
+      };
+      const wActive = n === activeN && activeSide === 'w' ? 'active' : '';
+      const bActive = n === activeN && activeSide === 'b' ? 'active' : '';
+      list.innerHTML += `
+        <div class="move-row">
+          <span class="num">${n}.</span>
+          <span class="move-cell ${wCls} ${wActive}">${pair[0] || ''}${wCls && wCls !== 'good' ? `<span class="glyph">${glyph(wCls)}</span>` : ''}</span>
+          <span class="move-cell ${bCls} ${bActive}">${pair[1] || ''}${bCls && bCls !== 'good' ? `<span class="glyph">${glyph(bCls)}</span>` : ''}</span>
+        </div>
+      `;
+    });
+  }
+  renderMoves('movesList1', 29, 'b');
+  renderMoves('movesList2', 17, 'w');
+  renderMoves('movesList3', 14, 'w');
+  renderMoves('movesList4', 15, 'b');
+
+  // Click-to-expand for clickable best-rows
+  document.querySelectorAll('.best-row.clickable').forEach((row) => {
+    row.addEventListener('click', () => {
+      row.classList.toggle('expanded');
+    });
+  });
+</script>
+</body>
+</html>
