@@ -128,30 +128,29 @@ function AnalysisHeader({ move, flagged }: AnalysisHeaderProps) {
 		move.time_spent_ms !== null || move.clock_remaining_ms !== null;
 	return (
 		<div
-			className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 px-5 py-3.5 ${
+			className={`flex flex-col gap-1 px-5 py-3.5 ${
 				flagged ? "bg-tint-blunder" : ""
 			}`}
 		>
-			<MoveBadge cls={move.classification} size="lg" />
-			<span className="mono-nums font-mono text-ui text-fg">
-				{move.moveNumber}
-				{move.side === "white" ? "." : "..."} {move.san}
-			</span>
-			<div className="ml-auto flex flex-col items-end gap-1">
-				<div className="flex items-center gap-2.5">
-					{move.is_player_move && (
-						<EvalArrow
-							evalBefore={move.eval_before}
-							evalAfter={move.eval_after}
-							side={move.side}
-						/>
-					)}
-					<EvalDelta
-						evalBefore={move.eval_before}
-						evalAfter={move.eval_after}
-						side={move.side}
-					/>
-				</div>
+			<div className="flex items-center gap-x-2.5">
+				<MoveBadge cls={move.classification} size="lg" />
+				<span className="mono-nums font-mono text-ui text-fg">
+					{move.moveNumber}
+					{move.side === "white" ? "." : "..."} {move.san}
+				</span>
+				<EvalDelta
+					evalBefore={move.eval_before}
+					evalAfter={move.eval_after}
+					side={move.side}
+					className="ml-auto"
+				/>
+			</div>
+			<div className="flex flex-col items-end gap-1">
+				<EvalArrow
+					evalBefore={move.eval_before}
+					evalAfter={move.eval_after}
+					side={move.side}
+				/>
 				{showClock && (
 					<ClockLine
 						timeSpentMs={move.time_spent_ms}
@@ -385,6 +384,7 @@ type EvalProps = {
 	evalBefore: number;
 	evalAfter: number;
 	side: "white" | "black";
+	className?: string;
 };
 
 function EvalArrow({ evalBefore, evalAfter, side }: EvalProps) {
@@ -402,7 +402,7 @@ function EvalArrow({ evalBefore, evalAfter, side }: EvalProps) {
 	);
 }
 
-function EvalDelta({ evalBefore, evalAfter, side }: EvalProps) {
+function EvalDelta({ evalBefore, evalAfter, side, className }: EvalProps) {
 	const before = playerPerspective(evalBefore, side);
 	const after = playerPerspective(evalAfter, side);
 	const delta = after - before;
@@ -422,7 +422,7 @@ function EvalDelta({ evalBefore, evalAfter, side }: EvalProps) {
 		<span
 			className={`inline-flex items-center gap-0.5 rounded-xs px-1.5 py-0.5 ${
 				isUp ? "bg-surface-2 text-fg-2" : "bg-tint-blunder text-blunder"
-			}`}
+			} ${className ?? ""}`}
 		>
 			{isUp ? (
 				<ArrowUp className="h-2.5 w-2.5" />
