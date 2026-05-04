@@ -32,8 +32,11 @@ function GameDetailPage() {
 	const analysisComplete = analysis?.status === "complete";
 
 	const moves = useMemo(
-		() => (analysisComplete ? flattenMoves(analysis.moves) : []),
-		[analysisComplete, analysis],
+		() =>
+			analysisComplete
+				? flattenMoves(analysis.moves, game?.timeControl ?? null)
+				: [],
+		[analysisComplete, analysis, game?.timeControl],
 	);
 	// Start at the last move so the user sees the completed game state
 	const initialCursor = Math.max(0, moves.length - 1);

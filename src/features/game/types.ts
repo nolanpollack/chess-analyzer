@@ -12,12 +12,15 @@ export type GameDetailOk = Exclude<GameDetailResult, { error: string }>;
 /**
  * A single move projected onto a flat list for UI display. Extends the raw
  * `MoveAnalysis` JSONB shape with position metadata computed by
- * `flattenMoves` in `utils/flat-moves.ts`.
+ * `flattenMoves` in `utils/flat-moves.ts`, plus clock fields derived from
+ * the PGN [%clk] annotations and the game's time control.
  */
 export type FlatMove = MoveAnalysis & {
 	index: number;
 	moveNumber: number;
 	side: PlayerColor;
+	clock_remaining_ms: number | null;
+	time_spent_ms: number | null;
 };
 
 /**

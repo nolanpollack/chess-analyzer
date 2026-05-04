@@ -124,9 +124,11 @@ type AnalysisHeaderProps = {
 };
 
 function AnalysisHeader({ move, flagged }: AnalysisHeaderProps) {
+	const showClock =
+		move.time_spent_ms !== null || move.clock_remaining_ms !== null;
 	return (
 		<div
-			className={`flex flex-wrap items-center gap-2.5 px-5 py-3.5 ${
+			className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 px-5 py-3.5 ${
 				flagged ? "bg-tint-blunder" : ""
 			}`}
 		>
@@ -135,22 +137,64 @@ function AnalysisHeader({ move, flagged }: AnalysisHeaderProps) {
 				{move.moveNumber}
 				{move.side === "white" ? "." : "..."} {move.san}
 			</span>
-			<div className="ml-auto flex items-center gap-2.5">
-				{move.is_player_move && (
-					<EvalArrow
+			<div className="ml-auto flex flex-col items-end gap-1">
+				<div className="flex items-center gap-2.5">
+					{move.is_player_move && (
+						<EvalArrow
+							evalBefore={move.eval_before}
+							evalAfter={move.eval_after}
+							side={move.side}
+						/>
+					)}
+					<EvalDelta
 						evalBefore={move.eval_before}
 						evalAfter={move.eval_after}
 						side={move.side}
 					/>
+				</div>
+				{showClock && (
+					<ClockLine
+						timeSpentMs={move.time_spent_ms}
+						clockRemainingMs={move.clock_remaining_ms}
+					/>
 				)}
-				<EvalDelta
-					evalBefore={move.eval_before}
-					evalAfter={move.eval_after}
-					side={move.side}
-				/>
 			</div>
 		</div>
 	);
+}
+
+type ClockLineProps = {
+	timeSpentMs: number | null;
+	clockRemainingMs: number | null;
+};
+
+function ClockLine({ timeSpentMs, clockRemainingMs }: ClockLineProps) {
+	const parts: string[] = [];
+	if (timeSpentMs !== null) parts.push(`${formatDuration(timeSpentMs)} spent`);
+	if (clockRemainingMs !== null)
+		parts.push(`${formatClock(clockRemainingMs)} left`);
+	if (parts.length === 0) return null;
+	return (
+		<span className="mono-nums font-mono text-2xs text-fg-3">
+			{parts.join(" · ")}
+		</span>
+	);
+}
+
+function formatDuration(ms: number): string {
+	const totalSeconds = ms / 1000;
+	if (totalSeconds < 10) return `${totalSeconds.toFixed(1)}s`;
+	if (totalSeconds < 60) return `${Math.round(totalSeconds)}s`;
+	const m = Math.floor(totalSeconds / 60);
+	const s = Math.round(totalSeconds - m * 60);
+	return `${m}m ${s}s`;
+}
+
+function formatClock(ms: number): string {
+	const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+	const m = Math.floor(totalSeconds / 60);
+	const s = totalSeconds - m * 60;
+	return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 type BestMoveStackProps = {

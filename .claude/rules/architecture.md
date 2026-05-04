@@ -126,6 +126,12 @@
 - Progress tracking: `moves_analyzed` / `total_moves` updated during analysis
 - Configuration: `src/config/analysis.ts` — depth, thresholds, eval clamp
 - Classification thresholds: blunder >= 200cp, mistake >= 100cp, inaccuracy >= 50cp
+- Per-move clock data: `analyze-game` parses `[%clk H:MM:SS]` annotations from
+  the PGN via `extractClockMsByPly` (`src/lib/analysis/pgn.ts`) and writes
+  `moves.clock_remaining_ms`. Time spent per move is derived in
+  `flattenMoves` (UI utility) using the game's `time_control` parsed by
+  `parseTimeControl` (`src/lib/analysis/time-control.ts`). Both are null
+  when annotations or time control are missing (e.g. correspondence games).
 
 ## Move explanations
 - On-demand LLM-generated explanations for individual moves

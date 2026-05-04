@@ -17,6 +17,10 @@ import {
 	moves,
 } from "#/db/schema";
 
+type MoveAnalysisWithClock = MoveAnalysis & {
+	clock_remaining_ms: number | null;
+};
+
 type UiAnalysisStatus = "pending" | "complete" | "failed";
 
 function toUiStatus(status: AnalysisStatus): UiAnalysisStatus {
@@ -48,7 +52,7 @@ export const getGameWithAnalysis = createServerFn({ method: "GET" })
 
 			const job = await getLatestJob(gameId);
 
-			let moveRows: MoveAnalysis[] = [];
+			let moveRows: MoveAnalysisWithClock[] = [];
 			if (job) {
 				const rows = await db
 					.select()
@@ -117,7 +121,7 @@ export const getAnalysisStatus = createServerFn({ method: "GET" })
 		}
 	});
 
-function toMoveAnalysis(row: typeof moves.$inferSelect): MoveAnalysis {
+function toMoveAnalysis(row: typeof moves.$inferSelect): MoveAnalysisWithClock {
 	return {
 		ply: row.ply,
 		san: row.san,
@@ -131,5 +135,6 @@ function toMoveAnalysis(row: typeof moves.$inferSelect): MoveAnalysis {
 		best_move_san: row.engineBestSan ?? "",
 		classification: row.classification ?? "good",
 		is_player_move: row.isPlayerMove === 1,
+		clock_remaining_ms: row.clockRemainingMs,
 	};
 }

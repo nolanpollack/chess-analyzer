@@ -9,6 +9,7 @@
  */
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import * as schema from "#/db/schema";
 import {
 	enqueueGameAnalysis,
 	enqueueMaiaOnly,
@@ -25,7 +26,7 @@ if (!DATABASE_URL) {
 }
 
 const pool = new pg.Pool({ connectionString: DATABASE_URL });
-const db = drizzle(pool);
+const db = drizzle(pool, { schema });
 
 const targets = await findReconcileTargets(db);
 const { orphanGameIds, maiaStragglers } = targets;

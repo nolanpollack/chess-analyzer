@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ensureMaiaDirectBatch } from "#/lib/maia-direct-batch";
 import type { MaiaOutput } from "#/lib/position-cache";
 
 // ── Mock #/lib/maia-direct-batch ──────────────────────────────────────────
 const mockEnsureMaiaDirectBatch = vi
-	.fn<() => Promise<Map<string, MaiaOutput>>>()
+	.fn<typeof ensureMaiaDirectBatch>()
 	.mockResolvedValue(new Map());
 vi.mock("#/lib/maia-direct-batch", () => ({
-	ensureMaiaDirectBatch: (...args: unknown[]) =>
+	ensureMaiaDirectBatch: (...args: Parameters<typeof ensureMaiaDirectBatch>) =>
 		mockEnsureMaiaDirectBatch(...args),
 }));
 
@@ -132,8 +133,8 @@ describe("computeAndPersistMaiaRating", () => {
 		});
 
 		expect(mockEnsureMaiaDirectBatch).toHaveBeenCalledOnce();
-		const [fensArg] = mockEnsureMaiaDirectBatch.mock.calls[0];
-		expect(new Set(fensArg as string[])).toEqual(new Set([fen1, fen2]));
+		const fensArg = mockEnsureMaiaDirectBatch.mock.calls[0]?.[0] ?? [];
+		expect(new Set(fensArg)).toEqual(new Set([fen1, fen2]));
 
 		const updateMock = (
 			db as unknown as { _updateSet: ReturnType<typeof vi.fn> }

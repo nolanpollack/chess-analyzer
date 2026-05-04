@@ -16,7 +16,7 @@ export function maiaTagRatingsToGameFactors(
 	dimensionType: "phase" | "piece" | "agency",
 	ratings: MaiaTagRating[],
 	overallElo: number,
-): (GameFactor & { sortKey: number })[] {
+): GameFactor[] {
 	return ratings
 		.filter((r) => r.nPositions >= MIN_POSITIONS)
 		.map((r) => ({

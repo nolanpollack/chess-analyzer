@@ -2,10 +2,8 @@
  * Wipes all analysis state and re-enqueues every game for analysis.
  * Run with: bun run reanalyze
  */
-import { config } from "dotenv";
 import { desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { PgBoss } from "pg-boss";
 import pg from "pg";
 import {
 	analysisJobs,
@@ -14,10 +12,10 @@ import {
 	moves,
 	moveTags,
 } from "#/db/schema";
+import { enqueueGameAnalysis } from "#/lib/enqueue-analysis";
+import { getBoss } from "#/lib/queue";
 import { ANALYZE_GAME_QUEUE } from "#/worker/jobs/analyze-game";
 import { ANALYZE_GAME_MAIA_QUEUE } from "#/worker/jobs/analyze-game-maia";
-
-config({ path: ".env.local" });
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -34,6 +32,13 @@ await db.delete(moveTags);
 await db.delete(moves);
 await db.delete(analysisJobs);
 
+const boss = await getBoss();
+await boss.createQueue(ANALYZE_GAME_QUEUE);
+await boss.deleteAllJobs(ANALYZE_GAME_QUEUE);
+await boss.createQueue(ANALYZE_GAME_MAIA_QUEUE);
+await boss.deleteAllJobs(ANALYZE_GAME_MAIA_QUEUE);
+console.log("Cleared stale jobs from queues.");
+
 const allGames = await db
 	.select({ id: games.id })
 	.from(games)
@@ -42,16 +47,8 @@ console.log(
 	`Enqueueing ${allGames.length} games for re-analysis (newest first)...`,
 );
 
-const boss = new PgBoss(DATABASE_URL);
-await boss.start();
-await boss.createQueue(ANALYZE_GAME_QUEUE);
-await boss.deleteAllJobs(ANALYZE_GAME_QUEUE);
-await boss.createQueue(ANALYZE_GAME_MAIA_QUEUE);
-await boss.deleteAllJobs(ANALYZE_GAME_MAIA_QUEUE);
-console.log("Cleared stale jobs from queues.");
-
 for (const game of allGames) {
-	await boss.send(ANALYZE_GAME_QUEUE, { gameId: game.id });
+	await enqueueGameAnalysis(game.id);
 }
 
 await boss.stop();

@@ -59,7 +59,9 @@ weak, and what the player should note about this move for their own improvement.
 
 	switch (classification) {
 		case "brilliant":
+		case "great":
 		case "best":
+		case "excellent":
 			return `This was a strong move. Briefly confirm why this is a good choice — what it
 achieves positionally or tactically. Keep it concise (2-3 sentences).`;
 		case "good":
@@ -78,6 +80,10 @@ Be direct and educational.`;
 			return `This was a blunder — a serious error. Explain clearly what the player missed
 and why the best move is dramatically better. Be direct, focus on the specific
 tactical or positional problem.`;
+		case "miss":
+			return `The player missed a much stronger move that was available. Explain what the
+player chose, what they missed, and why the best move would have been
+significantly better. Be instructive about how to spot this pattern next time.`;
 	}
 }
 

@@ -194,7 +194,8 @@ export const moves = pgTable(
 
 		// Future: depth at which engine's best move stabilized. Null until generator added.
 		depthToStability: integer("depth_to_stability"),
-		// Future: clock remaining from PGN %clk
+		// Clock remaining (ms) after this move was played, parsed from PGN [%clk].
+		// Null when the PGN omits clock annotations (e.g. correspondence games).
 		clockRemainingMs: integer("clock_remaining_ms"),
 
 		createdAt: timestamp("created_at").defaultNow().notNull(),

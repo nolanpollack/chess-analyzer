@@ -27,7 +27,7 @@ import {
 	cpToWinPct,
 	type MoveEvalData,
 } from "#/lib/analysis/accuracy";
-import { type PgnMove, walkPgn } from "#/lib/analysis/pgn";
+import { extractClockMsByPly, type PgnMove, walkPgn } from "#/lib/analysis/pgn";
 import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
 import { ensureQueue, getBoss } from "#/lib/queue";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
@@ -117,6 +117,8 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			jobId,
 		);
 
+		const clockMsByPly = extractClockMsByPly(game.pgn, pgnMoves.length);
+
 		const { moveRows, accuracyWhite, accuracyBlack } = buildMoveRows({
 			pgnMoves,
 			positionEvals,
@@ -124,6 +126,7 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 			playerId: game.playerId,
 			gameId,
 			analysisJobId: jobId,
+			clockMsByPly,
 		});
 
 		// Replace any prior moves + tags for this job (re-run safety).
@@ -351,6 +354,7 @@ function buildMoveRows(args: {
 	playerId: string;
 	gameId: string;
 	analysisJobId: string;
+	clockMsByPly: (number | null)[];
 }): BuildMoveRowsResult {
 	const isPlayerWhite = args.playerColor === "white";
 	const moveRows: MoveRow[] = [];
@@ -425,6 +429,7 @@ function buildMoveRows(args: {
 			evalDeltaCp: evalDelta,
 			classification,
 			accuracyScore: isPlayerMove ? accuracyScore : null,
+			clockRemainingMs: args.clockMsByPly[move.ply - 1] ?? null,
 		});
 
 		allEvals.push(evalData);
