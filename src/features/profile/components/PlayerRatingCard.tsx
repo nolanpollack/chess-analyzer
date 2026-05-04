@@ -40,8 +40,8 @@ export function PlayerRatingCard({
 							</button>
 						</TooltipTrigger>
 						<TooltipContent side="top" className="max-w-65">
-							An estimate of your skill computed from analysis of your recent
-							games. Refines as more games are analyzed.
+							An estimate of your skill scaled to Glicko-2 ratings. 
+              Computed from analysis of your recent games.
 						</TooltipContent>
 					</Tooltip>
 				</div>

@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { drizzle } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
+import type * as schema from "#/db/schema";
 import { games, players } from "#/db/schema";
-import { env } from "#/env";
-import { enqueueGameAnalysis } from "#/lib/enqueue-analysis";
+import { createAndEnqueueAnalysis } from "#/lib/enqueue-analysis";
 import { createChessComProvider } from "#/providers/chess-com-provider";
 import type { RawGame } from "#/providers/game-provider";
+import { getWorkerDb } from "#/worker/db";
 
 // ── Job Types ──────────────────────────────────────────────────────────
 
@@ -36,8 +36,7 @@ async function handleSyncGames(data: SyncGamesPayload) {
 	const { playerId, username, platform } = data;
 	console.log(`[sync-games] Starting sync for ${username} (${platform})`);
 
-	// Worker creates its own DB connection (per architecture rules)
-	const db = drizzle(env.DATABASE_URL);
+	const db = getWorkerDb();
 
 	try {
 		// 1. Fetch games from the provider
@@ -77,7 +76,7 @@ async function handleSyncGames(data: SyncGamesPayload) {
 		if (newGames.length > 0) {
 			newGames.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime());
 			for (const game of newGames) {
-				await enqueueGameAnalysis(game.id);
+				await createAndEnqueueAnalysis(db, game.id);
 			}
 			console.log(
 				`[sync-games] Enqueued analysis for ${newGames.length} new games (newest first)`,
@@ -96,7 +95,7 @@ async function handleSyncGames(data: SyncGamesPayload) {
 // ── Helpers ────────────────────────────────────────────────────────────
 
 async function upsertGame(
-	db: NodePgDatabase,
+	db: NodePgDatabase<typeof schema>,
 	raw: RawGame,
 	playerId: string,
 	platform: "chess.com" | "lichess",

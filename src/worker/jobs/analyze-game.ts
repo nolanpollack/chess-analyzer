@@ -15,7 +15,11 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
-import { ANALYSIS_CONFIG } from "#/config/analysis";
+import {
+	ANALYSIS_CONFIG,
+	ENGINE_NAME,
+	PIPELINE_VERSION,
+} from "#/config/analysis";
 import type * as schema from "#/db/schema";
 import { analysisJobs, games, moves, moveTags } from "#/db/schema";
 
@@ -29,24 +33,17 @@ import {
 } from "#/lib/analysis/accuracy";
 import { extractClockMsByPly, type PgnMove, walkPgn } from "#/lib/analysis/pgn";
 import { classifyMove, type PrevMoveContext } from "#/lib/move-classification";
-import { ensureQueue, getBoss } from "#/lib/queue";
 import { computeGameAccuracy } from "#/lib/scoring/game-accuracy";
 import { runGeneratorsForMove } from "#/lib/tagging/registry";
 import type { Move } from "#/lib/tagging/types";
 import type { AnalysisEngine } from "#/providers/analysis-engine";
 import { createStockfishWasmEngine } from "#/providers/stockfish-wasm-engine";
 import { getWorkerDb } from "../db";
-import {
-	ANALYZE_GAME_MAIA_QUEUE,
-	type AnalyzeGameMaiaPayload,
-} from "./analyze-game-maia";
 
 export const ANALYZE_GAME_QUEUE = "analyze-game";
-export const PIPELINE_VERSION = "v1";
 
 const ENGINE_DEPTH =
 	Number(process.env.ANALYSIS_ENGINE_DEPTH) || ANALYSIS_CONFIG.engineDepth;
-const ENGINE_NAME = "stockfish-wasm";
 
 export type AnalyzeGamePayload = {
 	gameId: string;
@@ -88,11 +85,6 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 		console.log(`[analyze-game] Game ${gameId} already analyzed, skipping`);
 		return;
 	}
-
-	// Enqueue Maia inference as an independent job so it can run at higher
-	// concurrency (batchSize=8) without being blocked by Stockfish (batchSize=2).
-	// singletonKey prevents duplicate enqueues if analyze-game is retried.
-	await enqueueMaiaJob(gameId, jobId);
 
 	const game = await loadGame(db, gameId);
 	const engine = createStockfishWasmEngine();
@@ -160,30 +152,6 @@ async function handleAnalyzeGame(data: AnalyzeGamePayload) {
 		throw err;
 	} finally {
 		await engine.destroy();
-	}
-}
-
-async function enqueueMaiaJob(
-	gameId: string,
-	analysisJobId: string,
-): Promise<void> {
-	await ensureQueue(ANALYZE_GAME_MAIA_QUEUE);
-	const boss = await getBoss();
-	const id = await boss.send(
-		ANALYZE_GAME_MAIA_QUEUE,
-		{ gameId, analysisJobId } satisfies AnalyzeGameMaiaPayload,
-		{
-			singletonKey: `analyze-game-maia:${analysisJobId}`,
-			retryLimit: 3,
-			retryBackoff: true,
-		},
-	);
-	if (!id) {
-		// pg-boss returns null when a singleton dedupe rejects the enqueue —
-		// useful to know if we accidentally collide with an in-flight job.
-		console.warn(
-			`[analyze-game] maia enqueue dedup'd for job ${analysisJobId} (gameId=${gameId})`,
-		);
 	}
 }
 

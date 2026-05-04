@@ -1,13 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { ANALYSIS_CONFIG } from "#/config/analysis";
 import { db } from "#/db/index";
 import { analysisJobs } from "#/db/schema";
-import { enqueueGameAnalysis } from "#/lib/enqueue-analysis";
-import { PIPELINE_VERSION } from "#/worker/jobs/analyze-game";
-
-const ENGINE = "stockfish-wasm";
+import { createAndEnqueueAnalysis } from "#/lib/enqueue-analysis";
 
 export const triggerAnalysis = createServerFn({ method: "POST" })
 	.inputValidator(z.object({ gameId: z.string().uuid() }))
@@ -30,16 +26,7 @@ export const triggerAnalysis = createServerFn({ method: "POST" })
 				return { enqueued: false };
 			}
 
-			// No job, or last attempt failed → create a fresh queued job.
-			await db.insert(analysisJobs).values({
-				gameId,
-				engine: ENGINE,
-				depth: ANALYSIS_CONFIG.engineDepth,
-				pipelineVersion: PIPELINE_VERSION,
-				status: "queued",
-			});
-
-			await enqueueGameAnalysis(gameId);
+			await createAndEnqueueAnalysis(db, gameId);
 			return { enqueued: true };
 		} catch (err) {
 			console.error("[triggerAnalysis] Error:", err);
@@ -53,17 +40,7 @@ export const resetAndTriggerAnalysis = createServerFn({ method: "POST" })
 		const { gameId } = data;
 
 		try {
-			// Re-analysis: insert a new job rather than mutating prior state.
-			// The worker writes a fresh moves/move_tags batch keyed on this job.
-			await db.insert(analysisJobs).values({
-				gameId,
-				engine: ENGINE,
-				depth: ANALYSIS_CONFIG.engineDepth,
-				pipelineVersion: PIPELINE_VERSION,
-				status: "queued",
-			});
-
-			await enqueueGameAnalysis(gameId);
+			await createAndEnqueueAnalysis(db, gameId);
 			return { enqueued: true };
 		} catch (err) {
 			console.error("[resetAndTriggerAnalysis] Error:", err);

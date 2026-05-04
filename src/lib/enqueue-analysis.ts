@@ -1,3 +1,11 @@
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import {
+	ANALYSIS_CONFIG,
+	ENGINE_NAME,
+	PIPELINE_VERSION,
+} from "#/config/analysis";
+import type * as schema from "#/db/schema";
+import { analysisJobs } from "#/db/schema";
 import { ensureQueue, getBoss } from "#/lib/queue";
 import {
 	ANALYZE_GAME_QUEUE,
@@ -7,6 +15,32 @@ import {
 	ANALYZE_GAME_MAIA_QUEUE,
 	type AnalyzeGameMaiaPayload,
 } from "#/worker/jobs/analyze-game-maia";
+
+type Db = NodePgDatabase<typeof schema>;
+
+/**
+ * Pre-creates the analysis_jobs row then enqueues both the Stockfish and Maia
+ * jobs. Call this everywhere a new analysis should start so both pipelines are
+ * in flight immediately rather than Maia waiting on Stockfish's batchSize.
+ */
+export async function createAndEnqueueAnalysis(
+	db: Db,
+	gameId: string,
+): Promise<void> {
+	const [job] = await db
+		.insert(analysisJobs)
+		.values({
+			gameId,
+			engine: ENGINE_NAME,
+			depth: ANALYSIS_CONFIG.engineDepth,
+			pipelineVersion: PIPELINE_VERSION,
+			status: "queued",
+		})
+		.returning({ id: analysisJobs.id });
+
+	await enqueueGameAnalysis(gameId);
+	await enqueueMaiaOnly(gameId, job.id);
+}
 
 /**
  * Single entry point for enqueueing analyze-game jobs.

@@ -1,3 +1,6 @@
+export const PIPELINE_VERSION = "v1";
+export const ENGINE_NAME = "stockfish-wasm";
+
 export const ANALYSIS_CONFIG = {
 	/** Stockfish search depth per position. Override with ANALYSIS_ENGINE_DEPTH env var. */
 	engineDepth: 18,

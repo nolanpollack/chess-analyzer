@@ -29,7 +29,10 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PgBoss } from "pg-boss";
 import type * as schema from "#/db/schema";
-import { enqueueGameAnalysis, enqueueMaiaOnly } from "#/lib/enqueue-analysis";
+import {
+	createAndEnqueueAnalysis,
+	enqueueMaiaOnly,
+} from "#/lib/enqueue-analysis";
 import { getWorkerDb } from "#/worker/db";
 
 type Db = NodePgDatabase<typeof schema>;
@@ -59,7 +62,7 @@ async function handleReconcile(): Promise<void> {
 	const db = getWorkerDb();
 	try {
 		const targets = await findReconcileTargets(db);
-		await reEnqueueOrphans(targets.orphanGameIds);
+		await reEnqueueOrphans(db, targets.orphanGameIds);
 		await reEnqueueMaiaStragglers(targets.maiaStragglers);
 		logSummary(targets);
 	} catch (err) {
@@ -113,9 +116,9 @@ async function findMaiaStragglers(db: Db): Promise<MaiaStraggler[]> {
 	}));
 }
 
-async function reEnqueueOrphans(gameIds: string[]): Promise<void> {
+async function reEnqueueOrphans(db: Db, gameIds: string[]): Promise<void> {
 	for (const id of gameIds) {
-		await enqueueGameAnalysis(id);
+		await createAndEnqueueAnalysis(db, id);
 	}
 }
 
