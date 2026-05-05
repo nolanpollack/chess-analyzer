@@ -133,6 +133,7 @@ function toMoveAnalysis(row: typeof moves.$inferSelect): MoveAnalysisWithClock {
 		eval_delta: row.evalDeltaCp ?? 0,
 		best_move_uci: row.engineBestUci ?? "",
 		best_move_san: row.engineBestSan ?? "",
+		alternative_moves: row.alternativeMoves ?? null,
 		classification: row.classification ?? "good",
 		is_player_move: row.isPlayerMove === 1,
 		clock_remaining_ms: row.clockRemainingMs,

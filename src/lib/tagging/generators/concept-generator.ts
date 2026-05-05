@@ -55,6 +55,7 @@ function toMoveAnalysis(move: Move): MoveAnalysis {
 		eval_delta: move.evalDeltaCp ?? 0,
 		best_move_uci: move.engineBestUci ?? "",
 		best_move_san: move.engineBestSan ?? "",
+		alternative_moves: move.alternativeMoves ?? null,
 		classification: move.classification ?? "good",
 		is_player_move: move.isPlayerMove === 1,
 	};

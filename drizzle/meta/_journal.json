@@ -43,6 +43,13 @@
       "when": 1777435094607,
       "tag": "0005_aberrant_blockbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777859754361,
+      "tag": "0006_slim_thing",
+      "breakpoints": true
     }
   ]
 }

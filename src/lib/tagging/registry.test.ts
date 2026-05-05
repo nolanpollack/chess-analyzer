@@ -33,6 +33,7 @@ function buildMoves(): { moves: Move[]; game: Game } {
 		fenAfter: m.fenAfter,
 		engineBestUci: m.uci, // engine agrees with played move (no inaccuracy)
 		engineBestSan: m.san,
+		alternativeMoves: null,
 		evalBeforeCp: 20,
 		evalAfterCp: 20,
 		evalDeltaCp: 0,

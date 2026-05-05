@@ -66,6 +66,7 @@ type CachedPositionEval = {
 	evalCp: number;
 	bestMoveUci: string;
 	bestMoveSan: string;
+	pvs: Array<{ eval_cp: number; move_uci: string; move_san: string }>;
 };
 
 type GameRow = {
@@ -278,6 +279,7 @@ async function evaluateAllPositions(
 				evalCp: result.eval_cp,
 				bestMoveUci: result.best_move_uci,
 				bestMoveSan: result.best_move_san,
+				pvs: result.pvs,
 			});
 		}
 
@@ -300,6 +302,7 @@ async function evaluateAllPositions(
 				evalCp: result.eval_cp,
 				bestMoveUci: result.best_move_uci,
 				bestMoveSan: result.best_move_san,
+				pvs: result.pvs,
 			});
 		}
 	}
@@ -392,6 +395,11 @@ function buildMoveRows(args: {
 			fenAfter: move.fenAfter,
 			engineBestUci: before.bestMoveUci,
 			engineBestSan: before.bestMoveSan,
+			alternativeMoves: before.pvs.slice(1).map((pv) => ({
+				move_uci: pv.move_uci,
+				move_san: pv.move_san,
+				eval_cp: pv.eval_cp,
+			})),
 			evalBeforeCp: before.evalCp,
 			evalAfterCp: after.evalCp,
 			evalDeltaCp: evalDelta,

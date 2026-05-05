@@ -184,6 +184,10 @@ export const moves = pgTable(
 
 		engineBestUci: text("engine_best_uci"),
 		engineBestSan: text("engine_best_san"),
+		alternativeMoves:
+			jsonb("alternative_moves").$type<
+				Array<{ move_uci: string; move_san: string; eval_cp: number }>
+			>(),
 		evalBeforeCp: integer("eval_before_cp"),
 		evalAfterCp: integer("eval_after_cp"),
 		// Player-perspective eval delta (positive = good for the side that moved)
@@ -320,6 +324,12 @@ export type Concept =
 // Still produced inside the worker for downstream computations even though
 // it's no longer persisted as a JSONB column — analysis output now lives in
 // the `moves` table. Will likely be replaced entirely in a later phase.
+export type AlternativeMove = {
+	move_uci: string;
+	move_san: string;
+	eval_cp: number;
+};
+
 export type MoveAnalysis = {
 	ply: number;
 	san: string;
@@ -331,6 +341,7 @@ export type MoveAnalysis = {
 	eval_delta: number;
 	best_move_uci: string;
 	best_move_san: string;
+	alternative_moves: AlternativeMove[] | null;
 	classification: MoveClassification;
 	is_player_move: boolean;
 };

@@ -38,11 +38,11 @@ export function MoveCell({ move, active, onClick }: MoveCellProps) {
 		<button
 			type="button"
 			onClick={onClick}
-			className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 mono-nums font-mono text-xs-plus transition-colors duration-100 ${
+			className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 mono-nums font-mono text-sm transition-colors duration-100 ${
 				active
 					? "border-accent-brand/40 bg-tint-data-6 text-fg-1"
 					: `border-transparent bg-transparent ${TEXT[move.classification]} hover:bg-surface-2`
-			}`}
+			} ${symbol ? "font-bold" : "font-medium"}`}
 		>
 			<span>{move.san}</span>
 			{symbol && <span className="font-semibold text-2xs">{symbol}</span>}

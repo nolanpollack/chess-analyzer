@@ -17,6 +17,7 @@ function makeMove(overrides: Partial<Move>): Move {
 		fenAfter: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
 		engineBestUci: "e2e4",
 		engineBestSan: "e4",
+		alternativeMoves: null,
 		evalBeforeCp: 0,
 		evalAfterCp: 20,
 		evalDeltaCp: 20,
