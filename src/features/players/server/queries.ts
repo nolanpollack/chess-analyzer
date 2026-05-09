@@ -1,13 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import z from "zod";
 import { db } from "#/db/index";
 import { players } from "#/db/schema";
-import { ensureQueue, getBoss } from "#/lib/queue";
-import {
-	SYNC_GAMES_QUEUE,
-	type SyncGamesPayload,
-} from "#/worker/jobs/sync-games";
+import { SYNC_GAMES_QUEUE } from "#/worker/jobs/sync-games";
 
 export const getPlayerStatus = createServerFn({ method: "GET" })
 	.inputValidator(
@@ -30,20 +26,21 @@ export const getPlayerStatus = createServerFn({ method: "GET" })
 
 			// Determine sync status:
 			// - If lastSyncedAt is null, initial sync hasn't completed yet
-			// - Otherwise check for queued/active jobs via findJobs
+			// - Otherwise query pgboss directly for queued OR active jobs.
+			//   findJobs({ queued: true }) only matches state < 'active', so it
+			//   misses jobs the worker has already picked up. Raw SQL catches all
+			//   live states ('created', 'retry', 'active').
 			let isSyncing = player.lastSyncedAt === null;
 
 			if (!isSyncing) {
-				await ensureQueue(SYNC_GAMES_QUEUE);
-				const boss = await getBoss();
-				const pendingJobs = await boss.findJobs<SyncGamesPayload>(
-					SYNC_GAMES_QUEUE,
-					{
-						queued: true,
-						data: { playerId: player.id },
-					},
-				);
-				isSyncing = pendingJobs.length > 0;
+				const result = await db.execute(sql`
+					SELECT COUNT(*)::int AS count
+					FROM pgboss.job
+					WHERE name = ${SYNC_GAMES_QUEUE}
+					AND state IN ('created', 'retry', 'active')
+					AND data->>'playerId' = ${player.id}
+				`);
+				isSyncing = (result.rows[0]?.count as number) > 0;
 			}
 
 			return {
